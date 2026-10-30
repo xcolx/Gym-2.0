@@ -1,0 +1,69 @@
+# Weekly update pull requests for the dependencies. The commit message prefixes make the titles pass the PR title
+# check (Conventional Commits, see CONTRIBUTING.md). Minor and patch updates come grouped in one pull request per
+# ecosystem, major updates each in their own.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(web)
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /infra/mailserver
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(infra)
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(backend)
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  # The images of the Dockerfiles and the compose files. A new major version of Node, Python or PostgreSQL also has to
+  # change the versions in ci.yml and usually needs more work, so those are updated by hand.
+  - package-ecosystem: docker
+    directories: [/infra, /infra/backup, /infra/mailserver, /infra/offsite-backup]
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build(infra)
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: python # 3.14 is also the version in ci.yml
+        update-types: ["version-update:semver-minor"]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
