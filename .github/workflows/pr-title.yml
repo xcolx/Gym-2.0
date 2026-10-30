@@ -1,0 +1,36 @@
+# Checks that the title of every pull request into main follows the commit message format of CONTRIBUTING.md
+# (Conventional Commits), since a squash merge makes the title the first line of the commit.
+name: PR title
+
+on:
+  pull_request:
+    # edited: the title changed; the others so the check reports on every new head commit too
+    types: [opened, edited, reopened, synchronize]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  title:
+    name: PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the title
+        # The title comes in through env, never directly in the script, so it can't inject shell code
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          types='feat|fix|perf|refactor|test|docs|build|ci|chore|revert'
+          scopes='ios|web|backend|infra'
+          pattern="^($types)(\(($scopes)\))?!?: [^A-Z ].*[^. ]$"
+          echo "Title: $TITLE"
+          if [[ ! "$TITLE" =~ $pattern ]]; then
+            echo "::error::The title must look like '<type>(<scope>): <summary>', e.g. 'fix(ios): keep the keyboard open'." \
+              "Types: ${types//|/, }. Scopes (optional): ${scopes//|/, }. The summary starts with a lowercase letter and" \
+              "has no period at the end. See Commit messages in CONTRIBUTING.md."
+            exit 1
+          fi
+          if (( ${#TITLE} > 72 )); then
+            echo "::error::The title has ${#TITLE} characters, at most 72 are allowed."
+            exit 1
+          fi

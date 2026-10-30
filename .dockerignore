@@ -1,0 +1,13 @@
+# The Dockerfiles only copy what they need, this keeps the build context small and free of secrets
+.git
+**/.env
+**/.env.*
+.venv
+**/.venv
+**/__pycache__
+**/node_modules
+**/.DS_Store
+web/.next
+backend/data
+assets
+ios

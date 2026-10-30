@@ -1,0 +1,78 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+
+# Windows
+Thumbs.db
+
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+
+# Xcode
+DerivedData/
+build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+*.xcuserstate
+.build/
+*.xcarchive
+timeline.xctimeline
+playground.xcworkspace
+.swiftpm/
+
+# Secrets / Environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+
+# Next.js 
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Docker / Infra
+docker-data/
+postgres-data/
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Idea
+.idea
+
+# Locally stored uploaded images
+backend/data/

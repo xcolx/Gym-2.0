@@ -1,0 +1,104 @@
+services:
+  web:
+    build:
+      dockerfile: infra/web.Dockerfile
+      target: dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    # The anonymous node_modules volume outlives rebuilds, so the dependencies are installed again on start whenever
+    # package-lock.json changed (after a change: docker compose restart web). npm install, since npm ci removes the
+    # node_modules directory, which fails on a mount point.
+    command: >-
+      sh -c 'sha=$$(sha1sum package-lock.json);
+      [ "$$(cat node_modules/.lock-sha 2>/dev/null)" = "$$sha" ] ||
+      { npm install --no-audit --no-fund && echo "$$sha" > node_modules/.lock-sha; };
+      exec npm run dev'
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      # Where the proxy of /api/* sends the requests (web/src/proxy.ts), localhost would be this container
+      BACKEND_URL: http://backend:5000
+  
+  db:
+    image: postgres:18-alpine
+    container_name: gym_db_dev
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: gym2_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+  flyway:
+    image: flyway/flyway:13-alpine
+    command: -url=jdbc:postgresql://db:5432/gym2_db -user=admin -password=dev_password -connectRetries=60 migrate
+    volumes:
+      - ./backend/db/migrations:/flyway/sql
+    depends_on:
+      - db
+
+  backend:
+    build:
+      dockerfile: infra/backend.Dockerfile
+    environment:
+      DATABASE_URL: postgresql://admin:dev_password@db:5432/gym2_db
+      ENVIRONMENT: development
+      MAILSERVER_URL: http://mailserver:5003
+      IMAGE_STORAGE_PATH: /data/images
+    networks:
+      - default
+      - mail
+    volumes:
+      - images:/data/images
+    ports:
+      - "5000:5000"
+    depends_on:
+      flyway:
+        condition: service_completed_successfully # Waits for migrations to finish
+
+  # Removes old data every day at 01:00 UTC, run it right away with:
+  #   docker compose run --rm maintenance python -m app.jobs.prune --once
+  maintenance:
+    build:
+      dockerfile: infra/backend.Dockerfile
+    command: ["python", "-m", "app.jobs.prune"]
+    environment:
+      DATABASE_URL: postgresql://admin:dev_password@db:5432/gym2_db
+      ENVIRONMENT: development
+      IMAGE_STORAGE_PATH: /data/images
+    volumes:
+      - images:/data/images
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+
+  mailserver:
+    build:
+      dockerfile: infra/mailserver/Dockerfile
+    # On docker stop the mailserver finishes the emails being sent (each SMTP step may take up to 15 s) before exiting
+    stop_grace_period: 30s
+    environment:
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      VERIFY_URL: ${VERIFY_URL:-http://localhost:5000/v1/auth/verify-email}
+      RESET_URL: ${RESET_URL:-http://localhost:5000/v1/auth/reset-password}
+    networks:
+      - mail
+      - mail-egress
+    restart: unless-stopped
+
+# Only the backend can reach the mailserver, like in production (see docker-compose.prod.yml)
+networks:
+  mail:
+    internal: true
+  mail-egress:
+
+volumes:
+  postgres_data:
+  images:

@@ -1,0 +1,71 @@
+{% extends "sqladmin/layout.html" %}
+{% block content_header %}
+<h2 class="page-title">Merge exercises</h2>
+{% endblock %}
+{% block content %}
+<div class="col-12">
+  <div class="card">
+    <div class="card-body">
+      <p>
+        The exercises below are replaced by the exercise you enter in every workout and scheme that uses them,
+        and are deleted afterwards. The users receive the change with their next sync. The exercise to keep has to
+        track the same metrics, since the sets of the workouts are kept as they are.
+      </p>
+      {% if exercises %}
+      <table class="table table-vcenter card-table mb-4">
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Created by</th><th>Verified</th><th>Metrics</th><th>Workout uses</th><th>Scheme uses</th></tr>
+        </thead>
+        <tbody>
+          {% for exercise in exercises %}
+          <tr>
+            <td><a href="{{ url_for('admin:details', identity='exercise', pk=exercise.id) }}">{{ exercise.id }}</a></td>
+            <td>{{ exercise.name }}{% if exercise.deleted_at %} <span class="badge">Deleted</span>{% endif %}</td>
+            <td>
+              {% if exercise.user_id %}<a href="{{ url_for('admin:details', identity='user', pk=exercise.user_id) }}">{{ exercise.user_id }}</a>{% else %}Admin{% endif %}
+            </td>
+            <td>{{ "Yes" if exercise.verified else "No" }}</td>
+            <td>{{ exercise.metrics }}</td>
+            <td>{{ exercise.workouts }}</td>
+            <td>{{ exercise.schemes }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      {% if error %}
+      <div class="alert alert-danger" role="alert">{{ error }}</div>
+      {% endif %}
+      <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="pks" value="{{ pks }}">
+        <div class="col-auto">
+          <label class="form-label" for="into">ID of the exercise to keep</label>
+          <input class="form-control" id="into" name="into" value="{{ into }}" inputmode="numeric" required autofocus>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary">Merge</button>
+          <a href="{{ url_for('admin:list', identity=model_view.identity) }}" class="btn">Cancel</a>
+        </div>
+      </form>
+      {% if similar %}
+      <h3 class="mt-5">Similar verified exercises</h3>
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Metrics</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for exercise in similar %}
+          <tr>
+            <td><a href="{{ url_for('admin:details', identity='exercise', pk=exercise.id) }}">{{ exercise.id }}</a></td>
+            <td>{{ exercise.name }}</td>
+            <td>{{ exercise.metrics }}</td>
+            <td><button type="button" class="btn btn-sm" onclick="document.getElementById('into').value = '{{ exercise.id }}'">Use this ID</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

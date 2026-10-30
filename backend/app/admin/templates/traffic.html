@@ -1,0 +1,172 @@
+{% extends "sqladmin/layout.html" %}
+{% macro totals_cells(totals, all) %}
+<td class="text-end text-nowrap">{{ "{:,}".format(totals.requests) }}</td>
+<td class="text-end text-nowrap text-secondary">{{ all.share(totals.requests) }}</td>
+<td class="text-end text-nowrap">{{ "{:,}".format(totals.client_errors) }}</td>
+<td class="text-end text-nowrap{% if totals.server_errors %} text-danger{% endif %}">{{ "{:,}".format(totals.server_errors) }}</td>
+<td class="text-end text-nowrap">{{ totals.average_ms }}</td>
+{% endmacro %}
+{% macro totals_headers() %}
+<th class="text-end text-nowrap">Requests</th><th class="text-end text-nowrap">Share</th><th class="text-end text-nowrap">4xx</th><th class="text-end text-nowrap">5xx</th><th class="text-end text-nowrap">Avg</th>
+{% endmacro %}
+{% block content_header %}
+<h2 class="page-title">Traffic</h2>
+{% endblock %}
+{% block content %}
+<div class="col-12">
+  <div class="w-100">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <div class="btn-group">
+      {% for key, option in periods.items() %}
+      <a href="?period={{ key }}" class="btn btn-sm {% if key == period %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ option.label }}</a>
+      {% endfor %}
+    </div>
+    <span class="text-secondary small">
+      API requests without the admin and the healthchecks, counted per hour (UTC) and written once a minute.
+      Durations are measured in the backend, p95 is the bucket ({{ duration_buckets | join(", ") }} ms) it falls into.
+    </span>
+  </div>
+
+  <div class="row row-cards mb-4">
+    {% for label, value in [
+      ("Requests", "{:,}".format(totals.requests)),
+      ("Client errors (4xx)", "{:,} · {}".format(totals.client_errors, totals.share(totals.client_errors))),
+      ("Server errors (5xx)", "{:,} · {}".format(totals.server_errors, totals.share(totals.server_errors))),
+      ("Rate limited (429)", "{:,}".format(totals.rate_limited)),
+      ("Average duration", totals.average_ms),
+      ("p95 duration", p95),
+      ("Slowest request", "{:,} ms".format(totals.duration_ms_max) if totals.requests else "–"),
+    ] %}
+    <div class="col-sm-6 col-lg-3">
+      <div class="card card-sm">
+        <div class="card-body">
+          <div class="subheader">{{ label }}</div>
+          <div class="h1 mb-0 mt-2">{{ value }}</div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header">
+      <h3 class="card-title">Requests per {{ unit }}</h3>
+      <div class="card-actions small text-secondary">
+        max {{ "{:,}".format(bar_max) }} ·
+        <span style="color: var(--tblr-success)">■</span> 1xx–3xx
+        <span style="color: var(--tblr-warning)">■</span> 4xx
+        <span style="color: var(--tblr-danger)">■</span> 5xx
+      </div>
+    </div>
+    <div class="card-body">
+      {% set scale = 100 / bar_max if bar_max else 0 %}
+      <svg viewBox="0 0 {{ bars | length * 10 }} 100" preserveAspectRatio="none" style="width: 100%; height: 180px; display: block">
+        {% for bar in bars %}
+        {% set x = loop.index0 * 10 + 1 %}
+        {% set ok_h = bar.ok * scale %}{% set client_h = bar.client_errors * scale %}{% set server_h = bar.server_errors * scale %}
+        <g>
+          <title>{{ bar.start.strftime("%Y-%m-%d %H:%M" if unit == "hour" else "%Y-%m-%d") }} UTC: {{ bar.total }} requests, {{ bar.client_errors }} 4xx, {{ bar.server_errors }} 5xx</title>
+          <rect x="{{ x - 1 }}" y="0" width="10" height="100" fill="transparent"></rect>
+          <rect x="{{ x }}" y="{{ 100 - ok_h }}" width="8" height="{{ ok_h }}" fill="var(--tblr-success)"></rect>
+          <rect x="{{ x }}" y="{{ 100 - ok_h - client_h }}" width="8" height="{{ client_h }}" fill="var(--tblr-warning)"></rect>
+          <rect x="{{ x }}" y="{{ 100 - ok_h - client_h - server_h }}" width="8" height="{{ server_h }}" fill="var(--tblr-danger)"></rect>
+        </g>
+        {% endfor %}
+      </svg>
+      <div class="d-flex justify-content-between small text-secondary mt-1">
+        <span>{{ bars[0].start.strftime("%Y-%m-%d %H:%M") }} UTC</span>
+        <span>{{ bars[-1].start.strftime("%Y-%m-%d %H:%M") }} UTC</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h3 class="card-title">Endpoints</h3></div>
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead><tr><th>Endpoint</th>{{ totals_headers() }}<th class="text-end text-nowrap">p95</th><th class="text-end text-nowrap">Max</th></tr></thead>
+        <tbody>
+          {% for row in endpoints %}
+          <tr>
+            <td><code>{{ row.label }}</code></td>
+            {{ totals_cells(row.totals, totals) }}
+            <td class="text-end text-nowrap">{{ row.p95 }}</td>
+            <td class="text-end text-nowrap">{{ "{:,}".format(row.totals.duration_ms_max) }} ms</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-secondary">No requests in this period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row row-cards mb-4">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Platforms</h3></div>
+        <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead><tr><th>Platform</th>{{ totals_headers() }}</tr></thead>
+          <tbody>
+            {% for row in platforms %}
+            <tr><td>{{ row.label }}</td>{{ totals_cells(row.totals, totals) }}</tr>
+            {% else %}
+            <tr><td colspan="6" class="text-secondary">No requests in this period.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Status codes</h3></div>
+        <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead><tr><th>Status</th><th class="text-end text-nowrap">Requests</th><th class="text-end text-nowrap">Share</th><th class="text-end text-nowrap">Avg</th></tr></thead>
+          <tbody>
+            {% for row in statuses %}
+            <tr>
+              <td{% if row.label >= "500" %} class="text-danger"{% endif %}>{{ row.label }}</td>
+              <td class="text-end text-nowrap">{{ "{:,}".format(row.totals.requests) }}</td>
+              <td class="text-end text-nowrap text-secondary">{{ totals.share(row.totals.requests) }}</td>
+              <td class="text-end text-nowrap">{{ row.totals.average_ms }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-secondary">No requests in this period.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header">
+      <h3 class="card-title">API versions</h3>
+      <div class="card-actions small text-secondary">All stored stats, not only the selected period</div>
+    </div>
+    <div class="table-responsive">
+    <table class="table table-vcenter card-table">
+      <thead><tr><th>Version</th><th class="text-end text-nowrap">Requests</th><th class="text-end text-nowrap">4xx</th><th class="text-end text-nowrap">5xx</th><th class="text-end text-nowrap">Last request</th></tr></thead>
+      <tbody>
+        {% for row in versions %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td class="text-end text-nowrap">{{ "{:,}".format(row.totals.requests) }}</td>
+          <td class="text-end text-nowrap">{{ "{:,}".format(row.totals.client_errors) }}</td>
+          <td class="text-end text-nowrap">{{ "{:,}".format(row.totals.server_errors) }}</td>
+          <td class="text-end text-nowrap">{{ row.last_seen.strftime("%Y-%m-%d %H:00") }} UTC</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-secondary">No requests stored.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  </div>
+</div>
+{% endblock %}

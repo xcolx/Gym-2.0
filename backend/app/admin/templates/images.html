@@ -1,0 +1,59 @@
+{% extends "sqladmin/layout.html" %}
+{% block content_header %}
+<h2 class="page-title">Images</h2>
+{% endblock %}
+{% block content %}
+<div class="col-12">
+  <div class="w-100">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <div class="btn-group">
+      {% for key, option in kinds.items() %}
+      <a href="?type={{ key }}" class="btn btn-sm {% if key == kind_key %}btn-primary{% else %}btn-outline-primary{% endif %}">
+        {{ option.label }} ({{ "{:,}".format(counts[key]) }})
+      </a>
+      {% endfor %}
+    </div>
+    <span class="text-secondary small">Newest first. Remove takes the image away for good, the apps receive the change with their next sync.</span>
+  </div>
+
+  <div class="row row-cards mb-4">
+    {% for tile in tiles %}
+    {% set image_url = url_for("image", image_hash=tile.image_hash) %}
+    <div class="col-6 col-sm-4 col-md-3 col-xl-2">
+      <div class="card card-sm">
+        <a href="{{ image_url }}" target="_blank" class="d-block" style="aspect-ratio: 1; background: var(--tblr-bg-surface-secondary)">
+          <img src="{{ image_url }}" loading="lazy" class="card-img-top" style="width: 100%; height: 100%; object-fit: contain">
+        </a>
+        <div class="card-body small">
+          <div class="text-truncate">
+            <a href="{{ url_for('admin:details', identity=tile.identity, pk=tile.pk) }}">{{ tile.label }}</a>
+          </div>
+          <div class="text-secondary">
+            {{ tile.date.strftime("%Y-%m-%d %H:%M") ~ " UTC" if tile.date else "–" }}
+            {% if tile.deleted %}<span class="badge bg-red-lt ms-1">deleted</span>{% endif %}
+          </div>
+          {% if kind.remove_action %}
+          <a href="{{ url_for('admin:action-' ~ kind.identity ~ '-' ~ kind.remove_action) }}?pks={{ tile.pk }}"
+             class="btn btn-outline-danger btn-sm mt-2 w-100"
+             onclick="return confirm({{ kind.remove_confirm | tojson | forceescape }})">Remove</a>
+          {% else %}
+          <a href="{{ url_for('admin:edit', identity=kind.identity, pk=tile.pk) }}" class="btn btn-outline-primary btn-sm mt-2 w-100">Edit</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-secondary">No images.</div>
+    {% endfor %}
+  </div>
+
+  {% if pages > 1 %}
+  <ul class="pagination">
+    <li class="page-item{% if page <= 1 %} disabled{% endif %}"><a class="page-link" href="?type={{ kind_key }}&page={{ page - 1 }}">Previous</a></li>
+    <li class="page-item disabled"><span class="page-link">Page {{ page }} of {{ pages }}</span></li>
+    <li class="page-item{% if page >= pages %} disabled{% endif %}"><a class="page-link" href="?type={{ kind_key }}&page={{ page + 1 }}">Next</a></li>
+  </ul>
+  {% endif %}
+  </div>
+</div>
+{% endblock %}

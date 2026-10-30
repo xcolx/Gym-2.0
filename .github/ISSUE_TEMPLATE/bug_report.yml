@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in the iOS app, the web app or the API doesn't work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. For security problems, don't open an issue, report them privately as described
+        in [SECURITY.md](https://github.com/xcolx/Gym-2.0/blob/main/SECURITY.md).
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - iOS app
+        - Web app
+        - Both
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Device and version
+      description: The device and its iOS version, or the browser and its version, and the app version if you know it.
+      placeholder: iPhone 15, iOS 26.1, app 3.0 / Firefox 144 on Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a workout
+        2. Add an exercise
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happens
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, error messages, how often it happens. Leave out personal data like your email address.

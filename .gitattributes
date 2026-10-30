@@ -1,0 +1,11 @@
+# Normalize line endings to LF in the repository.
+* text=auto
+
+# Generated files: left out of the GitHub language stats and collapsed in pull request diffs.
+package-lock.json linguist-generated
+*.pbxproj linguist-generated
+*.xcworkspacedata linguist-generated
+*.xcscheme linguist-generated
+
+# The admin templates are Jinja, not plain HTML.
+backend/app/admin/templates/*.html linguist-language=Jinja

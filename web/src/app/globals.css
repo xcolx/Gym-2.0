@@ -1,0 +1,230 @@
+@import "tailwindcss";
+
+/*
+ * Light, dark or the system appearance (Settings → Appearance, lib/theme.ts): <html data-theme="light|dark"> forces
+ * one, without the attribute the system decides. `dark:` utilities follow the same rule.
+ */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+/*
+ * Design tokens mirroring the iOS app (Assets.xcassets + UIKit system colors).
+ * "my-black" / "my-white" invert in dark mode exactly like the MyBlack / MyWhite color sets.
+ */
+:root {
+  color-scheme: light dark;
+  --app-color: #ff0000; /* overridden at runtime from Settings → App Color */
+  --background: #ffffff;
+  --foreground: #000000;
+  --my-black: #000000;
+  --my-white: #ffffff;
+  --my-gray: #666666;
+  --secondary-label: rgba(60, 60, 67, 0.6);
+  --field: rgba(128, 128, 128, 0.3);
+  --separator: rgba(60, 60, 67, 0.29);
+  --bar-bg: rgba(249, 249, 249, 0.94);
+  --tab-inactive: #999999;
+  --banner: #34c759;
+  --secondary-muscle: #ff9500;
+  /* systemGroupedBackground behind the sections of a Form, secondarySystemGroupedBackground of its cells */
+  --grouped-bg: #f2f2f7;
+  --cell-bg: #ffffff;
+  --tabbar-h: 49px;
+  --sidebar-w: 240px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* The dark tokens, twice: for the system appearance and for the forced dark theme. Keep both blocks the same. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #000000;
+    --foreground: #ffffff;
+    --my-black: #ffffff;
+    --my-white: #000000;
+    --my-gray: #999999;
+    --secondary-label: rgba(235, 235, 245, 0.6);
+    --separator: rgba(84, 84, 88, 0.6);
+    --bar-bg: rgba(22, 22, 22, 0.94);
+    --tab-inactive: #8e8e93;
+    --banner: #30d158;
+    --secondary-muscle: #ff9f0a;
+    --grouped-bg: #000000;
+    --cell-bg: #1c1c1e;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #000000;
+  --foreground: #ffffff;
+  --my-black: #ffffff;
+  --my-white: #000000;
+  --my-gray: #999999;
+  --secondary-label: rgba(235, 235, 245, 0.6);
+  --separator: rgba(84, 84, 88, 0.6);
+  --bar-bg: rgba(22, 22, 22, 0.94);
+  --tab-inactive: #8e8e93;
+  --banner: #30d158;
+  --secondary-muscle: #ff9f0a;
+  --grouped-bg: #000000;
+  --cell-bg: #1c1c1e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-app: var(--app-color);
+  --color-my-black: var(--my-black);
+  --color-my-white: var(--my-white);
+  --color-my-gray: var(--my-gray);
+  --color-secondary-label: var(--secondary-label);
+  --color-field: var(--field);
+  --color-separator: var(--separator);
+  --color-bar: var(--bar-bg);
+  --color-tab-inactive: var(--tab-inactive);
+  --color-banner: var(--banner);
+  --color-grouped: var(--grouped-bg);
+  --color-cell: var(--cell-bg);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue",
+    Helvetica, Arial, sans-serif;
+
+  /* iOS Dynamic Type sizes (default content size) */
+  --text-large-title: 34px;
+  --text-large-title--line-height: 41px;
+  --text-title: 28px;
+  --text-title--line-height: 34px;
+  --text-title2: 22px;
+  --text-title2--line-height: 28px;
+  --text-headline: 17px;
+  --text-headline--line-height: 22px;
+  --text-body: 17px;
+  --text-body--line-height: 22px;
+  --text-footnote: 13px;
+  --text-footnote--line-height: 18px;
+  --text-caption: 10px;
+  --text-caption--line-height: 12px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 22px;
+  accent-color: var(--app-color);
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+
+/*
+ * The focus indicator of the text fields, which draw no outline of their own (like on iOS): a ring in the app color
+ * inside the frame, so a scrolling or rounded container never clips it. `focus-ring` on a field with its own background
+ * or border, `focus-ring-within` on the row or search bar around a transparent field. Buttons and links keep the focus
+ * ring of the browser.
+ */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--app-color);
+    outline-offset: -2px;
+  }
+}
+@utility focus-ring-within {
+  &:has(:is(input, textarea, select):focus-visible) {
+    outline: 2px solid var(--app-color);
+    outline-offset: -2px;
+  }
+}
+
+input[type="range"].ios-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 28px;
+  background: transparent;
+}
+input[type="range"].ios-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--app-color) 0 var(--fill, 50%),
+    var(--field) var(--fill, 50%) 100%
+  );
+}
+input[type="range"].ios-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--field);
+}
+input[type="range"].ios-slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--app-color);
+}
+input[type="range"].ios-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.12), 0 6px 13px rgba(0, 0, 0, 0.12);
+}
+input[type="range"].ios-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.12), 0 6px 13px rgba(0, 0, 0, 0.12);
+}
+
+/* The landing page (components/landing): the cards floating around the start button and the pulse of the button */
+@keyframes landing-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+@keyframes landing-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+/* Height available to a page: full viewport minus the bottom tab bar (phone) */
+.screen {
+  min-height: calc(100dvh - var(--tabbar-h) - env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .screen {
+    min-height: 100dvh;
+  }
+}

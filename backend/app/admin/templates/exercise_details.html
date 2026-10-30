@@ -1,0 +1,32 @@
+{% extends "sqladmin/details.html" %}
+{% block details_table %}
+{{ super() }}
+<div class="card-body border-top">
+  <h3 class="card-title">
+    Muscles
+    <small class="ms-2"><a href="{{ url_for('admin:list', identity='exercise-muscle') }}?exercise_id={{ model.id }}">Edit</a></small>
+  </h3>
+  {% set muscles = request.state.exercise_muscles %}
+  {% if muscles %}
+  <table class="table table-vcenter card-table">
+    <tbody>
+      {% for muscle in muscles %}
+      <tr>
+        <td class="w-1">
+          {% if muscle.image_url %}
+          <img src="{{ url_for('image', image_hash=muscle.image_url) }}" loading="lazy" style="max-width:40px;max-height:40px;border-radius:4px">
+          {% endif %}
+        </td>
+        <td><a href="{{ url_for('admin:details', identity='muscle', pk=muscle.id) }}">{{ muscle.name }}</a></td>
+        <td>
+          {% if muscle.is_primary %}<span class="badge bg-primary text-white">Primary</span>{% else %}<span class="badge">Secondary</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-secondary mb-0">No muscles assigned.</p>
+  {% endif %}
+</div>
+{% endblock %}

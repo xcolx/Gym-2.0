@@ -1,0 +1,228 @@
+# Production stack. Start/update with:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Secrets are read from the .env file next to this file (see .env.example).
+#
+# Data is stored on the host in /data/postgres and /data/images, the nightly database dumps in /data/backups.
+# One-time setup before the first start (the backend runs as UID 999 and needs write access to the images, postgres sets
+# up its directory itself), then initialize the offsite backup repository (see infra/README.md, Backups):
+#   sudo mkdir -p /data/postgres /data/images /data/backups && sudo chown 999:999 /data/images
+# TLS and the public domains are handled by the reverse proxy in front of the published ports.
+#
+# Client addresses (rate limits, login IP): requests go client → Cloudflare → reverse proxy (Traefik, 192.168.4.101)
+# → web or backend. Cloudflare and Traefik both append to X-Forwarded-For, so it arrives as
+# "<anything the client sent>, <client>, <Cloudflare>", or "<client>" alone for a request that skipped Cloudflare
+# (Traefik replaces the header of senders it doesn't trust). The web server forwards its last TRUSTED_PROXY_HOPS
+# entries, and uvicorn reads the header from the right, skipping the proxies in FORWARDED_ALLOW_IPS: the first
+# address it doesn't trust is the client, whatever the client wrote in front of it.
+
+name: gym2-prod
+
+# The logs contain IP addresses, so they go to the host's journal, which deletes them after at most 15 days (set up by
+# gym2-vm/bootstrap/prepare-host.sh in homeserver-infra, as promised in the privacy policy). Read them with
+# docker compose logs or journalctl CONTAINER_TAG=<container name>.
+x-logging: &default-logging
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
+# A fixed subnet, so the web server gets a fixed address whose X-Forwarded-For the backend trusts (FORWARDED_ALLOW_IPS).
+# Not the whole subnet: it contains the gateway (172.30.0.1), the source of connections through docker-proxy (from the
+# host itself, over IPv6), whose X-Forwarded-For anyone can write. Changes to the network need a down and up.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          # Addresses of the containers without a fixed one, so they never take the fixed ones below
+          ip_range: 172.30.0.128/25
+  # The mailserver sends whatever email it is asked to, so only the backend can reach it: the two share this network,
+  # which has no connection to the outside, and the mailserver isn't on the default network
+  mail:
+    internal: true
+  # The mailserver's own way out to the SMTP server, no other container is on it
+  mail-egress:
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: infra/web.Dockerfile
+      target: runner
+    restart: unless-stopped
+    environment:
+      # Where the proxy of /api/* sends the requests (web/src/proxy.ts)
+      BACKEND_URL: http://backend:5000
+      # Cloudflare and Traefik: forwards "<client>, <Cloudflare>" (or "<client>" without Cloudflare) to the backend
+      TRUSTED_PROXY_HOPS: "2"
+    networks:
+      default:
+        # Fixed, so the backend trusts only the web server's X-Forwarded-For (FORWARDED_ALLOW_IPS)
+        ipv4_address: 172.30.0.10
+    ports:
+      - "3000:3000"
+    healthcheck:
+      # The site and, through the proxy of /api/* (BACKEND_URL), the backend's /health, so a deploy whose web can't
+      # reach the backend fails and is rolled back
+      test: ["CMD", "node", "-e", "Promise.all(['/', '/api/health'].map(p => fetch('http://127.0.0.1:3000' + p))).then(rs => process.exit(rs.every(r => r.ok) ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging: *default-logging
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gym2
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: gym2_db
+    volumes:
+      - /data/postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gym2 -d gym2_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+
+  flyway:
+    image: flyway/flyway:13-alpine
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://db:5432/gym2_db
+      FLYWAY_USER: gym2
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      FLYWAY_CONNECT_RETRIES: 60
+    volumes:
+      - ./backend/db/migrations:/flyway/sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    logging: *default-logging
+
+  backend:
+    build:
+      context: .
+      dockerfile: infra/backend.Dockerfile
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+      DATABASE_URL: postgresql://gym2:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@db:5432/gym2_db
+      MAILSERVER_URL: http://mailserver:5003
+      ADMIN_HOST: admin.gym2.app
+      # The internal Ollama server that answers the AI conversations
+      OLLAMA_URL: http://192.168.4.108:5000
+      OLLAMA_MODEL: qwen3.5:4b-q4_K_M
+      IMAGE_STORAGE_PATH: /data/images
+      DEPRECATED_API_VERSIONS: ${DEPRECATED_API_VERSIONS:-[]}
+      RETIRED_API_VERSIONS: ${RETIRED_API_VERSIONS:-[]}
+      # The proxies whose X-Forwarded-* headers are trusted, so https:// URLs and client IPs are correct: the reverse
+      # proxy, the web server (its fixed address) and Cloudflare (https://www.cloudflare.com/ips/, keep in sync with
+      # x-cloudflare-ips in homeserver-infra's reverse-proxy-vm/traefik/traefik.yaml). Never "*": uvicorn then takes
+      # the first X-Forwarded-For entry, which the client writes.
+      FORWARDED_ALLOW_IPS: >-
+        192.168.4.101, 172.30.0.10,
+        173.245.48.0/20, 103.21.244.0/22, 103.22.200.0/22, 103.31.4.0/22, 141.101.64.0/18, 108.162.192.0/18,
+        190.93.240.0/20, 188.114.96.0/20, 197.234.240.0/22, 198.41.128.0/17, 162.158.0.0/15, 104.16.0.0/13,
+        104.24.0.0/14, 172.64.0.0/13, 131.0.72.0/22,
+        2400:cb00::/32, 2606:4700::/32, 2803:f800::/32, 2405:b500::/32, 2405:8100::/32, 2a06:98c0::/29, 2c0f:f248::/32
+    networks:
+      - default
+      - mail
+    volumes:
+      - /data/images:/data/images
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      db:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully # Waits for migrations to finish
+      mailserver:
+        condition: service_started
+    logging: *default-logging
+
+  # Removes old data every day at 01:00 UTC (backend/app/jobs/prune.py): rows soft deleted more than 30 days ago and
+  # accounts not verified within 3 days, with their images. Same image as the backend, no published port.
+  maintenance:
+    build:
+      context: .
+      dockerfile: infra/backend.Dockerfile
+    command: ["python", "-m", "app.jobs.prune"]
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set in .env}
+      DATABASE_URL: postgresql://gym2:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@db:5432/gym2_db
+      IMAGE_STORAGE_PATH: /data/images
+    volumes:
+      - /data/images:/data/images
+    depends_on:
+      db:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+    logging: *default-logging
+
+  # Only reachable by the backend (network mail), no published port
+  mailserver:
+    build:
+      context: .
+      dockerfile: infra/mailserver/Dockerfile
+    restart: unless-stopped
+    # On docker stop the mailserver finishes the emails being sent (each SMTP step may take up to 15 s) before exiting
+    stop_grace_period: 30s
+    environment:
+      EMAIL_USER: ${EMAIL_USER:?EMAIL_USER must be set in .env}
+      EMAIL_PASS: ${EMAIL_PASS:?EMAIL_PASS must be set in .env}
+      VERIFY_URL: https://api.gym2.app/v1/auth/verify-email
+      RESET_URL: https://api.gym2.app/v1/auth/reset-password
+      # The mail server is in the same DMZ (mail-vm on VM102), reached directly instead of out through VM100 and
+      # back in through the public edge. By address, see SMTP_HOST in infra/mailserver/server.js.
+      SMTP_HOST: 192.168.4.102
+    networks:
+      - mail
+      - mail-egress
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5003/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+
+  # Nightly database dump and offsite backup of the dump and the images with restic, see infra/README.md (Backups)
+  backup:
+    build:
+      context: .
+      dockerfile: infra/backup/Dockerfile
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: gym2
+      PGDATABASE: gym2_db
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:?RESTIC_REPOSITORY must be set in .env}
+      RESTIC_REST_USERNAME: ${RESTIC_REST_USERNAME:?RESTIC_REST_USERNAME must be set in .env}
+      RESTIC_REST_PASSWORD: ${RESTIC_REST_PASSWORD:?RESTIC_REST_PASSWORD must be set in .env}
+      RESTIC_PASSWORD: ${RESTIC_PASSWORD:?RESTIC_PASSWORD must be set in .env}
+      BACKUP_HEALTHCHECK_URL: ${BACKUP_HEALTHCHECK_URL:?BACKUP_HEALTHCHECK_URL must be set in .env}
+    volumes:
+      - /data/backups:/backups
+      - /data/images:/data/images:ro
+      - restic-cache:/root/.cache/restic
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *default-logging
+
+volumes:
+  restic-cache:

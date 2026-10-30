@@ -1,0 +1,28 @@
+# Gym 2.0
+
+> Gym 2.0 is a free, open source workout tracker for iPhone and the web. It logs your sets, shows on a body map which muscles you trained, suggests workouts for the muscles you haven't trained this week and lets you train with friends. No ads, no tracking, hosted in Switzerland.
+
+- Web app: https://gym2.app (also installable on Android from the browser)
+- iPhone app (iOS 17 or later): https://apps.apple.com/app/id6695759065
+- Price: free, an account is needed to use the app
+
+## Features
+
+- Log every set: reps, weight, time, intensity and distance, one side at a time for unilateral exercises, with a stopwatch and the history of every exercise
+- See your muscles: a body map of what you trained in the last days and what you skipped
+- Suggested workouts: picks exercises for the time and equipment you have
+- Stats and records: personal records, volume and the distribution over your muscle groups
+- Train with friends: chats, groups and Gym-AI, an assistant for ideas for your next session
+- Works offline: everything is stored on the device first and synced between the iPhone and the web app
+
+## Privacy
+
+- No analytics, no third-party SDKs, data is never sold or used to train AI models
+- The server, the database and Gym-AI run in Switzerland, data can be downloaded or deleted anytime
+
+## Links
+
+- [Privacy Policy](https://gym2.app/privacy)
+- [Terms of Use](https://gym2.app/tos)
+- [Source code](https://github.com/xcolx/Gym-2.0)
+- [Developer](https://www.colinrueegg.com)
