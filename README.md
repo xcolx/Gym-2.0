@@ -1,17 +1,61 @@
-# Gym 2.0
+<p align="center">
+  <img src="web/public/icon.png" alt="Gym 2.0 app icon" width="96" height="96">
+</p>
 
-A workout tracker for iOS and the web, with a self-hostable backend.
+<h1 align="center">Gym 2.0</h1>
 
-[![License: AGPL v3 + additional terms](https://img.shields.io/badge/license-AGPL--3.0%20%2B%20terms-blue.svg)](NOTICE)
-![iOS 17+](https://img.shields.io/badge/iOS-17%2B-black?logo=apple)
-![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![FastAPI](https://img.shields.io/badge/FastAPI-Python%203.14-009688?logo=fastapi)
-![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-336791?logo=postgresql)
+<p align="center">
+  A free, ad-free workout tracker for iOS and the web, with a self-hostable backend.
+</p>
 
-The hosted web app runs at [gym2.app](https://gym2.app).
+<p align="center">
+  <a href="https://apps.apple.com/app/id6695759065">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/white/en-us">
+      <img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us" height="48">
+    </picture>
+  </a>
+  &nbsp;
+  <a href="https://gym2.app"><img alt="Open the web app" src="https://img.shields.io/badge/Open%20the%20web%20app-gym2.app-black?style=for-the-badge" height="48"></a>
+</p>
+
+<p align="center">
+  <a href="NOTICE"><img alt="License: AGPL v3 + additional terms" src="https://img.shields.io/badge/license-AGPL--3.0%20%2B%20terms-blue.svg"></a>
+  <img alt="iOS 17+" src="https://img.shields.io/badge/iOS-17%2B-black?logo=apple">
+  <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-black?logo=next.js">
+  <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-Python%203.14-009688?logo=fastapi">
+  <img alt="PostgreSQL 18" src="https://img.shields.io/badge/PostgreSQL-18-336791?logo=postgresql">
+</p>
+
+## Screenshots
+
+<p align="center">
+  <a href="https://apps.apple.com/app/id6695759065">
+    <img src="docs/screenshots/showcase.jpg" alt="Gym 2.0 on iOS: the home screen, a workout with the history of an exercise, statistics, the exercise library and a chat with a friend">
+  </a>
+</p>
+
+The full-size App Store screenshots are in [docs/screenshots/app-store](docs/screenshots/app-store).
+
+## Highlights
+
+Gym 2.0 is designed, built and run by one developer, from the native iOS app to the production server.
+
+- **Two clients, one sync model:** a native SwiftUI/SwiftData iOS app and a Next.js PWA that both work fully offline
+  and sync with the backend once they're online again.
+- **A production backend:** a FastAPI REST API on PostgreSQL with Flyway migrations, an admin interface, rate limits
+  and scheduled maintenance jobs.
+- **Content moderation:** uploaded images are checked for nudity on the server with NudeNet and rejected or queued
+  for review, alongside blocking and reporting.
+- **Self-hosted operations:** the whole stack runs in Docker behind Cloudflare and Traefik, with its own mail server and
+  nightly encrypted backups to an offsite server with restic.
+- **Shipped and maintained:** live on the App Store and at gym2.app, with CI that runs every test suite and builds every
+  image on each pull request, plus weekly Dependabot updates.
 
 ## Table of contents
 
+- [Screenshots](#screenshots)
+- [Highlights](#highlights)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Getting started](#getting-started)
