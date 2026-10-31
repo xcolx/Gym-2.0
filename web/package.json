@@ -37,7 +37,7 @@
     "fake-indexeddb": "6.2.6",
     "jsdom": "30.1.2",
     "tailwindcss": "^4",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vitest": "5.0.5"
   },
   "overrides": {
