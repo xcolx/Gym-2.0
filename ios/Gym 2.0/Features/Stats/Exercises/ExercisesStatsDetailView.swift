@@ -15,9 +15,10 @@ struct ExercisesStatsDetailView: View {
     
     @State var filteredPastWorkoutExercises: [WorkoutExercise] = []
     
+    // Sorted in onAppear: a SortDescriptor through the optional relationship (\WorkoutExercise.workout?.date)
+    // crashes in release builds, SwiftData can't find the optimized key path
     @Query(
-        filter: #Predicate <WorkoutExercise> {$0.workout?.inProgress == false} ,
-        sort: [SortDescriptor(\WorkoutExercise.workout?.date, order: .reverse)]
+        filter: #Predicate <WorkoutExercise> {$0.workout?.inProgress == false}
     ) var workoutExercises: [WorkoutExercise]
     
     var body: some View {
@@ -75,6 +76,7 @@ struct ExercisesStatsDetailView: View {
                     return nil
                 }
             }
+            .sorted { ($0.workout?.date ?? .distantPast) > ($1.workout?.date ?? .distantPast) }
         }
 
     }
