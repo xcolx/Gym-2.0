@@ -19,11 +19,16 @@ struct WhilstWorkoutView: View {
     
     @State var showAlert: Bool = false
     @State var showEditSheet: Bool = false
+    // The sheet of EndWorkoutView is presented here: as a page of the TabView, that view is created anew, e.g. when the
+    // swipe to it ends after the tap, which reset its state and closed the sheet again
+    @State var showExercisesView: Bool = false
+    @State var exercisesToAdd: [Exercise] = []
 
     // The stopwatches of the time fields keep running while the workout is open
     @State var stopwatchStore = StopwatchStore()
     
     @Environment(\.modelContext) var context
+    @Environment(UserSettings.self) var userSettings
     
     var body: some View {
         
@@ -42,7 +47,7 @@ struct WhilstWorkoutView: View {
                         .padding(.horizontal, 10)
                 }
                 
-                EndWorkoutView(workout: workout, navigationStackPath: $navigationStackPath)
+                EndWorkoutView(workout: workout, navigationStackPath: $navigationStackPath, showExercisesView: $showExercisesView)
             }
             .tabViewStyle(PageTabViewStyle())
             .environment(stopwatchStore)
@@ -64,6 +69,12 @@ struct WhilstWorkoutView: View {
             .sheet(isPresented: $showEditSheet) {
                 EditPerformingWorkoutView(workout: workout)
             }
+            .sheet(isPresented: $showExercisesView, onDismiss: {
+                workout.addExercises(exercisesToAdd, bodyWeight: userSettings.bodyweight ?? 0)
+                exercisesToAdd = []
+            }, content: {
+                ExercisesView(showExercisesView: $showExercisesView, exerciseList: $exercisesToAdd)
+            })
             .ignoresSafeArea(.keyboard)
             .navigationBarBackButtonHidden(true)
             

@@ -9,7 +9,7 @@ import Foundation
 import Observation
 import OSLog
 
-/// Ending the workout in progress, adding exercises to it before, or discarding it if nothing was entered
+/// Ending the workout in progress, or discarding it if nothing was entered
 @MainActor
 @Observable
 final class EndWorkoutViewModel {
@@ -25,8 +25,6 @@ final class EndWorkoutViewModel {
     let workout: Workout
     @ObservationIgnored private let workouts: WorkoutRepository
 
-    var exercisesToAdd: [Exercise] = []
-    var showExercisesView = false
     /// Set while asking whether the workout ended at the last change, see Workout.suggestedEnd
     var suggestedEnd: Date? = nil
     /// Set when nothing was entered, ending would delete the workout
@@ -66,11 +64,6 @@ final class EndWorkoutViewModel {
         } catch {
             Logger.workout.error("Saving the context after discarding the workout failed: \(error.localizedDescription, privacy: .public)")
         }
-    }
-
-    func addPickedExercises(bodyWeight: Double) {
-        workout.addExercises(exercisesToAdd, bodyWeight: bodyWeight)
-        exercisesToAdd = []
     }
 
     // The time, with the day if it wasn't today

@@ -12,11 +12,13 @@ struct EndWorkoutView: View {
 
     let workout: Workout
     @Binding var navigationStackPath: [NavigationDestination]
+    // Presented by WhilstWorkoutView, this view is a page of its TabView
+    @Binding var showExercisesView: Bool
 
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        EndWorkoutContentView(model: EndWorkoutViewModel(workout: workout, workouts: WorkoutRepository(context: context)), navigationStackPath: $navigationStackPath)
+        EndWorkoutContentView(model: EndWorkoutViewModel(workout: workout, workouts: WorkoutRepository(context: context)), navigationStackPath: $navigationStackPath, showExercisesView: $showExercisesView)
     }
 }
 
@@ -24,14 +26,16 @@ private struct EndWorkoutContentView: View {
 
     @State private var model: EndWorkoutViewModel
     @Binding var navigationStackPath: [NavigationDestination]
+    @Binding var showExercisesView: Bool
 
     @Environment(UserSettings.self) var userSettings
     @Environment(\.celebrateWorkout) private var celebrateWorkout
 
     // The view model is created once, later ones of the parent's body are discarded
-    init(model: EndWorkoutViewModel, navigationStackPath: Binding<[NavigationDestination]>) {
+    init(model: EndWorkoutViewModel, navigationStackPath: Binding<[NavigationDestination]>, showExercisesView: Binding<Bool>) {
         _model = State(initialValue: model)
         _navigationStackPath = navigationStackPath
+        _showExercisesView = showExercisesView
     }
 
     private var bodyWeight: Double {
@@ -52,7 +56,7 @@ private struct EndWorkoutContentView: View {
             Spacer()
 
             Button(action: {
-                model.showExercisesView.toggle()
+                showExercisesView.toggle()
             }, label: {
                 Image(systemName: "plus.circle")
                     .font(.system(size: 100))
@@ -109,13 +113,6 @@ private struct EndWorkoutContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color("MyGray"))
-        // Not on the Spacer: its presentations are created anew when the app goes to the background, which lost the
-        // input of an exercise being created in the sheet
-        .sheet(isPresented: $model.showExercisesView, onDismiss: {
-            model.addPickedExercises(bodyWeight: bodyWeight)
-        }, content:{
-            ExercisesView(showExercisesView: $model.showExercisesView, exerciseList: $model.exercisesToAdd)
-        })
     }
 
     /// Leaves the workout, celebrating it if it was saved
