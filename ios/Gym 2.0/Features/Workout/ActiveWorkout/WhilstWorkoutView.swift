@@ -14,9 +14,6 @@ struct WhilstWorkoutView: View {
     @Bindable var workout: Workout
     @Binding var navigationStackPath: [NavigationDestination]
     
-    @State var timer: Timer? = nil
-    @State var time: String = ""
-    
     @State var showAlert: Bool = false
     @State var showEditSheet: Bool = false
     // The sheet of EndWorkoutView is presented here: as a page of the TabView, that view is created anew, e.g. when the
@@ -54,7 +51,7 @@ struct WhilstWorkoutView: View {
             .navigationTitle("Workout")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Text(time).font(.headline).frame(minWidth: 100)
+                    WorkoutClock(start: workout.date).frame(minWidth: 100)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     toolbarButtons
@@ -77,13 +74,6 @@ struct WhilstWorkoutView: View {
             })
             .ignoresSafeArea(.keyboard)
             .navigationBarBackButtonHidden(true)
-            
-            .onAppear{
-                startTimer()
-            }
-            .onDisappear {
-                stopTimer()
-            }
             // finished on another device while it was open here, ending it here clears the path as well
             .onChange(of: workout.inProgress) {
                 if !workout.inProgress {
@@ -125,33 +115,24 @@ struct WhilstWorkoutView: View {
             Logger.workout.error("Saving the context after cancelling the workout failed: \(error.localizedDescription, privacy: .public)")
         }
     }
-    
-    func formatTimeInterval(interval: TimeInterval) -> String {
+}
+
+/// The time since the start of the workout. Only this view is updated every second, not the pages of the workout.
+private struct WorkoutClock: View {
+
+    let start: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: start, by: 1)) { context in
+            Text(Self.format(context.date.timeIntervalSince(start)))
+                .font(.headline)
+        }
+    }
+
+    static func format(_ interval: TimeInterval) -> String {
         let seconds = Int(interval) % 60
         let minutes = (Int(interval) / 60) % 60
         let hours = Int(interval) / 3600
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
-    
-    func updateTimeInterval(){
-        let now = Date()
-
-        let timeInterval = now.timeIntervalSince(workout.date)
-        let formattedInterval = formatTimeInterval(interval: timeInterval)
-        time = formattedInterval
-    }
-    
-    func startTimer() {
-        stopTimer()
-        
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            self.updateTimeInterval()
-        }
-    }
-    
-    func stopTimer() {
-        timer?.invalidate()
-        timer = nil
-    }
-    
 }
