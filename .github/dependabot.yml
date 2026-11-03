@@ -1,6 +1,7 @@
 # Weekly update pull requests for the dependencies. The commit message prefixes make the titles pass the PR title
 # check (Conventional Commits, see CONTRIBUTING.md). Minor and patch updates come grouped in one pull request per
-# ecosystem, major updates each in their own.
+# ecosystem, major updates each in their own. The group name is part of the title, which the check allows at most 72
+# characters, so it's kept short.
 version: 2
 
 updates:
@@ -11,7 +12,7 @@ updates:
     commit-message:
       prefix: build(web)
     groups:
-      minor-and-patch:
+      deps:
         update-types: [minor, patch]
 
   - package-ecosystem: npm
@@ -21,7 +22,7 @@ updates:
     commit-message:
       prefix: build(infra)
     groups:
-      minor-and-patch:
+      deps:
         update-types: [minor, patch]
 
   - package-ecosystem: pip
@@ -31,7 +32,7 @@ updates:
     commit-message:
       prefix: build(backend)
     groups:
-      minor-and-patch:
+      deps:
         update-types: [minor, patch]
 
   # The images of the Dockerfiles and the compose files. A new major version of Node, Python or PostgreSQL also has to
