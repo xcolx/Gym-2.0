@@ -9,7 +9,7 @@ import Foundation
 import Observation
 import SwiftData
 
-/// The summary of all finished workouts, shown on Home and at the top of the stats.
+/// The summary of all finished workouts, shown on Home and at the top of the stats, and the rest of the stats overview.
 ///
 /// Computing it reads every workout exercise and decodes its set arrays, which took about a second with many workouts.
 /// Done in the bodies of the views, it ran on every tab switch and every save. It's now computed once in the
@@ -20,6 +20,8 @@ final class WorkoutTotals {
 
     /// Nil until the first calculation is done
     private(set) var summary: StatsSummary?
+    /// The activity, muscles, exercises and facts of the stats overview, nil until the first calculation is done
+    private(set) var overview: StatsOverview?
 
     @ObservationIgnored private let container: ModelContainer
     @ObservationIgnored private var saveObserver: NSObjectProtocol?
@@ -47,19 +49,26 @@ final class WorkoutTotals {
         calculation = Task {
             while needsCalculation {
                 needsCalculation = false
-                summary = await Self.calculate(in: container)
+                (summary, overview) = await Self.calculate(in: container)
             }
             calculation = nil
         }
     }
 
     // In a context of its own off the main thread, which only sees the saved workouts
-    private nonisolated static func calculate(in container: ModelContainer) async -> StatsSummary {
+    private nonisolated static func calculate(in container: ModelContainer) async -> (StatsSummary, StatsOverview) {
         await Task.detached(priority: .userInitiated) {
             let context = ModelContext(container)
             let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.inProgress == false })
             let workouts = (try? context.fetch(descriptor)) ?? []
-            return StatsCalculator.summary(of: workouts)
+            let user = try? context.fetch(FetchDescriptor<User>(predicate: #Predicate { $0.isCurrentUser })).first
+            let overview = StatsOverview.make(
+                workouts: workouts,
+                equipment: (try? context.fetch(FetchDescriptor<Equipment>())) ?? [],
+                muscleGroups: (try? context.fetch(FetchDescriptor<MuscleGroup>())) ?? [],
+                user: user
+            )
+            return (StatsCalculator.summary(of: workouts), overview)
         }.value
     }
 }

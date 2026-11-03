@@ -111,6 +111,17 @@ extension StatsSummary {
         return "\(minutes / 60) h \(minutes % 60) min"
     }
 
+    /// Short for the totals, e.g. "45 min", "2.5 h" or "168 h"
+    static func formatHours(minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes) min"
+        } else if minutes < 598 { // 598 and 599 are rounded up to 10.0, which is ugly
+            return String(format: "%.1f h", Double(minutes) / 60)
+        } else {
+            return String(format: "%.0f h", Double(minutes) / 60)
+        }
+    }
+
     /// e.g. "45 s", "2 min 5 s" or "1 h 2 min"
     static func formatTime(seconds: Double) -> String {
         let seconds = Int(seconds.rounded())

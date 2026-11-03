@@ -27,12 +27,12 @@ struct HomeView: View {
                 HStack(spacing: 0) {
                     TotalView(value: "\(summary.workouts)", label: "Workouts")
                     Divider()
-                    TotalView(value: formatTimeWorkedOut(minutes: summary.duration), label: "Trained")
+                    TotalView(value: StatsSummary.formatHours(minutes: summary.duration), label: "Trained")
                     Divider()
                     TotalView(value: "\(summary.sets)", label: "Sets")
                 }
                 .padding(.vertical, 14)
-                .homeCard()
+                .cardBackground()
                 .redacted(reason: workoutTotals.summary == nil ? .placeholder : [])
                 .padding(.horizontal)
                 .padding(.top, -36)
@@ -59,21 +59,6 @@ struct HomeView: View {
                 now = .now
                 try? await Task.sleep(for: .seconds(60))
             }
-        }
-    }
-
-
-    func formatTimeWorkedOut(minutes totalTime: Int) -> String{
-        if totalTime < 60{
-            return "\(totalTime) min"
-        } else if totalTime < 598{ //598 and 599 is rounded up to 10.0 which is ugly
-            let timeInHours: Double = Double(totalTime)/60
-            let timeInHoursString: String = String(format: "%.1f", timeInHours)
-            return timeInHoursString + " h"
-        } else {
-            let timeInHours: Double = Double(totalTime)/60
-            let timeInHoursString: String = String(format: "%.0f", timeInHours)
-            return timeInHoursString + " h"
         }
     }
 }
@@ -196,7 +181,7 @@ private struct RecentMusclesView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .homeCard()
+        .cardBackground()
         // a muscle trained in the meantime is no longer in the list
         .onChange(of: notTrainedMuscles) {
             if let selectedMuscle, !notTrainedMuscles.contains(selectedMuscle) {
@@ -213,13 +198,5 @@ private struct RecentMusclesView: View {
         let secondaryMusclesTrained: Double = Double(trainedMuscles.1.count)
 
         return Int(((primaryMusclesTrained + 0.33 * secondaryMusclesTrained) / numberOfPossibleMuscles)*100)
-    }
-}
-
-private extension View {
-    // The cards on the grouped background of Home
-    func homeCard() -> some View {
-        background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
 }
