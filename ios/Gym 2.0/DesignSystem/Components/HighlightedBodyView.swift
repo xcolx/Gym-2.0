@@ -15,6 +15,8 @@ struct HighlightedBodyView: View {
 
     let primaryMuscles: [Muscle]
     let secondaryMuscles: [Muscle]
+    /// Shown alone instead of the other muscles, slowly pulsing in this color, e.g. to show where a muscle is
+    var focusedMuscle: (muscle: Muscle, color: Color)? = nil
 
     @Environment(\.colorScheme) var colorScheme
 
@@ -25,12 +27,23 @@ struct HighlightedBodyView: View {
     var body: some View {
 
         ZStack{
-            ForEach(secondaryMuscles) {muscle in
-                MuscleHighlightView(hash: muscle.imageUrl, color: Color.orange, outline: outline)
-            }
+            if let focusedMuscle {
+                MuscleHighlightView(hash: focusedMuscle.muscle.imageUrl, color: focusedMuscle.color, outline: outline)
+                    .phaseAnimator([1.0, 0.25]) { content, opacity in
+                        content.opacity(opacity)
+                    } animation: { _ in
+                        .easeInOut(duration: 1.1)
+                    }
+                    // starts pulsing again from fully visible for another muscle
+                    .id(focusedMuscle.muscle.persistentModelID)
+            } else {
+                ForEach(secondaryMuscles) {muscle in
+                    MuscleHighlightView(hash: muscle.imageUrl, color: Color.orange, outline: outline)
+                }
 
-            ForEach(primaryMuscles) {muscle in
-                MuscleHighlightView(hash: muscle.imageUrl, color: Color(red: 1, green: 0, blue: 0), outline: outline)
+                ForEach(primaryMuscles) {muscle in
+                    MuscleHighlightView(hash: muscle.imageUrl, color: Color(red: 1, green: 0, blue: 0), outline: outline)
+                }
             }
 
             outline

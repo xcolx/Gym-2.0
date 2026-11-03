@@ -8,7 +8,8 @@
 import SwiftUI
 import SwiftData
 
-/// Profile image, username and account creation date of the current user, as loaded by the sync
+/// Profile image, username and account creation date of the current user, as loaded by the sync, centered on a header
+/// in the app color
 struct ProfileBannerView: View {
 
     @Environment(UserSettings.self) var userSettings
@@ -20,41 +21,49 @@ struct ProfileBannerView: View {
     }
 
     var body: some View {
-        HStack {
+        VStack(spacing: 4) {
             ServerImageView(hash: user.flatMap { $0.profileImageUrl.isEmpty ? nil : $0.profileImageUrl }, contentMode: .fill) {
                 Circle()
-                    .fill(Color("MyBlack"))
+                    .fill(Color(.systemGray3))
                     .overlay(
                         Image(systemName: "person.fill")
                             .resizable()
-                            .foregroundStyle(Color("MyWhite"))
-                            .frame(width: 50, height: 50)
+                            .scaledToFit()
+                            .foregroundStyle(.white)
+                            .padding(24)
                     )
             }
-            .frame(width: 80, height: 80)
+            .frame(width: 96, height: 96)
             .clipShape(Circle())
-            .profileBorder(color: userSettings.schemeColor, size: 80)
+            .profileBorder(color: userSettings.schemeColor, size: 96)
             .opensPhotoViewer(hash: user?.profileImageUrl)
-            .padding(.vertical, 15)
-            .padding(.leading, 15)
-            .padding(.trailing, 5)
+            .padding(.bottom, 6)
 
-            VStack(alignment: .leading) {
-                // Empty until the first sync loaded the user
-                Text(user?.username ?? " ")
-                    .font(.largeTitle)
+            // Empty until the first sync loaded the user
+            Text(user?.username ?? " ")
+                .font(.title2.bold())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
 
-                if let createdAt = user?.createdAt {
-                    Text("Tracking with Gym 2.0 since: \(formatDate(date: createdAt))")
-                        .foregroundStyle(Color("MyGray"))
-                        .font(.footnote)
-                }
+            if let createdAt = user?.createdAt {
+                Text("Training since \(createdAt.formatted(.dateTime.month(.wide).year()))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            Spacer()
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .padding(.bottom, 10)
-        .background(userSettings.appColor.opacity(0.5).ignoresSafeArea())
+        .padding(.horizontal)
+        .padding(.top, 12)
+        // room for the totals, which overlap the bottom of the header
+        .padding(.bottom, 52)
+        .background(alignment: .bottom) {
+            LinearGradient(
+                colors: [userSettings.appColor.opacity(0.45), userSettings.appColor.opacity(0.15)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            // reaches up behind the status bar, also when the header is pulled down
+            .padding(.top, -1000)
+        }
     }
 }
