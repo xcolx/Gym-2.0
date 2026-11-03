@@ -49,25 +49,21 @@ import Testing
         #expect(auth.logins.isEmpty)
     }
 
-    @Test func offersToResendTheVerificationEmail() async {
+    @Test func showsTheVerificationHintForAnUnverifiedEmail() async {
         auth.failure = serverError(403, code: "EmailVerificationError", "Verify your email first.")
+        session.show(.login)
         let login = LoginViewModel(session: session)
         login.email = "tester@example.com "
         login.password = "secret"
 
         await login.login()
 
-        #expect(login.errorMessage == "Verify your email first.")
-        #expect(login.emailNotVerified)
-
-        auth.failure = nil
-        await login.resendVerificationEmail()
-
-        #expect(auth.resentTo == ["tester@example.com"])
-        #expect(login.resendMessage == "Email sent.")
+        #expect(session.screen == .checkEmail(email: "tester@example.com", message: "Verify your email first."))
+        #expect(login.errorMessage == nil)
+        #expect(!login.isLoading)
     }
 
-    @Test func showsOtherLoginErrorsWithoutTheResendButton() async {
+    @Test func showsOtherLoginErrorsOnTheLogin() async {
         auth.failure = serverError(401, "Wrong email or password.")
         let login = LoginViewModel(session: session)
         login.email = "tester@example.com"
@@ -76,7 +72,7 @@ import Testing
         await login.login()
 
         #expect(login.errorMessage == "Wrong email or password.")
-        #expect(!login.emailNotVerified)
+        #expect(session.screen == .welcome)
         #expect(!login.isLoading)
     }
 
@@ -121,6 +117,17 @@ import Testing
         #expect(signUp.passwordProblem == "The passwords don't match.")
         signUp.passwordConfirmation = "Password1"
         #expect(signUp.passwordProblem == nil)
+    }
+
+    @Test func ticksOffThePasswordRules() {
+        let signUp = SignUpViewModel(session: session)
+        #expect(!signUp.passwordHasValidLength && !signUp.passwordHasEnoughKinds && !signUp.passwordsMatch)
+        signUp.password = "password"
+        #expect(signUp.passwordHasValidLength && !signUp.passwordHasEnoughKinds)
+        signUp.password = "Password"
+        #expect(signUp.passwordHasEnoughKinds && !signUp.passwordsMatch)
+        signUp.passwordConfirmation = "Password"
+        #expect(signUp.passwordsMatch)
     }
 
     @Test func needsBothConsentsToSignUp() {
