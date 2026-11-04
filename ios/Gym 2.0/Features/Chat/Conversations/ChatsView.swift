@@ -33,12 +33,14 @@ extension View {
     }
 }
 
-/// The chat tab: the Gym-AI banner and the direct and group chats of the user, newest first.
+/// The chat tab: the Gym-AI card, the pending friend requests and the direct and group chats of the user, newest
+/// first, which can be searched by name.
 struct ChatsView: View {
 
     @Environment(SyncService.self) private var syncService
     @Environment(AuthService.self) private var authService
     @Environment(\.friendService) private var friendService
+    @Environment(UserSettings.self) private var userSettings
 
     @Query private var chats: [Chat]
     @Query private var users: [User]
@@ -48,6 +50,7 @@ struct ChatsView: View {
     @State private var showsNewGroup = false
     @State private var friendRequestCount = 0
     @State private var friendRequestsLoaded: Date?
+    @State private var searchText = ""
 
     /// No push updates yet, so the list polls while it's shown
     private static let pollInterval: Duration = .seconds(3)
@@ -65,33 +68,53 @@ struct ChatsView: View {
             .sorted { $0.lastActivity > $1.lastActivity }
     }
 
-    var body: some View {
-        NavigationStack(path: $path) {
-            VStack(spacing: 0) {
-                AIConversationsBannerView()
+    /// The visible chats that match the search, best match first
+    private func shownChats(users: [Int: User]) -> [Chat] {
+        guard !searchText.isEmpty else { return visibleChats }
+        return FuzzySearch.filter(visibleChats, query: searchText) { [$0.title(users: users, currentUserId: currentUserId)] }
+    }
 
-                List(visibleChats) { chat in
-                    NavigationLink(value: ChatRoute.chat(chat)) {
-                        ChatRowView(chat: chat, users: User.byServerId(users), currentUserId: currentUserId)
-                    }
-                }
-                .listStyle(.plain)
-                .overlay {
-                    if visibleChats.isEmpty {
-                        ContentUnavailableView {
-                            Label("No Chats", systemImage: "bubble.left.and.bubble.right")
-                        } description: {
-                            Text("Add friends to chat with them, or join a public group.")
-                        } actions: {
-                            Button("Friends") { path.append(ChatRoute.friends) }
-                            Button("Public Groups") { path.append(ChatRoute.publicGroups) }
+    var body: some View {
+        let users = User.byServerId(users)
+        let shownChats = shownChats(users: users)
+        NavigationStack(path: $path) {
+            List {
+                if searchText.isEmpty {
+                    Section {
+                        AIConversationsBannerView()
+                        if friendRequestCount > 0 {
+                            friendRequestsRow
                         }
                     }
                 }
-                .refreshable { await syncService.sync() }
+
+                Section {
+                    ForEach(shownChats) { chat in
+                        NavigationLink(value: ChatRoute.chat(chat)) {
+                            ChatRowView(chat: chat, users: users, currentUserId: currentUserId)
+                        }
+                    }
+                }
             }
+            .overlay {
+                if visibleChats.isEmpty {
+                    ContentUnavailableView {
+                        Label("No chats yet", systemImage: "bubble.left.and.bubble.right")
+                    } description: {
+                        Text("Add friends to chat with them, or join a public group.")
+                    } actions: {
+                        Button("Friends") { path.append(ChatRoute.friends) }
+                        Button("Public groups") { path.append(ChatRoute.publicGroups) }
+                    }
+                    // below the Gym-AI card
+                    .padding(.top, 120)
+                } else if shownChats.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search chats")
+            .refreshable { await syncService.sync() }
             .navigationTitle("Chats")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbar }
             .aiNavigationDestinations()
             .chatNavigationDestinations(path: $path)
@@ -116,6 +139,28 @@ struct ChatsView: View {
         }
     }
 
+    /// Only while friend requests are pending
+    private var friendRequestsRow: some View {
+        NavigationLink(value: ChatRoute.friends) {
+            HStack(spacing: 12) {
+                Image(systemName: "person.badge.plus")
+                    .font(.title3)
+                    .foregroundStyle(userSettings.appColor)
+                    .frame(width: 44, height: 44)
+                    .background(userSettings.appColor.opacity(0.15), in: Circle())
+                Text(friendRequestCount == 1 ? "1 friend request" : "\(friendRequestCount) friend requests")
+                    .font(.body.weight(.medium))
+                Spacer()
+                Text("\(friendRequestCount)")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(.red, in: Capsule())
+            }
+        }
+    }
+
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
@@ -136,8 +181,9 @@ struct ChatsView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
-                Button("New Group", systemImage: "person.3") { showsNewGroup = true }
-                Button("Public Groups", systemImage: "globe") { path.append(ChatRoute.publicGroups) }
+                Button("New group", systemImage: "person.3") { showsNewGroup = true }
+                Button("Public groups", systemImage: "globe") { path.append(ChatRoute.publicGroups) }
+                Button("Friends", systemImage: "person.2") { path.append(ChatRoute.friends) }
             } label: {
                 Image(systemName: "square.and.pencil")
             }
@@ -173,28 +219,28 @@ struct ChatRowView: View {
     var body: some View {
         let unread = chat.unreadCount(currentUserId: currentUserId)
         HStack(spacing: 12) {
-            ChatImageView(chat: chat, users: users, currentUserId: currentUserId, size: 50)
+            ChatImageView(chat: chat, users: users, currentUserId: currentUserId, size: 52)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline) {
                     Text(chat.title(users: users, currentUserId: currentUserId))
-                        .font(.headline)
+                        .font(.body.weight(unread > 0 ? .bold : .semibold))
                         .lineLimit(1)
                     Spacer()
                     Text(chat.lastActivity, format: chat.lastActivity.isToday ? .dateTime.hour().minute() : .dateTime.day().month())
-                        .font(.caption)
+                        .font(.caption.weight(unread > 0 ? .semibold : .regular))
                         .foregroundStyle(unread > 0 ? userSettings.appColor : .secondary)
                 }
-                HStack {
+                HStack(alignment: .top) {
                     Text(preview ?? "No messages yet")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .font(.subheadline.weight(unread > 0 ? .medium : .regular))
+                        .foregroundStyle(unread > 0 ? .primary : .secondary)
+                        .lineLimit(2, reservesSpace: false)
                     Spacer()
                     if unread > 0 {
                         Text("\(unread)")
                             .font(.caption.bold())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(userSettings.appColorForeground)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
                             .background(userSettings.appColor, in: Capsule())
@@ -202,11 +248,11 @@ struct ChatRowView: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 
-/// The group image, or the profile icon of the other member of a direct chat
+/// The group image (or the initials of the group), or the profile icon of the other member of a direct chat
 struct ChatImageView: View {
 
     let chat: Chat
@@ -215,15 +261,35 @@ struct ChatImageView: View {
     let size: CGFloat
     var opensPhotoViewer = true
 
+    @Environment(UserSettings.self) private var userSettings
+
+    /// The first letters of the first two words of the group name, e.g. "LD" for "Leg day crew"
+    static func initials(of name: String?) -> String? {
+        let letters = (name ?? "")
+            .split(whereSeparator: { $0.isWhitespace })
+            .prefix(2)
+            .compactMap { $0.first(where: { $0.isLetter || $0.isNumber }) }
+        return letters.isEmpty ? nil : String(letters).uppercased()
+    }
+
     var body: some View {
         if chat.groupChat {
             ServerImageView(hash: chat.imageUrl, contentMode: .fill) {
-                Image(systemName: "person.3.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .padding(size * 0.22)
-                    .foregroundStyle(.white)
-                    .background(.gray)
+                Group {
+                    if let initials = Self.initials(of: chat.name) {
+                        Text(initials)
+                            .font(.system(size: size * 0.38, weight: .semibold, design: .rounded))
+                    } else {
+                        Image(systemName: "person.3.fill")
+                            .resizable()
+                            .scaledToFit()
+                            .padding(size * 0.22)
+                    }
+                }
+                .foregroundStyle(userSettings.appColor)
+                // the whole circle, not only the wide icon
+                .frame(width: size, height: size)
+                .background(userSettings.appColor.opacity(0.18))
             }
             .frame(width: size, height: size)
             .clipShape(Circle())

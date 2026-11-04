@@ -42,15 +42,25 @@ struct ChatMembership {
     }
 
     func status(of member: ChatMember, user: User?) -> String? {
-        let relation: String? = if user?.isBlocked ?? false {
+        let relation = relation(to: user)
+        guard isAdmin(member) else { return relation }
+        return relation.map { "Admin · \($0)" } ?? "Admin"
+    }
+
+    /// Whether the member is an admin of the group
+    func isAdmin(_ member: ChatMember) -> Bool {
+        chat.groupChat && member.admin == true
+    }
+
+    /// "Blocked" or "Friend", if the user is either
+    func relation(to user: User?) -> String? {
+        if user?.isBlocked ?? false {
             "Blocked"
         } else if user?.isFriend ?? false {
             "Friend"
         } else {
             nil
         }
-        guard chat.groupChat, member.admin == true else { return relation }
-        return relation.map { "Admin · \($0)" } ?? "Admin"
     }
 
     /// The current user first, then by username

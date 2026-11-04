@@ -179,7 +179,7 @@ final class AIConversationsViewModel {
     }
 }
 
-private extension AIChatMessage {
+extension AIChatMessage {
     var isFailed: Bool {
         if case .failed = status { return true }
         return false
