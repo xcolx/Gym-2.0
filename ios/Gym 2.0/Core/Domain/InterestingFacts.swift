@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct InterestingFact: Identifiable {
+struct InterestingFact: Identifiable, Sendable {
     let title: String
     let text: String
 

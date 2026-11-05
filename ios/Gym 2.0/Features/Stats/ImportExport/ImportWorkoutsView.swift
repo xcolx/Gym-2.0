@@ -21,6 +21,10 @@ struct ImportWorkoutsView: View {
 private struct ImportWorkoutsContentView: View {
 
     @State private var viewModel: ImportWorkoutsViewModel
+    /// Shown after the import was confirmed, until another file is picked
+    @State private var importedCount: Int?
+
+    @Environment(\.dismiss) private var dismiss
 
     // The view model is created once, later ones of the parent's body are discarded
     init(viewModel: ImportWorkoutsViewModel) {
@@ -29,31 +33,47 @@ private struct ImportWorkoutsContentView: View {
 
     var body: some View {
         @Bindable var viewModel = viewModel
-        VStack(spacing: 30) {
-            Text("Import Workouts")
-                .font(.title)
-                .padding(.top)
-            
-            HStack {
-                Button {
-                    viewModel.selectFile(legacy: false)
-                } label: {
-                    Label("Select File", systemImage: "tray.and.arrow.down")
+        NavigationStack {
+            Form {
+                Section {
+                    Button {
+                        viewModel.selectFile(legacy: false)
+                    } label: {
+                        Label("Choose a Gym 2.0 file", systemImage: "doc.badge.plus")
+                    }
+                } footer: {
+                    Text("A JSON or CSV file exported from Gym 2.0. Workouts that exist already are skipped.")
                 }
-                .buttonStyle(.borderedProminent)
 
-                Button {
-                    viewModel.selectFile(legacy: true)
-                } label: {
-                    Label("Legacy Import", systemImage: "clock.arrow.circlepath")
+                Section {
+                    Button {
+                        viewModel.selectFile(legacy: true)
+                    } label: {
+                        Label("Import from an earlier version", systemImage: "clock.arrow.circlepath")
+                    }
+                } footer: {
+                    Text("A CSV file of an earlier version of the app. Its exercises are matched to the current ones by name.")
                 }
-                .buttonStyle(.bordered)
+
+                if hasResult {
+                    Section("Result") {
+                        results
+                    }
+                }
+            }
+            .navigationTitle("Import workouts")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
             }
             .fileImporter(
                 isPresented: $viewModel.showImporter,
                 allowedContentTypes: viewModel.isLegacyImport ? ImportWorkoutsViewModel.legacyContentTypes : ImportWorkoutsViewModel.allowedContentTypes,
                 allowsMultipleSelection: false
             ) { result in
+                importedCount = nil
                 switch result {
                 case .success(let urls):
                     if let url = urls.first {
@@ -63,67 +83,76 @@ private struct ImportWorkoutsContentView: View {
                     viewModel.importError = error.localizedDescription
                 }
             }
-            
-            if let error = viewModel.importError {
-                Text("Error: \(error)").foregroundStyle(.red)
-            }
-            
-            Text("Select a JSON or CSV file exported from Gym 2.0. Use Legacy Import for a CSV file of an earlier version, its exercises are matched to the current ones by name.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            if let legacyResult = viewModel.legacyResult {
-                if !legacyResult.renamedExercises.isEmpty {
-                    Text("Matched exercises: \(legacyResult.renamedExercises.map { "\($0.legacyName) → \($0.exerciseName)" }.joined(separator: ", "))")
-                        .foregroundStyle(.secondary)
+            .alert(
+                confirmationTitle,
+                isPresented: $viewModel.showConfirmation,
+                actions: {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Import") {
+                        importedCount = viewModel.numImported
+                        viewModel.confirmImport()
+                    }
+                },
+                message: {
+                    if viewModel.legacyResult != nil {
+                        Text("The other workouts contain exercises that could not be matched or exist already. This can't be undone.")
+                    } else {
+                        Text("This can't be undone.")
+                    }
                 }
-                if !legacyResult.unmatchedExerciseNames.isEmpty {
-                    Text("\(legacyResult.unmatchedWorkoutCount) workouts are not imported, since these exercises could not be matched: \(legacyResult.unmatchedExerciseNames.joined(separator: ", "))")
-                        .foregroundStyle(.orange)
-                }
-            }
-            
-            if viewModel.numExisting > 0 {
-                Text("\(viewModel.numExisting) workouts of the file exist already and are not imported again.")
-                    .foregroundStyle(.secondary)
-            }
-            
-            if !viewModel.missingExerciseNames.isEmpty {
-                Text("Not imported, since these exercises do not exist: \(viewModel.missingExerciseNames.joined(separator: ", "))")
-                    .foregroundStyle(.orange)
-            }
-
-            if !viewModel.invalidWorkouts.isEmpty {
-                Text("Not imported, since they contain values that are out of range or more than 100 sets or exercises: \(viewModel.invalidWorkouts.joined(separator: ", "))")
-                    .foregroundStyle(.orange)
-            }
-            
-            Spacer()
+            )
         }
-        .alert(
-            confirmationTitle,
-            isPresented: $viewModel.showConfirmation,
-            actions: {
-                Button("Cancel", role: .cancel) {}
-                Button("Import", role: .destructive) {
-                    viewModel.confirmImport()
-                }
-            },
-            message: {
-                if viewModel.legacyResult != nil {
-                    Text("The other workouts contain exercises that could not be matched or exist already. This cannot be undone.")
-                }
+    }
+
+    private var hasResult: Bool {
+        importedCount != nil || viewModel.importError != nil || viewModel.numExisting > 0 || !viewModel.missingExerciseNames.isEmpty
+            || !viewModel.invalidWorkouts.isEmpty || !(viewModel.legacyResult?.renamedExercises.isEmpty ?? true)
+            || !(viewModel.legacyResult?.unmatchedExerciseNames.isEmpty ?? true)
+    }
+
+    /// What happened to the workouts of the picked file, problems last
+    @ViewBuilder
+    private var results: some View {
+        if let importedCount {
+            resultRow(importedCount == 1 ? "1 workout imported" : "\(importedCount) workouts imported", systemImage: "checkmark.circle.fill", color: .green)
+        }
+        if let error = viewModel.importError {
+            resultRow(error, systemImage: "xmark.octagon.fill", color: .red)
+        }
+        if viewModel.numExisting > 0 {
+            resultRow(viewModel.numExisting == 1 ? "1 workout exists already and is skipped." : "\(viewModel.numExisting) workouts exist already and are skipped.", systemImage: "equal.circle.fill", color: .secondary)
+        }
+        if let legacyResult = viewModel.legacyResult {
+            if !legacyResult.renamedExercises.isEmpty {
+                resultRow("Matched: \(legacyResult.renamedExercises.map { "\($0.legacyName) → \($0.exerciseName)" }.joined(separator: ", "))", systemImage: "arrow.left.arrow.right.circle.fill", color: .secondary)
             }
-        )
-        .padding()
+            if !legacyResult.unmatchedExerciseNames.isEmpty {
+                resultRow("\(legacyResult.unmatchedWorkoutCount) workouts are skipped, these exercises could not be matched: \(legacyResult.unmatchedExerciseNames.joined(separator: ", "))", systemImage: "exclamationmark.triangle.fill", color: .orange)
+            }
+        }
+        if !viewModel.missingExerciseNames.isEmpty {
+            resultRow("Skipped, these exercises don't exist: \(viewModel.missingExerciseNames.joined(separator: ", "))", systemImage: "exclamationmark.triangle.fill", color: .orange)
+        }
+        if !viewModel.invalidWorkouts.isEmpty {
+            resultRow("Skipped, values out of range or more than 100 sets or exercises: \(viewModel.invalidWorkouts.joined(separator: ", "))", systemImage: "exclamationmark.triangle.fill", color: .orange)
+        }
+    }
+
+    private func resultRow(_ text: String, systemImage: String, color: Color) -> some View {
+        Label {
+            Text(text)
+                .font(.subheadline)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(color)
+        }
     }
 
     private var confirmationTitle: String {
         if let legacyResult = viewModel.legacyResult {
-            "Do you want to import \(viewModel.numImported)/\(legacyResult.totalCount) correctly mapped workouts?"
+            "Import \(viewModel.numImported) of \(legacyResult.totalCount) workouts?"
         } else {
-            "Are you sure you want to import \(viewModel.numImported) Workouts? This cannot be undone."
+            viewModel.numImported == 1 ? "Import 1 workout?" : "Import \(viewModel.numImported) workouts?"
         }
     }
 }
-

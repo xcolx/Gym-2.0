@@ -10,6 +10,8 @@ import SwiftUI
 struct NumberInsertView: View {
 
     @Bindable var workoutExercise: WorkoutExercise
+    /// In the workout in progress: at most four rows, more scroll. Editing a past workout shows all of them.
+    var limitsRows = true
     @Environment(UserSettings.self) var userSettings
     @Environment(StopwatchStore.self) var stopwatchStore: StopwatchStore?
 
@@ -18,6 +20,7 @@ struct NumberInsertView: View {
 
     @FocusState var focusedField: Field?
 
+
     struct Field: Hashable {
         let metric: SetMetric
         let set: Int
@@ -25,52 +28,42 @@ struct NumberInsertView: View {
 
     // Smaller fields when there are many columns
     private var fieldFont: Font {
-        workoutExercise.trackedMetrics.count <= 2 ? .title : .headline
+        workoutExercise.trackedMetrics.count <= 2 ? .title3.weight(.semibold) : .headline
     }
 
     var body: some View {
 
-        ZStack{
-            ScrollView{
-                HStack{
-                        VStack{
-                            Text("Set")
-                                .frame(height: 35)
-                            if workoutExercise.unilateral{
-                                ForEach(0..<workoutExercise.entryCount, id: \.self) {set in
-                                    if set % 2 == 0{
-                                        Text("\(set / 2 + 1)  R")
-                                            .frame(height: 35)
-                                    } else {
-                                        Text("    L")
-                                            .frame(height: 35, alignment: .trailing)
-                                    }
-
-                                }
-                            } else {
-                                ForEach(0..<workoutExercise.entryCount, id: \.self) {set in
-                                    Text("\(set+1)")
-                                        .frame(height: 35)
-                                }
-                            }
-                        }
-
-                        ForEach(workoutExercise.trackedMetrics, id: \.self) { metric in
-                            column(metric)
-                        }
-                    }
-
-
-                    .padding(10)
-
-                    }
-                    .scrollIndicators(.hidden)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke()
-                    )
-                    .padding(.horizontal, 10)
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Text("Set")
+                    .frame(width: setColumnWidth)
+                ForEach(workoutExercise.trackedMetrics, id: \.self) { metric in
+                    Text(header(metric))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                        .frame(maxWidth: .infinity)
+                }
             }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .frame(height: 20)
+
+            if limitsRows {
+                // At most four rows are shown, more scroll, so that the buttons below stay in place
+                ScrollView {
+                    rows
+                }
+                .frame(height: rowsHeight)
+                // The last sets are shown, and an added set scrolls into view as the rows grow. Scrolling to it from
+                // the change of the count ran before the new row was laid out, then only every second add scrolled.
+                .defaultScrollAnchor(.bottom)
+                .scrollBounceBehavior(.basedOnSize)
+                // shows that there are more sets than the four rows
+                .scrollIndicatorsFlash(onAppear: true)
+            } else {
+                rows
+            }
+        }
             .toolbar {
                 // The decimal pad has no minus key, only the intensity can be negative
                 if let focusedField, focusedField.metric == .intensity {
@@ -112,24 +105,108 @@ struct NumberInsertView: View {
 
     }
 
-    func column(_ metric: SetMetric) -> some View {
-        VStack{
-            Text(header(metric))
-                .frame(height: 35)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-            if let values = strings[metric], values.count == workoutExercise.entryCount{
-                ForEach(0..<workoutExercise.entryCount, id: \.self) {set in
-                    TextField(placeholder(metric), text: binding(metric, set: set))
-                        .font(fieldFont)
-                        .multilineTextAlignment(.center)
-                        .frame(height: 35)
-                        .keyboardType(keyboard(metric))
-                        .focused($focusedField, equals: Field(metric: metric, set: set))
-                        .background(Color.gray.opacity(0.3), in: .rect(cornerRadius: 10))
+    private let rowHeight: CGFloat = 40
+    private let rowSpacing: CGFloat = 6
+    // between the sets of a unilateral exercise, more than between its two sides
+    private let pairSpacing: CGFloat = 12
+    private let maxVisibleRows = 4
+
+    private var setColumnWidth: CGFloat {
+        workoutExercise.unilateral ? 52 : 36
+    }
+
+    // Four rows, or two sets of a unilateral exercise with both sides
+    private var rowsHeight: CGFloat {
+        let rows = max(1, min(workoutExercise.entryCount, maxVisibleRows))
+        if workoutExercise.unilateral {
+            let pairs = max(1, (rows + 1) / 2)
+            return CGFloat(pairs) * (2 * rowHeight + rowSpacing) + CGFloat(pairs - 1) * pairSpacing
+        }
+        return CGFloat(rows) * rowHeight + CGFloat(rows - 1) * rowSpacing
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        if workoutExercise.unilateral {
+            VStack(spacing: pairSpacing) {
+                ForEach(0..<(workoutExercise.entryCount / 2), id: \.self) { pair in
+                    // One number for both sides, the sides next to their fields
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            setNumber(pair)
+                            VStack(spacing: rowSpacing) {
+                                sideLabel("R")
+                                sideLabel("L")
+                            }
+                        }
+                        .frame(width: setColumnWidth, alignment: .leading)
+                        VStack(spacing: rowSpacing) {
+                            fields(set: pair * 2)
+                            fields(set: pair * 2 + 1)
+                        }
+                    }
+                }
+            }
+        } else {
+            VStack(spacing: rowSpacing) {
+                ForEach(0..<workoutExercise.entryCount, id: \.self) { set in
+                    HStack(spacing: 8) {
+                        setNumber(set)
+                            .frame(width: setColumnWidth)
+                        fields(set: set)
+                    }
                 }
             }
         }
+    }
+
+    private func setNumber(_ index: Int) -> some View {
+        Text("\(index + 1)")
+            .font(.subheadline.weight(.semibold))
+            .monospacedDigit()
+            .foregroundStyle(userSettings.appColor)
+            .frame(width: 30, height: 30)
+            .background(userSettings.appColor.opacity(0.15), in: Circle())
+            .accessibilityLabel("Set \(index + 1)")
+    }
+
+    private func sideLabel(_ side: String) -> some View {
+        Text(side)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.secondary)
+            .frame(width: 16, height: rowHeight)
+            .accessibilityLabel(side == "R" ? "Right" : "Left")
+    }
+
+    @ViewBuilder
+    private func fields(set: Int) -> some View {
+        HStack(spacing: 8) {
+            ForEach(workoutExercise.trackedMetrics, id: \.self) { metric in
+                if let values = strings[metric], values.count == workoutExercise.entryCount {
+                    field(metric, set: set)
+                } else {
+                    Color.clear.frame(height: rowHeight)
+                }
+            }
+        }
+    }
+
+    private func field(_ metric: SetMetric, set: Int) -> some View {
+        TextField(placeholder(metric), text: binding(metric, set: set))
+            .font(fieldFont)
+            .fontDesign(.rounded)
+            .monospacedDigit()
+            .multilineTextAlignment(.center)
+            .frame(height: rowHeight)
+            .keyboardType(keyboard(metric))
+            .focused($focusedField, equals: Field(metric: metric, set: set))
+            .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                if focusedField == Field(metric: metric, set: set) {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(userSettings.appColor, lineWidth: 2)
+                }
+            }
     }
 
     func binding(_ metric: SetMetric, set: Int) -> Binding<String> {
@@ -164,7 +241,7 @@ struct NumberInsertView: View {
     // Takes the entered text over if it is valid, otherwise the field shows the stored value again.
     // An empty field and partial input like "-" or "1:" are kept as they are.
     func textChanged(_ metric: SetMetric, set: Int) {
-        guard let text = strings[metric]?[set], workoutExercise.value(of: metric, at: set) != nil else { return }
+        guard let text = strings[metric]?[safe: set], workoutExercise.tracks(metric) else { return }
 
         if let value = parse(text, metric: metric), metric.range.contains(value) {
             // Not set again for the value that is shown, e.g. right after setStrings formatted it
@@ -326,11 +403,5 @@ struct NumberInsertView: View {
 private extension Character {
     var isASCIIDigit: Bool {
         isASCII && isNumber
-    }
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }

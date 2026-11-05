@@ -55,138 +55,134 @@ private struct PastWorkoutDetailContentView: View {
     }
 
     var body: some View {
-        VStack{
-            let musclesTrained = workout.musclesTrained()
-            HighlightedBodyView(primaryMuscles: musclesTrained.0, secondaryMuscles: musclesTrained.1)
-            
-            VStack{
-                ForEach(summaryLines(), id: \.title) { line in
-                    StatRowView(line.title, line.value)
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 2)
-           
-            
-            VStack{
-                List{
-                    ForEach(workout.workoutExercises.sorted { $0.index < $1.index }){ workoutExercise in
-                        HStack(alignment: .top){
-                            HStack{
-                                Text(workoutExercise.exercise?.name ?? "")
-                                if workoutExercise.exercise?.verified == true{
-                                    Image(systemName: "checkmark.circle")
-                                        .foregroundStyle(Color.blue)
-                                        .accessibilityLabel("Verified")
-                                }
+        let musclesTrained = workout.musclesTrained()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(workout.date.formatted(.dateTime.weekday(.wide).day().month(.wide).year().hour().minute()))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+
+                // The body with the totals of the workout next to it
+                HStack(alignment: .center, spacing: 16) {
+                    HighlightedBodyView(primaryMuscles: musclesTrained.0, secondaryMuscles: musclesTrained.1)
+                        .frame(width: 130)
+                    LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], alignment: .leading, spacing: 14) {
+                        ForEach(summaryLines().filter { $0.title != "Date" }, id: \.title) { line in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(line.title)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                Text(line.value)
+                                    .font(.headline)
+                                    .fontDesign(.rounded)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
                             }
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing){
-                                ForEach(0..<workoutExercise.entryCount, id: \.self) {set in
+                            .accessibilityElement(children: .combine)
+                        }
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardBackground()
+
+                ForEach(workout.workoutExercises.sorted { $0.index < $1.index }){ workoutExercise in
+                    VStack(alignment: .leading, spacing: 8) {
+                        ExerciseNameText(name: workoutExercise.exercise?.name ?? "", verified: workoutExercise.exercise?.verified == true)
+                            .font(.headline)
+                        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+                            ForEach(0..<workoutExercise.entryCount, id: \.self) {set in
+                                GridRow {
+                                    Text("\(set + 1)")
+                                        .foregroundStyle(.secondary)
+                                        .monospacedDigit()
+                                        .gridColumnAlignment(.trailing)
                                     Text(workoutExercise.entryDescription(at: set, weightUnit: userSettings.weightUnit, distanceUnit: userSettings.distanceUnit))
                                 }
                             }
                         }
+                        .font(.subheadline)
                     }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardBackground()
                 }
-                .scrollIndicators(ScrollIndicatorVisibility.hidden)
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(lineWidth: 2)
-                )
-                .padding(10)
-                .scrollContentBackground(.hidden)
-                .listStyle(PlainListStyle())
             }
-            
-            .navigationTitle(workout.name)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { toolbarButtons }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+        .safeAreaInset(edge: .bottom) {
+            Button(action: repeatWorkout) {
+                Label("Repeat workout", systemImage: "arrow.counterclockwise")
+                    .font(.headline)
+                    .foregroundStyle(userSettings.appColorForeground)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(userSettings.appColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .alert("Are you sure you want to delete this workout?", isPresented: $showDeleteAlert) {
-                Button("Delete", role: .destructive) {
-                    vm.delete(workout)
-                    dismiss()
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        .navigationTitle(workout.name)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                ShareLink(item: getShareText()){
+                    Label("Share workout", systemImage: "square.and.arrow.up")
                 }
-                Button("Go back", role: .cancel) {}
-            } message: {
-                Text("If you delete this workout all of the progress you made will be deleted from the statistics as well.")
             }
-            .alert("Are you sure you want to continue with this workout?", isPresented: $showContinueAlert) {
-                Button("Continue", action: continueWorkout)
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("You can continue with this workout if you accidentally ended it.")
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("Continue workout", systemImage: "play") {
+                        showContinueAlert = true
+                    }
+                    Button("Edit workout", systemImage: "pencil") {
+                        showSheet = true
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        showDeleteAlert = true
+                    } label: {
+                        // The menu would draw the icon in the app color, like the others
+                        Label {
+                            Text("Delete workout")
+                        } icon: {
+                            Image(uiImage: UIImage(systemName: "trash")!.withTintColor(.systemRed, renderingMode: .alwaysOriginal))
+                        }
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis")
+                }
             }
-            .alert("Error", isPresented: $showNotContinueAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("You cannot continue a workout if another workout is already in progress.")
-            }
-            .alert("Error", isPresented: $showNotRepeatAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("You cannot repeat a workout if another workout is already in progress.")
-            }
-            .fullScreenCover(isPresented: $showSheet, content: {
-                EditPastWorkoutView(workout: workout, container: context.container)
-            })
-            
         }
-
-    }
-    
-    
-    var toolbarButtons: some View{
-        HStack{
-            Button(action: {
-                showContinueAlert = true
-            }, label: {
-                Image(systemName: "arrow.right.circle")
-                    .font(.headline)
-                    .foregroundStyle(userSettings.appColor)
-                    .accessibilityLabel("Continue workout")
-            })
-            .padding(.vertical, 10)
-            
-            Button(action: repeatWorkout, label: {
-                Image(systemName: "arrow.counterclockwise.circle")
-                    .font(.headline)
-                    .foregroundStyle(userSettings.appColor)
-                    .accessibilityLabel("Repeat workout")
-            })
-            .padding(.vertical, 10)
-            
-            ShareLink(item: getShareText()){
-                Image(systemName: "square.and.arrow.up")
-                    .foregroundStyle(userSettings.appColor)
-                    .font(.headline)
-                    .accessibilityLabel("Share workout")
+        .alert("Delete this workout?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                vm.delete(workout)
+                dismiss()
             }
-            
-            Button(action: {
-                showSheet.toggle()
-            }, label: {
-                Image(systemName: "pencil")
-                    .font(.headline)
-                    .foregroundStyle(userSettings.appColor)
-                    .accessibilityLabel("Edit workout")
-            })
-            .padding(.vertical, 10)
-            
-            Button(action: {
-                showDeleteAlert = true
-            }, label: {
-                Image(systemName: "trash")
-                    .font(.headline)
-                    .foregroundStyle(.red)
-                    .accessibilityLabel("Delete workout")
-            })
-            .padding(10)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("If you delete this workout all of the progress you made will be deleted from the statistics as well.")
         }
+        .alert("Continue this workout?", isPresented: $showContinueAlert) {
+            Button("Continue", action: continueWorkout)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You can continue with this workout if you accidentally ended it.")
+        }
+        .alert("Can't continue this workout", isPresented: $showNotContinueAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("You cannot continue a workout if another workout is already in progress.")
+        }
+        .alert("Can't repeat this workout", isPresented: $showNotRepeatAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("You cannot repeat a workout if another workout is already in progress.")
+        }
+        .fullScreenCover(isPresented: $showSheet, content: {
+            EditPastWorkoutView(workout: workout, container: context.container)
+        })
     }
     
     func continueWorkout() {
@@ -218,7 +214,7 @@ private struct PastWorkoutDetailContentView: View {
         let summary = StatsCalculator.summary(of: [workout])
         var lines: [(title: String, value: String)] = [
             ("Date", formatDate(date: workout.date)),
-            ("Time Trained", StatsSummary.formatDuration(minutes: summary.duration)),
+            ("Time trained", StatsSummary.formatDuration(minutes: summary.duration)),
             ("Sets", "\(summary.sets)")
         ]
         if summary.reps.isTracked {
@@ -228,10 +224,10 @@ private struct PastWorkoutDetailContentView: View {
             lines.append(("Volume", userSettings.weightUnit.formatVolume(kilograms: summary.volume)))
         }
         if summary.time.isTracked {
-            lines.append(("Exercise Time", StatsSummary.formatTime(seconds: summary.time.total)))
+            lines.append(("Exercise time", StatsSummary.formatTime(seconds: summary.time.total)))
         }
         if summary.intensity.isTracked {
-            lines.append(("Avg Intensity", summary.intensity.average.map(StatsSummary.formatIntensity) ?? "–"))
+            lines.append(("Avg intensity", summary.intensity.average.map(StatsSummary.formatIntensity) ?? "–"))
         }
         if summary.distance.isTracked {
             lines.append(("Distance", userSettings.distanceUnit.formatDistance(meters: summary.distance.total)))

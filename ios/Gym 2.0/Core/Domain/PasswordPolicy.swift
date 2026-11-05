@@ -17,13 +17,23 @@ enum PasswordPolicy {
         let length = password.unicodeScalars.count
         if length < 8 { return "At least 8 characters." }
         if length > 50 { return "At most 50 characters." }
+        if !hasEnoughKinds(password) { return "Use at least two of: lowercase letters, uppercase letters, digits, special characters." }
+        return nil
+    }
+
+    /// Whether the password has 8 to 50 characters
+    static func hasValidLength(_ password: String) -> Bool {
+        (8...50).contains(password.unicodeScalars.count)
+    }
+
+    /// Whether the password has at least two of lowercase letters, uppercase letters, digits and special characters
+    static func hasEnoughKinds(_ password: String) -> Bool {
         let kinds = [
             password.contains(where: \.isLowercase),
             password.contains(where: \.isUppercase),
             password.contains(where: { $0.isASCII && $0.isNumber }),
             password.contains(where: { !$0.isLetter && !$0.isNumber })
         ].filter { $0 }.count
-        if kinds < 2 { return "Use at least two of: lowercase letters, uppercase letters, digits, special characters." }
-        return nil
+        return kinds >= 2
     }
 }

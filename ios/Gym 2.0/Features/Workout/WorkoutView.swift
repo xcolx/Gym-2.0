@@ -13,7 +13,8 @@ enum NavigationDestination: Hashable {
     // the free workout prefilled with the name and exercises of a past workout, to do it again
     case repeatedWorkout(name: String, exercises: [Exercise])
     case suggestedWorkoutSettings
-    case suggestedWorkout(exerciseList: [Exercise])
+    // the picked exercises, and the settings to pick others with
+    case suggestedWorkout(settings: WorkoutSuggestion.Settings, exerciseList: [Exercise])
     case addScheme
     case editScheme(selectedScheme: WorkoutScheme)
     // the workout in progress to show
@@ -23,49 +24,32 @@ enum NavigationDestination: Hashable {
     case exercise(Exercise)
 }
 
+/// The start of a workout: a free or a suggested one, or one of the user's own workouts
 struct WorkoutView: View {
-    
+
     @Binding var navigationStackPath: [NavigationDestination]
-    
+
     var body: some View {
-        
-        NavigationStack(path: $navigationStackPath){
-            
-            VStack(alignment: .leading){
-                
-                NavigationLink(value: NavigationDestination.freeWorkout){
-                    Text("Free Workout")
-                        .foregroundStyle(Color("MyWhite"))
-                        .font(.title)
-                        .padding(15)
-                        .background(
-                            RoundedRectangle(cornerRadius: 25)
-                                .tint(Color("MyBlack"))
-                        )
+        NavigationStack(path: $navigationStackPath) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    HStack(spacing: 12) {
+                        NavigationLink(value: NavigationDestination.freeWorkout) {
+                            StartCard(title: "Free workout", subtitle: "Pick your exercises", systemImage: "plus")
+                        }
+                        NavigationLink(value: NavigationDestination.suggestedWorkoutSettings) {
+                            StartCard(title: "Suggested", subtitle: "Based on your week", systemImage: "sparkles")
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    WorkoutSchemesView(navigationStackPath: $navigationStackPath)
                 }
-                
-                
-                NavigationLink(value: NavigationDestination.suggestedWorkoutSettings){
-                    Text("Suggested Workout")
-                        .foregroundStyle(Color("MyWhite"))
-                        .font(.title)
-                        .padding(15)
-                        .background(
-                            RoundedRectangle(cornerRadius: 25)
-                                .tint(Color("MyBlack"))
-                        )
-                }
-                
-                WorkoutSchemesView(navigationStackPath: $navigationStackPath)
-                    .padding(.top, 10)
-                Spacer()
-                
+                .padding(.horizontal)
+                .padding(.bottom)
             }
-            
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Workout")
-            .navigationBarTitleDisplayMode(.automatic)
             .navigationDestination(for: NavigationDestination.self) { destination in
                 switch destination {
                 case .freeWorkout:
@@ -74,8 +58,8 @@ struct WorkoutView: View {
                     FreeWorkoutView(navigationStackPath: $navigationStackPath, workoutTitle: name, exerciseList: exercises)
                 case .suggestedWorkoutSettings:
                     SuggestedWorkoutSettingsView(navigationStackPath: $navigationStackPath)
-                case .suggestedWorkout(let exerciseList):
-                    SuggestedWorkoutView(navigationStackPath: $navigationStackPath, exerciseList: exerciseList)
+                case .suggestedWorkout(let settings, let exerciseList):
+                    SuggestedWorkoutView(navigationStackPath: $navigationStackPath, settings: settings, exerciseList: exerciseList)
                 case .addScheme:
                     AddSchemeWorkoutView()
                 case .editScheme(let scheme):
@@ -85,7 +69,7 @@ struct WorkoutView: View {
                 case .scheme(let scheme):
                     SchemeWorkoutView(workoutScheme: scheme, navigationStackPath: $navigationStackPath)
                 case .exercise(let exercise):
-                    ExerciseDetailView(exercise: exercise, exerciseList: .constant([]), showExercisesView: .constant(false), showAddButton: false)
+                    ExerciseDetailView(exercise: exercise)
                 }
             }
             
@@ -95,3 +79,36 @@ struct WorkoutView: View {
     }
 }
 
+/// One of the two ways to start a workout without a saved one
+private struct StartCard: View {
+
+    let title: String
+    let subtitle: String
+    let systemImage: String
+
+    @Environment(UserSettings.self) private var userSettings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(userSettings.appColorForeground)
+                .frame(width: 44, height: 44)
+                .background(userSettings.appColor, in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardBackground()
+        .contentShape(Rectangle())
+    }
+}

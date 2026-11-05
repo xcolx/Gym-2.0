@@ -28,43 +28,13 @@ struct SchemeWorkoutView: View {
         
     var body: some View {
         
-        EditWorkoutView(navStackTitle: workoutScheme.name, workoutTitle: $localName, exerciseList: $localExercises)
-        
-            HStack{
-                Spacer()
-                
-                Button(action: {
-                    guard workoutsInProgress.isEmpty else {
-                        showsWorkoutInProgress = true
-                        return
-                    }
-                    
-                    let sortedExercisesWithIndex = workoutScheme.exercises.sorted { $0.index < $1.index }
-                    let sortedExercises = sortedExercisesWithIndex.map { $0.exercise }
-                    if sortedExercises != localExercises || workoutScheme.name != localName{
-                        showSaveForTheFutureAlert.toggle()
-                    }
-                    
-                    let workout = Workout.create(name: localName, exercises: localExercises, bodyWeight: userSettings.bodyweight ?? 0)
-                    WorkoutSchemeRepository(context: context).startWorkout(workout, from: workoutScheme)
-                    navigationStackPath.append(.workout(workout))
-                    
-                    
-                }, label: {
-                    Text("Start Workout")
-                        .foregroundStyle(Color("MyWhite"))
-                        .font(.title)
-                        .padding(15)
-                        .background(
-                            RoundedRectangle(cornerRadius: 25)
-                                .tint(Color("MyBlack"))
-                        )
-                })
-                
-                
-                Spacer()
-            }.padding(.bottom, 10)
-        
+        EditWorkoutView(navStackTitle: workoutScheme.name, workoutTitle: $localName, exerciseList: $localExercises) {
+            Button(action: start) {
+                Label("Start workout", systemImage: "play.fill")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(localExercises.isEmpty)
+        }
             // A local copy of the title and the list, so that the changes aren't saved into the model right away
             .onAppear {
                 localName = workoutScheme.name
@@ -73,16 +43,27 @@ struct SchemeWorkoutView: View {
             }
             .alert("Do you want to save these changes for future use?", isPresented: $showSaveForTheFutureAlert) {
                 Button("Just once", role: .cancel) {}
-                Button("Save for future") {
+                Button("Save for the future") {
                     WorkoutSchemeRepository(context: context).update(workoutScheme, name: localName, exercises: localExercises)
                 }
             } message: {
-                Text("If not it's only going to be changed for this time.")
+                Text("Otherwise it's only changed for this time.")
             }
             .inProgressWorkoutChooser(isPresented: $showsWorkoutInProgress, title: "A workout is already in progress", message: "Finish or cancel it before you start a new one.") { workout in
                 navigationStackPath = [.workout(workout)]
             }
     }
-    
-}
 
+    private func start() {
+        guard workoutsInProgress.isEmpty else {
+            showsWorkoutInProgress = true
+            return
+        }
+        if workoutScheme.sortedExercises != localExercises || workoutScheme.name != localName {
+            showSaveForTheFutureAlert.toggle()
+        }
+        let workout = Workout.create(name: localName, exercises: localExercises, bodyWeight: userSettings.bodyweight ?? 0)
+        WorkoutSchemeRepository(context: context).startWorkout(workout, from: workoutScheme)
+        navigationStackPath.append(.workout(workout))
+    }
+}

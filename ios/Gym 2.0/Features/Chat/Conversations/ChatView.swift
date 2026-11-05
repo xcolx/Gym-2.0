@@ -59,7 +59,7 @@ private struct ChatContentView: View {
     var body: some View {
         // Removed by a sync, e.g. after the user was removed from the group
         if chat.modelContext == nil || chat.isDeleted {
-            ContentUnavailableView("Chat Not Available", systemImage: "bubble.left.and.exclamationmark.bubble.right", description: Text("You're no longer a member of this chat."))
+            ContentUnavailableView("Chat not available", systemImage: "bubble.left.and.exclamationmark.bubble.right", description: Text("You're no longer a member of this chat."))
         } else {
             content
         }
@@ -75,22 +75,24 @@ private struct ChatContentView: View {
         return VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 6) {
+                    LazyVStack(spacing: 0) {
                         ForEach(Array(messages.enumerated()), id: \.element.serverId) { index, message in
                             let previous = index > 0 ? messages[index - 1] : nil
+                            let next = index < messages.count - 1 ? messages[index + 1] : nil
+                            let startsRun = previous.map { !Self.continues($0, with: message) } ?? true
+                            let endsRun = next.map { !Self.continues(message, with: $0) } ?? !model.isPending
                             if previous.map({ !Calendar.current.isDate($0.createdAt, inSameDayAs: message.createdAt) }) ?? true {
-                                Text(message.createdAt, format: .dateTime.weekday(.wide).day().month(.wide))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.vertical, 6)
+                                DaySeparator(date: message.createdAt)
                             }
                             MessageBubbleView(
                                 message: message,
                                 isOwn: message.senderId == currentUserId,
                                 // the sender's name above the first of their messages in a row in groups
-                                senderName: chat.groupChat && message.senderId != currentUserId && previous?.senderId != message.senderId
+                                senderName: chat.groupChat && message.senderId != currentUserId && startsRun
                                     ? message.senderId.flatMap { users[$0]?.username } ?? "Unknown user"
                                     : nil,
+                                startsRun: startsRun,
+                                endsRun: endsRun,
                                 onTapPhoto: { model.viewedPhoto = ViewedPhoto(hash: $0) },
                                 onDelete: message.senderId == currentUserId || isAdmin ? { Task { await model.delete(message) } } : nil,
                                 onReport: message.senderId == currentUserId ? nil : {
@@ -100,17 +102,20 @@ private struct ChatContentView: View {
                                     model.reportTarget = .message(id: message.serverId, senderName: message.senderId.flatMap { users[$0]?.username }, deletes: true)
                                 }
                             )
+                            .padding(.top, startsRun ? 10 : 2)
                         }
 
                         if model.isPending {
                             pendingMessage
+                                .padding(.top, 10)
                         }
 
                         Color.clear
                             .frame(height: 1)
                             .id(bottomID)
                     }
-                    .padding()
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 }
                 .defaultScrollAnchor(.bottom)
                 .scrollDismissesKeyboard(.interactively)
@@ -124,32 +129,28 @@ private struct ChatContentView: View {
             }
             .overlay {
                 if messages.isEmpty && !model.isPending {
-                    ContentUnavailableView("No Messages", systemImage: "bubble.left", description: Text("Say hi!"))
+                    ContentUnavailableView("No messages yet", systemImage: "bubble.left.and.bubble.right", description: Text("Say hi!"))
                 }
             }
 
-            Divider()
-
             if let blockedReason {
-                Text(blockedReason)
+                Label(blockedReason, systemImage: "hand.raised.fill")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
                     .padding()
+                    .background(.bar)
             } else {
                 inputBar
             }
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle(chat.title(users: users, currentUserId: currentUserId))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(value: ChatRoute.info(chat)) {
-                    // A tap opens the chat info, not the photo
-                    ChatImageView(chat: chat, users: users, currentUserId: currentUserId, size: 32, opensPhotoViewer: false)
-                }
-                .accessibilityLabel("Chat info")
+            ToolbarItem(placement: .principal) {
+                titleButton(users: users)
             }
         }
         .onAppear {
@@ -193,49 +194,83 @@ private struct ChatContentView: View {
         .reportAlert(for: $model.reportTarget, delete: model.deleteMessage)
     }
 
+    /// Whether the second message joins the run of the first: the same sender, the same day and at most a few
+    /// minutes later
+    private static func continues(_ first: Message, with second: Message) -> Bool {
+        first.senderId == second.senderId
+            && Calendar.current.isDate(first.createdAt, inSameDayAs: second.createdAt)
+            && second.createdAt.timeIntervalSince(first.createdAt) < 5 * 60
+    }
+
+    // MARK: - Title
+
+    /// The image and the name of the chat, which open the chat info
+    private func titleButton(users: [Int: User]) -> some View {
+        NavigationLink(value: ChatRoute.info(chat)) {
+            HStack(spacing: 8) {
+                // A tap opens the chat info, not the photo
+                ChatImageView(chat: chat, users: users, currentUserId: currentUserId, size: 30, opensPhotoViewer: false)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(chat.title(users: users, currentUserId: currentUserId))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    if chat.groupChat {
+                        Text(chat.members.count == 1 ? "1 member" : "\(chat.members.count) members")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .lineLimit(1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(chat.title(users: users, currentUserId: currentUserId)), chat info")
+    }
+
     // MARK: - Input
 
     private var inputBar: some View {
         @Bindable var model = model
         // read here, the label of the photos picker isn't isolated to the main actor
         let isSendingPhoto = model.isSendingPhoto
-        return HStack(alignment: .bottom, spacing: 10) {
+        let tint = userSettings.appColor
+        return HStack(alignment: .bottom, spacing: 8) {
             PhotosPicker(selection: $model.selectedPhoto, matching: .images, photoLibrary: .shared()) {
-                if isSendingPhoto {
-                    ProgressView()
-                        .frame(width: 28, height: 34)
-                } else {
-                    Image(systemName: "photo")
-                        .font(.title3)
-                        .frame(width: 28, height: 34)
+                Group {
+                    if isSendingPhoto {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "plus")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(tint)
+                    }
                 }
+                .frame(width: 36, height: 36)
+                .background(Color(.secondarySystemGroupedBackground), in: Circle())
             }
+            .buttonStyle(.plain)
             .disabled(model.isSendingPhoto)
             .accessibilityLabel("Send photo")
 
-            TextField("Message", text: $model.draft, axis: .vertical)
-                .lineLimit(1...5)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                // Not while it's being sent: a disabled field loses the focus, which closes the keyboard on every send
-                .disabled(model.isPending && !model.isSending)
+            HStack(alignment: .bottom, spacing: 4) {
+                TextField("Message", text: $model.draft, axis: .vertical)
+                    .lineLimit(1...5)
+                    .padding(.leading, 14)
+                    .padding(.vertical, 8)
+                    // Not while it's being sent: a disabled field loses the focus, which closes the keyboard on every send
+                    .disabled(model.isPending && !model.isSending)
 
-            Button {
-                Task { await model.send() }
-            } label: {
-                if model.isSending {
-                    ProgressView()
-                        .frame(width: 34, height: 34)
-                } else {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundStyle(model.canSend ? userSettings.appColor : Color.gray)
+                SendButton(isSending: model.isSending, canSend: model.canSend) {
+                    Task { await model.send() }
                 }
+                .padding(3)
             }
-            .disabled(!model.canSend)
-            .accessibilityLabel("Send")
+            .messageFieldBackground()
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
+        .background(.bar)
     }
 
     /// The text that couldn't be sent yet, e.g. offline. It's sent again by every sync until the server accepts it.
@@ -246,104 +281,166 @@ private struct ChatContentView: View {
                 Text(chat.input)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(userSettings.appColor.opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
-                    .foregroundStyle(.white)
+                    .background(userSettings.appColor.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .foregroundStyle(userSettings.appColorForeground)
             }
-            HStack(spacing: 12) {
-                Text(model.isSending ? "Sending..." : "Not sent yet, it's sent when you're online")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if !model.isSending {
+            HStack(spacing: 6) {
+                if model.isSending {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("Sending…")
+                } else {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(.red)
+                    Text("Not sent, it's sent when you're online")
                     Button("Retry") { Task { await model.retry() } }
-                        .font(.caption)
+                        .fontWeight(.semibold)
                 }
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
         }
     }
 }
 
-/// A message as a bubble, the own ones on the right in the app color
+/// The day above its first message, as a small capsule
+private struct DaySeparator: View {
+
+    let date: Date
+
+    private var text: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        if calendar.isDate(date, equalTo: .now, toGranularity: .year) {
+            return date.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        }
+        return date.formatted(.dateTime.day().month(.wide).year())
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Color(.tertiarySystemFill), in: Capsule())
+            .frame(maxWidth: .infinity)
+            .padding(.top, 16)
+            .padding(.bottom, 4)
+    }
+}
+
+/// A message as a bubble, the own ones on the right in the app color. The messages a sender sent in a row are
+/// grouped: their bubbles are close together, with the time below the last one.
 struct MessageBubbleView: View {
 
     let message: Message
     let isOwn: Bool
     /// Shown above the bubble, for the messages of others in groups
     let senderName: String?
+    /// The first message of the sender's run, with a round corner at the top
+    var startsRun = true
+    /// The last message of the sender's run, with a round corner at the bottom and the time below it
+    var endsRun = true
     let onTapPhoto: (String) -> Void
-    /// Set for the own messages (and all messages for group admins): "Delete for Everyone" in the context menu of the
+    /// Set for the own messages (and all messages for group admins): "Delete for everyone" in the context menu of the
     /// long press
     var onDelete: (() -> Void)? = nil
     /// Set for the messages of others: "Report…" in the context menu of the long press
     var onReport: (() -> Void)? = nil
-    /// Set for the messages of others for group admins: "Delete and Report…" in the context menu of the long press
+    /// Set for the messages of others for group admins: "Delete and report…" in the context menu of the long press
     var onDeleteAndReport: (() -> Void)? = nil
 
     @Environment(UserSettings.self) private var userSettings
+
+    private var shape: UnevenRoundedRectangle {
+        let round: CGFloat = 18
+        let joined: CGFloat = 5
+        let top = startsRun ? round : joined
+        let bottom = endsRun ? round : joined
+        return UnevenRoundedRectangle(
+            topLeadingRadius: isOwn ? round : top,
+            bottomLeadingRadius: isOwn ? round : bottom,
+            bottomTrailingRadius: isOwn ? bottom : round,
+            topTrailingRadius: isOwn ? top : round,
+            style: .continuous
+        )
+    }
 
     var body: some View {
         HStack {
             if isOwn {
                 Spacer(minLength: 60)
             }
-            VStack(alignment: isOwn ? .trailing : .leading, spacing: 2) {
+            VStack(alignment: isOwn ? .trailing : .leading, spacing: 3) {
                 if let senderName {
                     Text(senderName)
-                        .font(.caption.bold())
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, 12)
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    if let imageUrl = message.imageUrl {
-                        Button {
-                            onTapPhoto(imageUrl)
-                        } label: {
-                            // decoded at the size it's shown, full size images make the scrolling stutter
-                            ServerImageView(hash: imageUrl, contentMode: .fit, maxPixelSize: 720) {
-                                Rectangle()
-                                    .fill(.gray.opacity(0.3))
-                                    .frame(width: 200, height: 200)
-                                    .overlay { ProgressView() }
-                            }
-                            .frame(maxWidth: 240, maxHeight: 320)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Photo")
-                    }
-                    if let content = message.content {
-                        // No text selection: the long press opens the context menu, which has "Copy"
-                        Text(content)
-                    }
+                bubble
+                if endsRun {
                     Text(message.createdAt, format: .dateTime.hour().minute())
                         .font(.caption2)
-                        .opacity(0.7)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .fixedSize(horizontal: false, vertical: true)
-                .background(isOwn ? userSettings.appColor : Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-                .foregroundStyle(isOwn ? .white : .primary)
-                .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 16))
-                .contextMenu {
-                    if let content = message.content {
-                        Button("Copy", systemImage: "doc.on.doc") {
-                            UIPasteboard.general.string = content
-                        }
-                    }
-                    if let onDelete {
-                        Button("Delete for Everyone", systemImage: "trash", role: .destructive, action: onDelete)
-                    }
-                    if let onDeleteAndReport {
-                        Button("Delete and Report…", systemImage: "trash.slash", role: .destructive, action: onDeleteAndReport)
-                    }
-                    if let onReport {
-                        Button("Report…", systemImage: "exclamationmark.bubble", role: .destructive, action: onReport)
-                    }
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
                 }
             }
             if !isOwn {
                 Spacer(minLength: 60)
+            }
+        }
+    }
+
+    private var bubble: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let imageUrl = message.imageUrl {
+                Button {
+                    onTapPhoto(imageUrl)
+                } label: {
+                    // decoded at the size it's shown, full size images make the scrolling stutter
+                    ServerImageView(hash: imageUrl, contentMode: .fit, maxPixelSize: 720) {
+                        Rectangle()
+                            .fill(.gray.opacity(0.3))
+                            .frame(width: 200, height: 200)
+                            .overlay { ProgressView() }
+                    }
+                    .frame(maxWidth: 240, maxHeight: 320)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Photo")
+                .padding(4)
+            }
+            if let content = message.content {
+                // No text selection: the long press opens the context menu, which has "Copy"
+                Text(content)
+                    .padding(.horizontal, 12)
+                    .padding(.top, message.imageUrl == nil ? 8 : 4)
+                    .padding(.bottom, 8)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .background(isOwn ? userSettings.appColor : Color(.secondarySystemGroupedBackground), in: shape)
+        .foregroundStyle(isOwn ? userSettings.appColorForeground : .primary)
+        .contentShape(.contextMenuPreview, shape)
+        .contextMenu {
+            if let content = message.content {
+                Button("Copy", systemImage: "doc.on.doc") {
+                    UIPasteboard.general.string = content
+                }
+            }
+            if let onDelete {
+                Button("Delete for everyone", systemImage: "trash", role: .destructive, action: onDelete)
+            }
+            if let onDeleteAndReport {
+                Button("Delete and report…", systemImage: "trash.slash", role: .destructive, action: onDeleteAndReport)
+            }
+            if let onReport {
+                Button("Report…", systemImage: "exclamationmark.bubble", role: .destructive, action: onReport)
             }
         }
     }
@@ -357,7 +454,6 @@ private struct PhotoComposeView: View {
     let onSend: (String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(UserSettings.self) private var userSettings
     @State private var caption = ""
     @FocusState private var isCaptionFocused: Bool
 
@@ -374,26 +470,26 @@ private struct PhotoComposeView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding()
 
-                HStack(alignment: .bottom, spacing: 10) {
+                HStack(alignment: .bottom, spacing: 4) {
                     TextField("Add a message", text: $caption, axis: .vertical)
                         .lineLimit(1...5)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
                         .focused($isCaptionFocused)
+                        .padding(.leading, 14)
+                        .padding(.vertical, 8)
 
-                    Button {
+                    SendButton(isSending: false, canSend: trimmedCaption.count <= maxCaptionLength) {
                         onSend(trimmedCaption.isEmpty ? nil : trimmedCaption)
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 30))
-                            .foregroundStyle(trimmedCaption.count <= maxCaptionLength ? userSettings.appColor : Color.gray)
                     }
-                    .disabled(trimmedCaption.count > maxCaptionLength)
                     .accessibilityLabel("Send photo")
+                    .padding(3)
                 }
+                .messageFieldBackground()
                 .padding(.horizontal)
                 .padding(.vertical, 8)
+                .background(.bar)
             }
-            .navigationTitle("Send Photo")
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Send photo")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

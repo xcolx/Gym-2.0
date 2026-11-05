@@ -13,17 +13,19 @@ import Observation
 @Observable
 final class AuthViewModel {
 
-    enum Screen: Equatable {
+    enum Screen: Hashable {
+        /// The start, from which the others are opened
+        case welcome
         case login
         case signUp
         case forgotPassword
-        /// After creating an account, until the user goes back to the login
+        /// After creating an account or logging in with an email that isn't verified yet
         case checkEmail(email: String, message: String)
     }
 
     @ObservationIgnored let auth: any AuthServicing
 
-    var screen: Screen = .login
+    var screen: Screen = .welcome
     var email = ""
 
     init(auth: any AuthServicing) {
@@ -55,8 +57,6 @@ final class LoginViewModel {
     var password = ""
     var isLoading = false
     var errorMessage: String?
-    var emailNotVerified = false
-    var resendMessage: String?
 
     init(session: AuthViewModel) {
         self.session = session
@@ -75,26 +75,16 @@ final class LoginViewModel {
         guard canSubmit else { return }
         isLoading = true
         errorMessage = nil
-        emailNotVerified = false
-        resendMessage = nil
         defer { isLoading = false }
         do {
             try await session.auth.login(email: session.trimmedEmail, password: password)
         } catch {
-            errorMessage = error.localizedDescription
+            // The verification hint offers to send the email again
             if case .server(_, "EmailVerificationError"?, _) = error as? APIError {
-                emailNotVerified = true
+                session.show(.checkEmail(email: session.trimmedEmail, message: error.localizedDescription))
+            } else {
+                errorMessage = error.localizedDescription
             }
-        }
-    }
-
-    func resendVerificationEmail() async {
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            resendMessage = try await session.auth.resendVerificationEmail(to: session.trimmedEmail)
-        } catch {
-            resendMessage = error.localizedDescription
         }
     }
 }
@@ -132,6 +122,18 @@ final class SignUpViewModel {
             return "Username may only contain letters, numbers, \"_\", \".\" and \"-\"."
         }
         return nil
+    }
+
+    var passwordHasValidLength: Bool {
+        PasswordPolicy.hasValidLength(password)
+    }
+
+    var passwordHasEnoughKinds: Bool {
+        PasswordPolicy.hasEnoughKinds(password)
+    }
+
+    var passwordsMatch: Bool {
+        !password.isEmpty && password == passwordConfirmation
     }
 
     var passwordProblem: String? {
