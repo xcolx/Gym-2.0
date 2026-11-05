@@ -74,7 +74,9 @@ struct MainView: View {
             
             ChatsView()
                 .tabItem{
-                    Image(systemName: "star.bubble")
+                    // outlined: the tab bar fills its symbols otherwise
+                    Image(systemName: "bubble.left.and.bubble.right")
+                        .environment(\.symbolVariants, .none)
                     Text("Chat")
                 }
                 .tag("Chats")
