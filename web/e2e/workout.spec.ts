@@ -49,9 +49,9 @@ test("logs a workout that reaches the server and the user's other devices", asyn
   // The other device loads it with its first sync
   const phone = await deviceOf(browser, user);
   await phone.goto("/stats");
-  const stat = (term: string) => phone.getByRole("term").filter({ hasText: term }).locator("+ dd");
-  await expect(stat("Number of Workouts")).toHaveText("1");
-  await expect(stat("Total Reps")).toHaveText("18");
+  const total = (label: string) => phone.getByRole("group", { name: label, exact: true });
+  await expect(total("Workouts")).toContainText("1");
+  await expect(total("Reps")).toContainText("18");
 });
 
 test("keeps the sets entered offline and uploads them once online", async ({ page, context, request }) => {

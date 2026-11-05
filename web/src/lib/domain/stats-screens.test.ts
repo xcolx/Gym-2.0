@@ -6,7 +6,6 @@ import { distributionPercentages } from "./muscle-distribution";
 import { makeMuscleMask, maskAlpha, maskSize } from "./muscle-mask";
 import {
   exerciseStatsLines,
-  exercisesWithStats,
   interestingFactShareText,
   pastWorkoutShareText,
   pastWorkoutSummaryLines,
@@ -91,12 +90,12 @@ describe("past workout (PastWorkoutDetailView)", () => {
   it("shows the lines of the metrics tracked in the workout", () => {
     expect(pastWorkoutSummaryLines(workout, metric)).toEqual([
       { title: "Date", value: "12.10.26" },
-      { title: "Time Trained", value: "1 h 15 min" },
+      { title: "Time trained", value: "1 h 15 min" },
       { title: "Sets", value: "4" },
       { title: "Reps", value: "18" },
       { title: "Volume", value: "1.1k kg" },
-      { title: "Exercise Time", value: "8 min" },
-      { title: "Avg Intensity", value: "lvl 7.5" },
+      { title: "Exercise time", value: "8 min" },
+      { title: "Avg intensity", value: "lvl 7.5" },
       { title: "Distance", value: "3.5 km" },
     ]);
     const onlyRowing = makeWorkoutWithExercises({ duration: 20 }, [
@@ -106,15 +105,15 @@ describe("past workout (PastWorkoutDetailView)", () => {
       pastWorkoutSummaryLines(onlyRowing, metric)
         .map((line) => `${line.title}: ${line.value}`)
         .slice(2),
-    ).toEqual(["Sets: 1", "Exercise Time: 0 s", "Avg Intensity: –", "Distance: 0 m"]);
+    ).toEqual(["Sets: 1", "Exercise time: 0 s", "Avg intensity: –", "Distance: 0 m"]);
   });
 
   it("shares the workout with all its sets", () => {
     const anHourLater = new Date(workout.date.getTime() + 60 * 60 * 1000);
     expect(pastWorkoutShareText(workout, metric, anHourLater)).toBe(
       "I just completed a workout and tracked it with Gym 2.0! Check it out:\n\nPush\n" +
-        "Date: 12.10.26\nTime Trained: 1 h 15 min\nSets: 4\nReps: 18\nVolume: 1.1k kg\nExercise Time: 8 min\n" +
-        "Avg Intensity: lvl 7.5\nDistance: 3.5 km\n\n" +
+        "Date: 12.10.26\nTime trained: 1 h 15 min\nSets: 4\nReps: 18\nVolume: 1.1k kg\nExercise time: 8 min\n" +
+        "Avg intensity: lvl 7.5\nDistance: 3.5 km\n\n" +
         "💪Bench Press\n10x, 60.0 kg\n8x, 62.5 kg\n\n" +
         "💪Rowing\n8:00, lvl 7.5, 2 km\n0:00, lvl 0, 1.5 km\n\n",
     );
@@ -133,31 +132,6 @@ describe("past workout (PastWorkoutDetailView)", () => {
 });
 
 describe("exercise stats (ExercisesStatsView, ExercisesStatsDetailView)", () => {
-  it("lists the exercises of the workouts by name like Swift's <, or by the search incl. aliases", () => {
-    const squat = makeExercise({ id: "squat", name: "Squat" });
-    const arnold = makeExercise({ id: "arnold", name: "arnold press" });
-    const shoulder = makeExercise({ id: "shoulder", name: "Barbell Shoulder Press", aliases: ["Military Press"] });
-    const workouts = [
-      makeWorkoutWithExercises({}, [
-        [squat, {}],
-        [arnold, {}],
-      ]),
-      makeWorkoutWithExercises({}, [
-        [bench, {}],
-        [squat, {}],
-        [shoulder, {}],
-      ]),
-    ];
-    expect(exercisesWithStats(workouts, "").map((e) => e.name)).toEqual([
-      "Barbell Shoulder Press",
-      "Bench Press",
-      "Squat",
-      "arnold press",
-    ]);
-    expect(exercisesWithStats(workouts, "military").map((e) => e.id)).toEqual(["shoulder"]);
-    expect(exercisesWithStats(workouts, "press").map((e) => e.id)).toEqual(["arnold", "bench", "shoulder"]);
-  });
-
   it("sums up the values the exercise tracks", () => {
     const history = [
       makeWorkoutExercise({ workoutId: "a", exerciseId: "bench", reps: [10, 8], weights: [60, 62.5] }),
@@ -166,10 +140,10 @@ describe("exercise stats (ExercisesStatsView, ExercisesStatsDetailView)", () => 
     expect(exerciseStatsLines(bench, history, metric)).toEqual([
       { title: "Workouts", value: "2" },
       { title: "Sets", value: "3" },
-      { title: "Total Reps", value: "30" },
-      { title: "Avg Reps per Set", value: "10" },
+      { title: "Total reps", value: "30" },
+      { title: "Avg reps per set", value: "10" },
       { title: "Volume", value: "1.9k kg" },
-      { title: "Personal Record", value: "12x 62.5 kg" },
+      { title: "Personal record", value: "12x 62.5 kg" },
     ]);
     expect(exerciseStatsLines(bench, [], metric).map((line) => line.value)).toEqual(["0", "0", "0", "–", "0 kg", "–"]);
 
@@ -186,14 +160,14 @@ describe("exercise stats (ExercisesStatsView, ExercisesStatsDetailView)", () => 
     expect(exerciseStatsLines(rowing, rows, metric)).toEqual([
       { title: "Workouts", value: "1" },
       { title: "Sets", value: "2" },
-      { title: "Total Time", value: "8 min" },
-      { title: "Avg Time per Set", value: "8 min" },
-      { title: "Longest Set", value: "8 min" },
-      { title: "Avg Intensity", value: "lvl 7.5" },
-      { title: "Highest Intensity", value: "lvl 7.5" },
-      { title: "Total Distance", value: "3.5 km" },
-      { title: "Avg Distance per Set", value: "1.75 km" },
-      { title: "Longest Set", value: "2 km" },
+      { title: "Total time", value: "8 min" },
+      { title: "Avg time per set", value: "8 min" },
+      { title: "Longest set", value: "8 min" },
+      { title: "Avg intensity", value: "lvl 7.5" },
+      { title: "Highest intensity", value: "lvl 7.5" },
+      { title: "Total distance", value: "3.5 km" },
+      { title: "Avg distance per set", value: "1.75 km" },
+      { title: "Longest set", value: "2 km" },
     ]);
   });
 });

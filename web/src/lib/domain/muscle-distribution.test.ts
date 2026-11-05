@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { makeExercise, makeWorkoutWithExercises, muscleGroups, muscles } from "@/test/fixtures";
-import { distributionPercentages } from "./muscle-distribution";
+import { distributionPercentages, distributionRows } from "./muscle-distribution";
 
 // Chest (1) primary, Triceps (2) secondary
 const bench = makeExercise({ muscleGroupId: 1, primaryMuscleIds: [1], secondaryMuscleIds: [2] });
@@ -48,5 +48,16 @@ describe("distributionPercentages", () => {
     const orphan = { ...push, workoutExercises: push.workoutExercises.map((we) => ({ ...we, exercise: null })) };
     expect(distributionPercentages([orphan], muscles, muscleGroups, "Reps", "Muscle")).toEqual([0, 0, 0, 0]);
     expect(distributionPercentages([orphan], muscles, muscleGroups, "Workouts", "Muscle Group")).toEqual([0, 0]);
+  });
+});
+
+describe("distributionRows", () => {
+  it("lists the values, the most trained first, then by name", () => {
+    expect(distributionRows([push, legs], muscles, muscleGroups, "Sets", "Muscle")).toEqual([
+      { name: "Chest", value: 3 },
+      { name: "Quads", value: 2 },
+      { name: "Triceps", value: 0.99 },
+      { name: "Front Deltoid", value: 0 },
+    ]);
   });
 });

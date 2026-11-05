@@ -52,7 +52,7 @@ web/
       home/                 HomeView
       chat/                 ChatsView, [chatId] (ChatView), [chatId]/info, friends, groups, ai (Gym-AI)
       workout/              WorkoutView entry, free, schemes/{add,[schemeId],[schemeId]/edit}, suggested, active/[workoutId]
-      stats/                StatsView, distribution, exercises, facts, past-workouts/[workoutId]/edit
+      stats/                StatsView, distribution, exercises/[exerciseId], past-workouts/[workoutId]/edit
       settings/             SettingsView, account (AccountView) and account/{username,email,password}, blocked-users,
                             sync (SyncView) and sync/problems
     components/
@@ -566,8 +566,11 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   `FormRow` (content `className`, row `rowClassName` and props such as `onContextMenu`), `PressableRow` (a row that is
   a button with any content), `LinkRow`, `ButtonRow` (tinted or `destructive`, an icon may come first), `InputRow`,
   `SettingsLabel` (SettingsLabel.swift: a title with its icon in the app color, e.g. the `label` of a `LinkRow`)),
-  inset separators like iOS. Used by the settings, auth and chat screens. components/chat/chat-controls.tsx only keeps what
-  the chat alone uses: `ContentUnavailable`, `Menu` and the button styles.
+  inset separators like iOS. Used by the settings, auth and chat screens.
+- `ui/Menu.tsx`: `Menu` (the "…" and sort menus of the toolbars, items with an icon, `destructive`, `disabled` or
+  `checked`); `ui/ContentUnavailable.tsx` (ContentUnavailableView); `ui/ExerciseName.tsx` (ExerciseNameText.swift: the
+  name with the verified badge in the app color); `BottomActionBar` of `ui/PrimaryButton.tsx` (`.bottomActionBar`).
+  components/chat/chat-controls.tsx only keeps what the chat alone uses: the button styles and colors.
 
 ## Domain logic (`lib/domain`, pure, unit tested)
 
@@ -575,6 +578,10 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `fuzzy-search.ts` (FuzzySearch): `fuzzyScore`, `fuzzyFilter(items, query, names)`; use `exerciseSearchNames` to include aliases.
 - `units.ts` (Units): conversions, `formatWeight`, `formatDistance`, `formatVolume`, `formatNumber`, `unitOrMetric`.
 - `password-policy.ts`: `passwordProblem(password)`.
+- `stats-overview.ts` (StatsOverview.swift and the helpers of the stats screens): `statsOverview` (minutes per day,
+  sets per muscle, exercise count), `topMuscles`, the activity board (`activityWeeks`, `activityLevel`,
+  `monthStartIndices`), `workoutsByMonth`, `exerciseStatsRows` / `shownExerciseStatsRows`, the progress chart
+  (`chartMetrics`, `chartValue`, `chartRangeStart`) and `personalRecordSet`.
 - `interesting-facts.ts`: `interestingFacts({ workouts, equipment, muscleGroups, memberSince, weightUnit, distanceUnit, now?, weekStartsOn?, locale? })`, `formatCount`.
 - `format.ts` (DateFormatting.swift): `formatDate` (dd.MM.yy), `formatMonthYear`, `timeFromDate` (HH:mm), `startOfWeek`, `firstWeekday`, `roundHalfAwayFromZero`,
   `appLocale()` (English with the browser's region), `characterCount` (unicode scalars like the server's limits), `prefixCharacters` (grapheme clusters like Swift's `prefix`).
@@ -596,7 +603,7 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - Routes go in `src/app/<tab>/...` (tabs: home, chat, workout, stats, settings; auth UI in `src/app/auth/...`).
   Data pages are client components. Use the shared components of `components/ui` (Sheet, Alert, ActionSheet, Switch,
   ...) instead of building another overlay or control.
-- Route folders only hold `page.tsx` and `layout.tsx` (and data of that one page, e.g. `app/stats/sections.ts`).
+- Route folders only hold `page.tsx` and `layout.tsx` (and data of that one page).
   Components go in `src/components/<tab>/` (e.g. `components/workout/WorkoutPager.tsx`), or in `components/ui/` when
   several tabs use them. Logic without UI goes into `lib/domain` with a `*.test.ts` next to it.
 - Read with hooks, write with repo functions. Don't call `db.*` from components; add a hook/repo function instead:
@@ -657,7 +664,7 @@ backend, also offline. What is still different from iOS or left to do:
 | Features/Settings/* | app/settings/**, components/settings/, lib/repo/settings-feature.ts, lib/domain/profile-image-crop.ts |
 | Features/Chat/* | app/chat/**, components/chat/, lib/chat/actions.ts, lib/domain/chat-feature.ts, ai-chat.ts |
 | Features/Workout/* | app/workout/**, components/workout/ |
-| Features/Stats/* | app/stats/**, components/stats/, lib/domain/stats-screens.ts, workout-file.ts, legacy-workout-import.ts, lib/repo/stats-feature.ts |
+| Features/Stats/* | app/stats/**, components/stats/, lib/domain/stats-screens.ts, stats-overview.ts, workout-file.ts, legacy-workout-import.ts, lib/repo/stats-feature.ts |
 | Features/Settings/SyncProblemsView.swift, SettingsView (SyncView) | app/settings/sync/problems/page.tsx, app/settings/sync/page.tsx |
 | DesignSystem/Components/* | components/ui/ (HighlightedBody, PhotoViewer, ServerImage, ProfileIcon, AppColorSegmentedPicker) |
 | @Query | lib/repo/hooks.ts |

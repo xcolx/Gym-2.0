@@ -1,7 +1,5 @@
 import type { Exercise, UnitSystem, WorkoutExercise, WorkoutWithExercises } from "@/types/models";
-import { exerciseSearchNames } from "./exercise";
 import { formatDate } from "./format";
-import { fuzzyFilter } from "./fuzzy-search";
 import {
   formatDuration,
   formatIntensity,
@@ -32,17 +30,17 @@ export function pastWorkoutSummaryLines(workout: WorkoutWithExercises, units: Di
   const summary = summaryOfWorkouts([workout]);
   const lines: StatLine[] = [
     { title: "Date", value: formatDate(workout.date) },
-    { title: "Time Trained", value: formatDuration(summary.duration) },
+    { title: "Time trained", value: formatDuration(summary.duration) },
     { title: "Sets", value: String(summary.sets) },
   ];
   if (summary.reps.isTracked) lines.push({ title: "Reps", value: String(Math.trunc(summary.reps.total)) });
   if (workout.workoutExercises.some((we) => we.reps !== null && we.weights !== null)) {
     lines.push({ title: "Volume", value: formatVolume(summary.volume, units.weightUnit) });
   }
-  if (summary.time.isTracked) lines.push({ title: "Exercise Time", value: formatTime(summary.time.total) });
+  if (summary.time.isTracked) lines.push({ title: "Exercise time", value: formatTime(summary.time.total) });
   if (summary.intensity.isTracked) {
     const average = metricAverage(summary.intensity);
-    lines.push({ title: "Avg Intensity", value: average === null ? "–" : formatIntensity(average) });
+    lines.push({ title: "Avg intensity", value: average === null ? "–" : formatIntensity(average) });
   }
   if (summary.distance.isTracked) {
     lines.push({ title: "Distance", value: formatDistance(summary.distance.total, units.distanceUnit) });
@@ -89,40 +87,10 @@ export function interestingFactShareText(factText: string): string {
 
 // MARK: - Exercises
 
-/** Swift's `<` on strings: by Unicode scalars, case sensitive */
-function compareOrdinal(a: string, b: string): number {
-  const first = Array.from(a);
-  const second = Array.from(b);
-  for (let i = 0; i < Math.min(first.length, second.length); i++) {
-    const difference = first[i].codePointAt(0)! - second[i].codePointAt(0)!;
-    if (difference !== 0) return difference;
-  }
-  return first.length - second.length;
-}
-
-/**
- * The exercises done in the finished workouts, sorted by name, or the ones matching the search (incl. the aliases),
- * best match first (`filteredExercises`)
- */
-export function exercisesWithStats(workouts: readonly WorkoutWithExercises[], searchText: string): Exercise[] {
-  const exercises: Exercise[] = [];
-  const seen = new Set<string>();
-  for (const workout of workouts) {
-    for (const { exercise } of workout.workoutExercises) {
-      if (exercise && !seen.has(exercise.id)) {
-        seen.add(exercise.id);
-        exercises.push(exercise);
-      }
-    }
-  }
-  exercises.sort((a, b) => compareOrdinal(a.name, b.name));
-  return searchText === "" ? exercises : fuzzyFilter(exercises, searchText, exerciseSearchNames);
-}
-
 /** A workout exercise of a finished workout, with the workout it belongs to */
 export type HistoryEntry = WorkoutExercise & { workout: { id: string; name: string; date: Date } };
 
-/** The summary of an exercise, only the values the exercise tracks (`summaryView`) */
+/** The tiles of the totals of an exercise, only the values the exercise tracks (`statTiles`) */
 export function exerciseStatsLines(
   exercise: Exercise,
   history: readonly WorkoutExercise[],
@@ -143,30 +111,30 @@ export function exerciseStatsLines(
     { title: "Sets", value: String(summary.sets) },
   ];
   if (exercise.tracksReps) {
-    lines.push({ title: "Total Reps", value: String(Math.trunc(summary.reps.total)) });
-    lines.push({ title: "Avg Reps per Set", value: average(summary.reps, (value) => formatNumber(value, 1)) });
+    lines.push({ title: "Total reps", value: String(Math.trunc(summary.reps.total)) });
+    lines.push({ title: "Avg reps per set", value: average(summary.reps, (value) => formatNumber(value, 1)) });
   }
   if (exercise.tracksWeights) {
     if (exercise.tracksReps) lines.push({ title: "Volume", value: formatVolume(summary.volume, weightUnit) });
     lines.push({
-      title: "Personal Record",
+      title: "Personal record",
       value: summary.personalRecord ? formatRecord(summary.personalRecord, weightUnit) : "–",
     });
   }
   if (exercise.tracksTime) {
-    lines.push({ title: "Total Time", value: formatTime(summary.time.total) });
-    lines.push({ title: "Avg Time per Set", value: average(summary.time, formatTime) });
-    lines.push({ title: "Longest Set", value: maximum(summary.time, formatTime) });
+    lines.push({ title: "Total time", value: formatTime(summary.time.total) });
+    lines.push({ title: "Avg time per set", value: average(summary.time, formatTime) });
+    lines.push({ title: "Longest set", value: maximum(summary.time, formatTime) });
   }
   if (exercise.tracksIntensity) {
-    lines.push({ title: "Avg Intensity", value: average(summary.intensity, formatIntensity) });
-    lines.push({ title: "Highest Intensity", value: maximum(summary.intensity, formatIntensity) });
+    lines.push({ title: "Avg intensity", value: average(summary.intensity, formatIntensity) });
+    lines.push({ title: "Highest intensity", value: maximum(summary.intensity, formatIntensity) });
   }
   if (exercise.tracksDistance) {
     const distance = (value: number) => formatDistance(value, distanceUnit);
-    lines.push({ title: "Total Distance", value: distance(summary.distance.total) });
-    lines.push({ title: "Avg Distance per Set", value: average(summary.distance, distance) });
-    lines.push({ title: "Longest Set", value: maximum(summary.distance, distance) });
+    lines.push({ title: "Total distance", value: distance(summary.distance.total) });
+    lines.push({ title: "Avg distance per set", value: average(summary.distance, distance) });
+    lines.push({ title: "Longest set", value: maximum(summary.distance, distance) });
   }
   return lines;
 }
