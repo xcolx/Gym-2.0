@@ -76,11 +76,7 @@ export default function PastWorkoutsPage() {
         workouts={workouts ?? []}
         appColor={settings?.schemeColor ?? DEFAULT_APP_COLOR}
       />
-      <ImportWorkoutsSheet
-        open={showImport}
-        onClose={() => setShowImport(false)}
-        appColor={settings?.schemeColor ?? DEFAULT_APP_COLOR}
-      />
+      <ImportWorkoutsSheet open={showImport} onClose={() => setShowImport(false)} />
     </Page>
   );
 }

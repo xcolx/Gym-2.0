@@ -83,7 +83,6 @@ function EditPerformingWorkoutContent({
   const [showsExercises, setShowsExercises] = useState(false);
   const [asksToDelete, setAsksToDelete] = useState(false);
   const exercises = workout.workoutExercises;
-  const doneCounts = useDoneSetCounts(workout);
 
   return (
     <FormStack>
@@ -101,59 +100,20 @@ function EditPerformingWorkoutContent({
         </FormRow>
       </FormSection>
 
-      <FormSection
-        header={exerciseCountText(exercises.length)}
-        footer={
-          onSelect
-            ? "Tap an exercise to go to it, drag the handle to move it, swipe to remove it."
-            : "Drag the handle of an exercise to move it, swipe to remove it."
+      <WorkoutExercisesSection
+        workout={workout}
+        currentExerciseId={currentExerciseId}
+        onSelect={
+          onSelect &&
+          ((index) => {
+            onSelect(index);
+            onClose();
+          })
         }
-      >
-        <ReorderableList
-          items={exercises.map((workoutExercise) => ({ key: workoutExercise.id, label: workoutExercise.exercise?.name ?? "" }))}
-          rowHeight={ROW_HEIGHT}
-          onMove={(from, to) => void moveWorkoutExercise(workout.id, from, to)}
-          onDelete={(index) => void removeExerciseFromWorkout(exercises[index].id)}
-          renderRow={(index) => {
-            const workoutExercise = exercises[index];
-            const isCurrent = workoutExercise.id === currentExerciseId;
-            const done = doneCounts[index];
-            const row = (
-              <>
-                <span
-                  className={`flex size-[30px] shrink-0 items-center justify-center rounded-full text-subheadline font-semibold tabular-nums ${
-                    isCurrent ? "bg-app text-app-foreground" : "bg-app/15 text-app"
-                  }`}
-                >
-                  {index + 1}
-                </span>
-                <span className={`min-w-0 flex-1 truncate ${isCurrent ? "font-semibold" : ""}`}>{workoutExercise.exercise?.name ?? ""}</span>
-                <span className={`shrink-0 text-subheadline ${isCurrent ? "text-app" : "text-secondary-label"}`}>
-                  {isCurrent ? "Now" : done === 0 ? "–" : doneSetsText(done)}
-                </span>
-              </>
-            );
-            return onSelect ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onSelect(index);
-                  onClose();
-                }}
-                className="flex w-full items-center gap-3 py-2 text-left"
-              >
-                {row}
-              </button>
-            ) : (
-              <div className="flex items-center gap-3 py-2">{row}</div>
-            );
-          }}
-        />
-        <ButtonRow onClick={() => setShowsExercises(true)}>
-          <CirclePlus size={22} className="fill-current [&>path]:stroke-[var(--cell-bg)]" aria-hidden />
-          Add exercises
-        </ButtonRow>
-      </FormSection>
+        onMove={(from, to) => void moveWorkoutExercise(workout.id, from, to)}
+        onDelete={(index) => void removeExerciseFromWorkout(exercises[index].id)}
+        onAddExercises={() => setShowsExercises(true)}
+      />
 
       {onDeleteWorkout && (
         <FormSection>
@@ -181,5 +141,78 @@ function EditPerformingWorkoutContent({
         />
       )}
     </FormStack>
+  );
+}
+
+/**
+ * The exercises of a workout in its overview: numbered rows with their sets, the shown one marked "Now". Tapping a row
+ * selects it (if `onSelect`), its handle moves it and a swipe to the left removes it. Also used for the draft of a past
+ * workout.
+ */
+export function WorkoutExercisesSection({
+  workout,
+  currentExerciseId,
+  onSelect,
+  onMove,
+  onDelete,
+  onAddExercises,
+}: {
+  workout: WorkoutWithExercises;
+  currentExerciseId?: LocalId | null;
+  onSelect?: (index: number) => void;
+  onMove: (from: number, to: number) => void;
+  onDelete: (index: number) => void;
+  onAddExercises: () => void;
+}) {
+  const exercises = workout.workoutExercises;
+  const doneCounts = useDoneSetCounts(workout);
+
+  return (
+    <FormSection
+      header={exerciseCountText(exercises.length)}
+      footer={
+        onSelect
+          ? "Tap an exercise to go to it, drag the handle to move it, swipe to remove it."
+          : "Drag the handle of an exercise to move it, swipe to remove it."
+      }
+    >
+      <ReorderableList
+        items={exercises.map((workoutExercise) => ({ key: workoutExercise.id, label: workoutExercise.exercise?.name ?? "" }))}
+        rowHeight={ROW_HEIGHT}
+        onMove={onMove}
+        onDelete={onDelete}
+        renderRow={(index) => {
+          const workoutExercise = exercises[index];
+          const isCurrent = workoutExercise.id === currentExerciseId;
+          const done = doneCounts[index];
+          const row = (
+            <>
+              <span
+                className={`flex size-[30px] shrink-0 items-center justify-center rounded-full text-subheadline font-semibold tabular-nums ${
+                  isCurrent ? "bg-app text-app-foreground" : "bg-app/15 text-app"
+                }`}
+              >
+                {index + 1}
+              </span>
+              <span className={`min-w-0 flex-1 truncate ${isCurrent ? "font-semibold" : ""}`}>{workoutExercise.exercise?.name ?? ""}</span>
+              <span className={`shrink-0 text-subheadline ${isCurrent ? "text-app" : "text-secondary-label"}`}>
+                {isCurrent ? "Now" : done === 0 ? "–" : doneSetsText(done)}
+              </span>
+            </>
+          );
+          return onSelect ? (
+            <button type="button" onClick={() => onSelect(index)} className="flex w-full items-center gap-3 py-2 text-left">
+              {row}
+            </button>
+          ) : (
+            <div className="flex items-center gap-3 py-2">{row}</div>
+          );
+        }}
+      />
+      <ButtonRow onClick={onAddExercises}>
+        <CirclePlus size={22} className="fill-current [&>path]:stroke-[var(--cell-bg)]" aria-hidden />
+        Add exercises
+      </ButtonRow>
+    </FormSection>
   );
 }

@@ -568,7 +568,8 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   at most four rows that scroll there, all of them in a past workout) and `EditWorkoutExercise` read the units and
   reference data themselves; the set fields are `lib/domain/set-input.ts`.
 - The workout in progress: `WorkoutPager` (the pages with a bar per exercise and the finish page, `ref` to show a
-  page), `EditPerformingWorkout` (the overview sheet), `EndWorkout` (the finish page) and `DeleteWorkoutConfirmation`
+  page), `EditPerformingWorkout` (the overview sheet, its `WorkoutExercisesSection` is also the sheet of a past workout,
+  `EditWorkoutExercisesSheet`), `EndWorkout` (the finish page) and `DeleteWorkoutConfirmation`
   (asks twice before the workout is deleted); `useDoneSetCounts` of `active/use-active-workout.ts`.
 - `PhotoViewer` / `OpensPhotoViewer`, `ServerImage`, `ProfileIcon` / `ProfileCircle`.
 - Forms and lists: `ui/Form.tsx` (`FormPage`, `FormStack` for the sections in a `grouped` sheet, `FormSection`,
