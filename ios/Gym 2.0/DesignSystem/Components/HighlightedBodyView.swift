@@ -65,9 +65,9 @@ private struct MuscleHighlightView: View {
     @State private var mask: UIImage?
 
     var body: some View {
-        // The cache is checked directly, so that a muscle that was shown before appears right away
+        // The store is checked directly, so that a muscle that was shown or preloaded before appears right away
         Group {
-            if let mask = mask ?? MuscleMaskCache.mask(for: hash) {
+            if let mask = mask ?? MuscleMasks.mask(for: hash) {
                 Image(uiImage: mask)
                     .resizable()
                     .renderingMode(.template)
@@ -81,49 +81,118 @@ private struct MuscleHighlightView: View {
             }
         }
         .task(id: hash) {
-            if let cached = MuscleMaskCache.mask(for: hash) {
-                mask = cached
+            if let stored = MuscleMasks.mask(for: hash) {
+                mask = stored
                 return
             }
             mask = nil
-            guard !hash.isEmpty, let data = try? await imageService?.imageData(hash: hash) else { return }
-            mask = await MuscleMaskCache.makeMask(data, hash: hash)
+            guard let imageService else { return }
+            mask = await MuscleMasks.load(hash: hash, imageService: imageService)
         }
     }
 }
 
-// The masks of the muscle images by hash, made in the background once
-private enum MuscleMaskCache {
+/// The masks of the muscle images by hash. There are only a few muscles and their images never change under their
+/// hash, so every mask is made once: kept in memory for the whole launch and saved to disk for the next ones.
+/// `preload` makes them all at launch, so that a body is shown with its muscles right away.
+@MainActor
+enum MuscleMasks {
 
-    // large enough for the biggest highlighted body in the app
-    private static let maxPixelSize: CGFloat = 800
+    // sharp at the largest highlighted body in the app (about 300 points high at 3x)
+    private static let maxPixelSize: CGFloat = 500
     // JPEG compression gives the white and black parts of the image a little color
     private static let minChroma = 24
 
-    private static let cache: NSCache<NSString, UIImage> = {
-        let cache = NSCache<NSString, UIImage>()
-        cache.totalCostLimit = 50 * 1024 * 1024
-        return cache
-    }()
+    // A new folder when the way a mask is made changes, the old one is removed
+    private static let directoryName = "MuscleMasks-v1-500"
+    private static let directory = URL.cachesDirectory.appending(path: directoryName, directoryHint: .isDirectory)
+
+    private static var masks: [String: UIImage] = [:]
+    /// Loads that are running, so a mask several bodies show at once is made once
+    private static var loading: [String: Task<UIImage?, Never>] = [:]
 
     static func mask(for hash: String) -> UIImage? {
-        cache.object(forKey: hash as NSString)
+        masks[hash]
     }
 
-    static func makeMask(_ data: Data, hash: String) async -> UIImage? {
-        let mask = await Task.detached(priority: .userInitiated) {
-            makeMask(data)
-        }.value
+    /// The mask from memory, from disk, or made from the image of the muscle. Nil if the image can't be loaded.
+    static func load(hash: String, imageService: ImageService) async -> UIImage? {
+        guard !hash.isEmpty else { return nil }
+        if let mask = masks[hash] {
+            return mask
+        }
+        if let task = loading[hash] {
+            return await task.value
+        }
+        let task = Task<UIImage?, Never> {
+            let file = directory.appending(path: "\(hash).png")
+            if let stored = await Task.detached(priority: .userInitiated, operation: { readMask(file) }).value {
+                return stored
+            }
+            guard let data = try? await imageService.imageData(hash: hash) else { return nil }
+            return await Task.detached(priority: .userInitiated) {
+                let mask = makeMask(data)
+                if let mask {
+                    writeMask(mask, to: file)
+                }
+                return mask
+            }.value
+        }
+        loading[hash] = task
+        let mask = await task.value
+        loading[hash] = nil
         if let mask {
-            let cost = Int(mask.size.width * mask.size.height * 4)
-            cache.setObject(mask, forKey: hash as NSString, cost: cost)
+            masks[hash] = mask
         }
         return mask
     }
 
+    /// Makes the masks of all muscles one after the other in the background and removes the ones of images that
+    /// aren't used anymore
+    static func preload(hashes: [String], imageService: ImageService) async {
+        let hashes = Set(hashes.filter { !$0.isEmpty })
+        await Task.detached(priority: .utility) {
+            removeUnused(keeping: hashes)
+        }.value
+        for hash in hashes where masks[hash] == nil {
+            guard !Task.isCancelled else { return }
+            _ = await load(hash: hash, imageService: imageService)
+        }
+    }
+
+    // MARK: - Disk
+
+    nonisolated private static func readMask(_ file: URL) -> UIImage? {
+        guard let image = UIImage(contentsOfFile: file.path()) else { return nil }
+        // decoded here instead of on the main thread when it's drawn the first time
+        return (image.preparingForDisplay() ?? image).withRenderingMode(.alwaysTemplate)
+    }
+
+    nonisolated private static func writeMask(_ mask: UIImage, to file: URL) {
+        guard let data = mask.pngData() else { return }
+        try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: file, options: .atomic)
+    }
+
+    nonisolated private static func removeUnused(keeping hashes: Set<String>) {
+        let fileManager = FileManager.default
+        let caches = URL.cachesDirectory
+        // the folders of earlier versions of the masks
+        for folder in (try? fileManager.contentsOfDirectory(at: caches, includingPropertiesForKeys: nil)) ?? []
+        where folder.lastPathComponent.hasPrefix("MuscleMasks") && folder.lastPathComponent != directoryName {
+            try? fileManager.removeItem(at: folder)
+        }
+        for file in (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        where !hashes.contains(file.deletingPathExtension().lastPathComponent) {
+            try? fileManager.removeItem(at: file)
+        }
+    }
+
+    // MARK: - Making a mask
+
     // Keeps the colored pixels: the opacity of a pixel is its chroma (largest minus smallest channel), so the white
     // background, the black outline and the gray edges between them become transparent
-    private static func makeMask(_ data: Data) -> UIImage? {
+    nonisolated static func makeMask(_ data: Data) -> UIImage? {
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,

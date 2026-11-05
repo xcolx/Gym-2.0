@@ -22,6 +22,9 @@ struct MainView: View {
         filter: #Predicate <Workout> {$0.inProgress == true}
     ) var workouts: [Workout]
     
+    @Query private var muscles: [Muscle]
+    @Environment(\.imageService) private var imageService
+
     @State private var showsWorkoutChooser = false
     @State private var celebration: WorkoutCelebration?
 
@@ -166,6 +169,11 @@ struct MainView: View {
             } else if scenePhase == .background {
                 createsExercise = CreateExerciseDraft.isOpen
             }
+        }
+        // The highlighted bodies show their muscles right away, also after a sync changed the images
+        .task(id: muscles.map(\.imageUrl).sorted()) {
+            guard let imageService else { return }
+            await MuscleMasks.preload(hashes: muscles.map(\.imageUrl), imageService: imageService)
         }
         .alert("Not saved", isPresented: showsRejectedChanges) {
             Button("OK", role: .cancel) {}
