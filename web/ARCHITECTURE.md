@@ -62,8 +62,9 @@ web/
                             Features, Showcase, PrivacySection, FinalCallToAction, LandingFooter, SectionTitle, brand.ts
       legal/                PrivacyPolicy.tsx, TermsOfUse.tsx: the texts of /privacy and /tos (built with ui/LegalPage),
                             ThirdPartyLicenses.tsx + third-party-licenses.json (generated): /licenses
-      auth/                 AuthScreen.tsx (switches the views), LoginView, SignUpView, ForgotPasswordView,
-                            CheckEmailView, AuthParts.tsx (AuthHeader, AuthButton), use-auth-forms.ts (their hooks)
+      auth/                 AuthScreen.tsx (switches the views, back through the history), WelcomeView, LoginView,
+                            SignUpView, ForgotPasswordView, CheckEmailView, AuthParts.tsx (AuthPage, AuthTextField,
+                            PasswordRule, AuthCheckbox, AuthMessage, ...), use-auth-forms.ts (their hooks)
       workout/              the workout tab, also SetTable.tsx, EditWorkoutExercise.tsx (NumberInsertView,
                             EditWorkoutExerciseView: performing and past workouts), EditWorkout.tsx, ExercisesSheet.tsx
                             and the parts of the performing workout (PerformingExercise.tsx, WorkoutPager.tsx, ...)
@@ -86,7 +87,7 @@ web/
     lib/
       store.ts              createStore/useStore: tiny observable value (the web @Observable)
       uuid.ts               newUUID(), also outside secure contexts
-      app-color.ts          --app-color CSS variable from the user's schemeColor
+      app-color.ts          --app-color CSS variable from the user's schemeColor, --app-color-foreground on it
       site.ts               SITE_URL (https://gym2.app), the App Store ID and URL, INDEXED_ROUTES
       use-online.ts         useOnline(): navigator.onLine as hook
       use-now.ts            useNow(interval): the current time for durations, one shared clock per interval
@@ -553,7 +554,10 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   (ProgressView); `ui/AppColorSegmentedPicker.tsx` (AppColorSegmentedPicker.swift); `ui/Page.tsx`: `Page`,
   `PageHeader` (the navigation bar of every screen, large or `inline` title, `back`, `leading`/`trailing` toolbar
   items; back pops with `goBack(router, parentHref)` of `lib/navigation.ts`: history back if the previous entry is the
-  parent, otherwise the parent replaces the screen, so back never leaves the app), `PillLink`, `PillButton`.
+  parent, otherwise the parent replaces the screen, so back never leaves the app), `PillLink`, `PillButton`;
+  `ui/PrimaryButton.tsx`: `PrimaryButton` (PrimaryButtonStyle.swift: the filled main button of a screen in the app
+  color, `isLoading` shows a spinner), `SecondaryButton` (the one below it), `primaryButtonClass` (e.g. for a link).
+- The `card` utility of globals.css is `.cardBackground()` (CardBackground.swift): the rounded card on `bg-grouped`.
 - `SetTable` (`{ workoutExercise, stopwatchWorkoutId? }`, the stopwatch only in the performing workout) and
   `EditWorkoutExercise` read the units and reference data themselves; the set fields are `lib/domain/set-input.ts`.
 - `PhotoViewer` / `OpensPhotoViewer`, `ServerImage`, `ProfileIcon` / `ProfileCircle`.

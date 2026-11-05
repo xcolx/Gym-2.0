@@ -1,127 +1,112 @@
 "use client";
 
-import { FormPage, FormRow, FormSection, InputRow } from "@/components/ui/Form";
-import { Switch } from "@/components/ui/controls";
+import { Lock, Mail, RotateCcwKey, User } from "lucide-react";
+
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { PRIVACY_ROUTE, TERMS_ROUTE } from "@/lib/auth/routes";
 
-import { AuthButton, AuthHeader } from "./AuthParts";
+import { AuthCheckbox, AuthMessage, AuthPage, AuthSwitchLink, AuthTextField, PasswordRule } from "./AuthParts";
 import { useSignUp } from "./use-auth-forms";
 
-/** Creating an account: email, username, password and accepting the terms of use and the privacy policy */
+/**
+ * Creating an account (SignUpView of AuthView.swift): email, username, password with its rules ticked off while
+ * typing, and accepting the terms of use and the privacy policy
+ */
 export function SignUpView({
   email,
   setEmail,
+  onBack,
   showLogin,
   didSignUp,
 }: {
   email: string;
   setEmail: (email: string) => void;
+  onBack: () => void;
   showLogin: () => void;
   didSignUp: (email: string, message: string) => void;
 }) {
   const form = useSignUp(email, setEmail, didSignUp);
-  const { usernameIssue, passwordIssue, error, isLoading, canSubmit } = form;
+  const { usernameIssue, passwordRules, error, isLoading, canSubmit } = form;
 
   return (
-    <FormPage title="Create Account" inline withoutTabBar>
-      <form onSubmit={form.submit} className="contents">
-        <FormSection plain>
-          <AuthHeader
-            title="Create an account"
-            subtitle="Your workouts are saved to your account, so they are safe on every device."
-          />
-        </FormSection>
+    <AuthPage
+      title="Create account"
+      subtitle="Your workouts are saved to your account, so they're safe on every device."
+      onBack={onBack}
+      onSubmit={form.submit}
+      bottom={
+        <>
+          <PrimaryButton type="submit" isLoading={isLoading} disabled={!canSubmit}>
+            Create account
+          </PrimaryButton>
+          <AuthSwitchLink question="Already have an account?" action="Log in" onClick={showLogin} />
+        </>
+      }
+    >
+      <AuthTextField
+        icon={Mail}
+        type="email"
+        name="email"
+        placeholder="Email"
+        autoComplete="email"
+        inputMode="email"
+        enterKeyHint="next"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+      />
 
-        <FormSection>
-          <InputRow
-            type="email"
-            name="email"
-            placeholder="Email"
-            autoComplete="email"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            inputMode="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </FormSection>
+      <AuthTextField
+        icon={User}
+        name="username"
+        placeholder="Username"
+        autoComplete="username"
+        enterKeyHint="next"
+        value={form.username}
+        onChange={(event) => form.setUsername(event.target.value)}
+      />
+      {usernameIssue && <AuthMessage text={usernameIssue} style="error" />}
 
-        <FormSection footer={usernameIssue && <span className="text-[#ff3b30]">{usernameIssue}</span>}>
-          <InputRow
-            name="username"
-            placeholder="Username"
-            autoComplete="off"
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-            value={form.username}
-            onChange={(event) => form.setUsername(event.target.value)}
-          />
-        </FormSection>
+      <AuthTextField
+        icon={Lock}
+        type="password"
+        name="new-password"
+        placeholder="Password"
+        autoComplete="new-password"
+        enterKeyHint="next"
+        value={form.password}
+        onChange={(event) => form.setPassword(event.target.value)}
+      />
+      <AuthTextField
+        icon={RotateCcwKey}
+        type="password"
+        name="repeat-password"
+        placeholder="Repeat password"
+        autoComplete="new-password"
+        enterKeyHint="done"
+        value={form.passwordConfirmation}
+        onChange={(event) => form.setPasswordConfirmation(event.target.value)}
+      />
 
-        <FormSection footer={passwordIssue && <span className="text-[#ff3b30]">{passwordIssue}</span>}>
-          <InputRow
-            type="password"
-            name="new-password"
-            placeholder="Password"
-            autoComplete="new-password"
-            value={form.password}
-            onChange={(event) => form.setPassword(event.target.value)}
-          />
-          <InputRow
-            type="password"
-            name="repeat-password"
-            placeholder="Repeat password"
-            autoComplete="new-password"
-            value={form.passwordConfirmation}
-            onChange={(event) => form.setPasswordConfirmation(event.target.value)}
-          />
-        </FormSection>
+      <ul className="mb-2 flex flex-col gap-1.5 px-1" aria-label="Password rules">
+        <PasswordRule title="8 to 50 characters" isMet={passwordRules.hasValidLength} />
+        <PasswordRule title="Two of: lowercase, uppercase, digits, symbols" isMet={passwordRules.hasEnoughKinds} />
+        <PasswordRule title="Passwords match" isMet={passwordRules.passwordsMatch} />
+      </ul>
 
-        <FormSection>
-          <FormRow>
-            <span className="flex-1">
-              I&apos;m at least 16 years old and accept the{" "}
-              <a href={TERMS_ROUTE} target="_blank" rel="noopener noreferrer" className="text-app">
-                Terms of Use
-              </a>
-            </span>
-            <Switch
-              label="I'm at least 16 years old and accept the Terms of Use"
-              checked={form.acceptsTermsOfUse}
-              onChange={form.setAcceptsTermsOfUse}
-            />
-          </FormRow>
-          <FormRow>
-            <span className="flex-1">
-              I accept the{" "}
-              <a href={PRIVACY_ROUTE} target="_blank" rel="noopener noreferrer" className="text-app">
-                Privacy Policy
-              </a>
-            </span>
-            <Switch label="I accept the Privacy Policy" checked={form.acceptsPrivacyPolicy} onChange={form.setAcceptsPrivacyPolicy} />
-          </FormRow>
-        </FormSection>
+      <AuthCheckbox checked={form.acceptsTermsOfUse} onChange={form.setAcceptsTermsOfUse}>
+        I&apos;m at least 16 years old and accept the{" "}
+        <a href={TERMS_ROUTE} target="_blank" rel="noopener noreferrer" className="text-app hover:underline">
+          Terms of Use
+        </a>
+      </AuthCheckbox>
+      <AuthCheckbox checked={form.acceptsPrivacyPolicy} onChange={form.setAcceptsPrivacyPolicy}>
+        I accept the{" "}
+        <a href={PRIVACY_ROUTE} target="_blank" rel="noopener noreferrer" className="text-app hover:underline">
+          Privacy Policy
+        </a>
+      </AuthCheckbox>
 
-        {error && (
-          <FormSection>
-            <FormRow>
-              <span className="whitespace-pre-line text-[#ff3b30]">{error}</span>
-            </FormRow>
-          </FormSection>
-        )}
-
-        <FormSection>
-          <AuthButton title="Create Account" isLoading={isLoading} disabled={!canSubmit} />
-        </FormSection>
-
-        <FormSection plain>
-          <button type="button" onClick={showLogin} className="w-full py-2.5 text-center text-app active:opacity-50">
-            Already have an account? Log in
-          </button>
-        </FormSection>
-      </form>
-    </FormPage>
+      {error && <AuthMessage text={error} style="error" />}
+    </AuthPage>
   );
 }

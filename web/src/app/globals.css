@@ -22,6 +22,7 @@
 :root {
   color-scheme: light dark;
   --app-color: #ff0000; /* overridden at runtime from Settings → App Color */
+  --app-color-foreground: #ffffff; /* black or white on the app color, set with it (lib/app-color.ts) */
   --background: #ffffff;
   --foreground: #000000;
   --my-black: #000000;
@@ -84,6 +85,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-app: var(--app-color);
+  --color-app-foreground: var(--app-color-foreground);
   --color-my-black: var(--my-black);
   --color-my-white: var(--my-white);
   --color-my-gray: var(--my-gray);
@@ -105,6 +107,8 @@
   --text-title--line-height: 34px;
   --text-title2: 22px;
   --text-title2--line-height: 28px;
+  --text-title3: 20px;
+  --text-title3--line-height: 25px;
   --text-headline: 17px;
   --text-headline--line-height: 22px;
   --text-body: 17px;

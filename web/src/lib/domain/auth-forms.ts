@@ -1,6 +1,7 @@
 // When the forms of AuthView.swift can be sent, the rules of the fields are in lib/auth/validation.ts
 
 import { newPasswordProblem, trimmed, usernameProblem } from "@/lib/auth/validation";
+import { hasEnoughKinds, hasValidLength } from "@/lib/domain/password-policy";
 
 /** The login needs an email and a password and isn't sent twice */
 export function canSubmitLogin(email: string, password: string, isLoading: boolean): boolean {
@@ -25,8 +26,8 @@ export interface SignUpForm {
 export interface SignUpFormState {
   /** Shown below the username, null if it's fine or still empty */
   usernameIssue: string | null;
-  /** Shown below the passwords, null if they're fine or still empty */
-  passwordIssue: string | null;
+  /** The rules of the password, ticked off while typing */
+  passwordRules: { hasValidLength: boolean; hasEnoughKinds: boolean; passwordsMatch: boolean };
   canSubmit: boolean;
 }
 
@@ -36,16 +37,20 @@ export interface SignUpFormState {
  */
 export function signUpFormState(form: SignUpForm): SignUpFormState {
   const usernameIssue = usernameProblem(form.username);
-  const passwordIssue = newPasswordProblem(form.password, form.passwordConfirmation);
+  const passwordRules = {
+    hasValidLength: hasValidLength(form.password),
+    hasEnoughKinds: hasEnoughKinds(form.password),
+    passwordsMatch: form.password !== "" && form.password === form.passwordConfirmation,
+  };
   const canSubmit =
     trimmed(form.email) !== "" &&
     form.username !== "" &&
     form.password !== "" &&
     form.password === form.passwordConfirmation &&
     usernameIssue === null &&
-    passwordIssue === null &&
+    newPasswordProblem(form.password, form.passwordConfirmation) === null &&
     form.acceptsTermsOfUse &&
     form.acceptsPrivacyPolicy &&
     !form.isLoading;
-  return { usernameIssue, passwordIssue, canSubmit };
+  return { usernameIssue, passwordRules, canSubmit };
 }
