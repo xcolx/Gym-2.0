@@ -59,241 +59,94 @@ private struct CreateExerciseContentView: View {
         _deletedExercise = deletedExercise
     }
 
+    private var isEditing: Bool {
+        editMode != nil
+    }
+
     var body: some View {
         @Bindable var model = model
-        // read here, the label of the photos picker isn't isolated to the main actor
-        let imageCount = model.imageCount
-        VStack{
+        NavigationStack {
+            Form {
+                imagesSection
 
-            HStack {
-                Button(action: {
-                    dismiss()
-                }, label: {
-                    Image(systemName: "xmark")
-                        .font(.title)
-                        .foregroundStyle(Color.red)
-                        .padding(.leading, 10)
-                        .accessibilityLabel("Cancel")
-                })
-
-
-                TextField("Name of the Exercise", text: $model.name)
-                    .autocorrectionDisabled()
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding(.trailing, 10)
-                    .padding(.vertical, 10)
-                    .font(.title)
-                    .foregroundStyle(model.nameProblem != nil ? Color.red : Color("MyBlack"))
-
-                if editMode != nil{
-                    Button(action: {
-                        model.requestDeletion()
-                    }, label: {
-                        Image(systemName: "trash")
-                            .foregroundStyle(Color.red)
-                            .font(.title)
-                            .padding(.vertical, 10)
-                            .padding(.trailing, 10)
-                            .accessibilityLabel("Delete exercise")
-                    })
-                }
-            }
-
-            if let problem = model.problem {
-                Text(problem)
-                    .font(.caption)
-                    .foregroundStyle(Color.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-            }
-
-            HStack{
-
-                VStack (alignment: .leading) {
-                    Text("Description:")
-                        .font(.headline)
-                    TextEditor(text: $model.exerciseDescription)
-                        .background(Color.gray.opacity(0.2))
-                        .aspectRatio(1, contentMode: .fit)
-                    .border(Color("MyBlack"), width: 1)
+                Section {
+                    TextField("e.g. Bench press", text: $model.name)
+                        .font(.title3.weight(.semibold))
+                        .autocorrectionDisabled()
+                        .foregroundStyle(model.nameProblem != nil ? Color.red : Color.primary)
+                } header: {
+                    Text("Name")
+                } footer: {
+                    if let problem = model.nameProblem {
+                        ProblemText(problem)
+                    }
                 }
 
-                VStack (alignment: .leading) {
-                    HStack(spacing: 4) {
-                        Text("Images:")
-                            .font(.headline)
-                        Text("\(model.imageCount)/\(Exercise.maxImages)")
-                            .foregroundStyle(.secondary)
-                    }
-                    Rectangle()
-                        .fill(Color.black)
-                        .aspectRatio(1, contentMode: .fit)
-                        .overlay(
-                            ExerciseImagesView(
-                                images: ExerciseImageItem.items(imageUrls: model.imageUrls, pendingImages: model.photos.map { (id: $0.id.uuidString, data: $0.data) }),
-                                showsTrailing: model.imageCount < Exercise.maxImages,
-                                onRemove: model.removeImage
-                            ) {
-                                Image(systemName: "photo.badge.plus")
-                                    .font(.largeTitle)
-                                    .foregroundStyle(.white)
-                            } trailing: {
-                                PhotosPicker(selection: $model.selectedPhotos, maxSelectionCount: max(1, Exercise.maxImages - model.imageCount), matching: .images, photoLibrary: .shared()) {
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "photo.badge.plus")
-                                            .font(.largeTitle)
-                                        if imageCount > 0 {
-                                            Text("Add more")
-                                                .font(.footnote)
-                                        }
-                                    }
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                    .contentShape(Rectangle())
-                                }
-                                .accessibilityLabel("Add images")
-                            }
-                        )
-                        .clipped()
-                }
+                aliasSection
 
-            }
-            .padding(.horizontal, 10)
-
-            aliasSelection
-                .padding(.horizontal, 10)
-                .padding(.top, 5)
-
-            metricSelection
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-
-            HStack{
-                VStack(alignment: .leading){
-                    HighlightedBodyView(primaryMuscles: model.primaryMuscles, secondaryMuscles: model.secondaryMuscles)
-
-                    Spacer()
-
-                    VStack(alignment: .leading){
-                        HStack {
-                            Text("Muscle Group:")
-                                .font(.headline)
-                            Button(action: {
-                                model.showsMuscleGroupDialog = true
-                            }, label: {
-                                Image(systemName: "pencil")
-                                    .foregroundStyle(Color.green)
-                                    .accessibilityLabel("Choose muscle group")
-                            })
+                Section {
+                    TextField("How is it done? What should you look out for?", text: $model.exerciseDescription, axis: .vertical)
+                        .lineLimit(4...12)
+                } header: {
+                    Text("Description")
+                } footer: {
+                    HStack(alignment: .top) {
+                        if let problem = model.descriptionProblem {
+                            ProblemText(problem)
                         }
-                        Text(model.muscleGroup?.name ?? "Select a muscle group")
-                            .foregroundStyle(model.missingSelectionWarning && model.muscleGroup == nil ? Color.red : Color("MyBlack"))
-                    }
-                    .padding(.leading, 10)
-                    .padding(.bottom, 10)
-
-                    VStack(alignment: .leading){
-                        HStack{
-                            Text("Equipment needed:")
-                                .font(.headline)
-                            Button(action: {
-                                model.showsEquipmentDialog = true
-                            }, label: {
-                                Image(systemName: "pencil")
-                                    .foregroundStyle(Color.green)
-                                    .accessibilityLabel("Choose equipment")
-                            })
-                        }
-                        Text(model.equipment?.name ?? "Select the equipment")
-                            .foregroundStyle(model.missingSelectionWarning && model.equipment == nil ? Color.red : Color("MyBlack"))
-                    }
-                    .padding(.leading, 10)
-
-                }
-
-
-                VStack(alignment: .leading){
-                    HStack {
-                        Text("Primary Muscles:")
-                            .font(.headline)
-                        Button(action: {
-                            model.musclePicker = .primary
-                        }, label: {
-                            Image(systemName: "plus.circle")
-                                .foregroundStyle(Color.green)
-                                .accessibilityLabel("Choose primary muscles")
-                        })
-                    }
-                    ScrollView {
-                        VStack(alignment: .leading){
-                            ForEach(model.primaryMuscles) {muscle in
-                                Text(muscle.name)
-                            }
-                        }
-                    }
-
-                    HStack {
-                        Text("Secondary Muscles:")
-                            .font(.headline)
-                        Button(action: {
-                            model.musclePicker = .secondary
-                        }, label: {
-                            Image(systemName: "plus.circle")
-                                .foregroundStyle(Color.green)
-                                .accessibilityLabel("Choose secondary muscles")
-                        })
-                    }
-                    ScrollView{
-                        VStack(alignment: .leading){
-                            ForEach(model.secondaryMuscles) {muscle in
-                                Text(muscle.name)
-                            }
-                        }
-                    }
-                    HStack{
                         Spacer()
-                        Button(action: {
-                            if model.save() {
-                                dismiss()
-                            }
-                        }, label: {
-                            HStack {
-                                Text("Save")
-                                Image(systemName: "square.and.arrow.down")
-                            }
-                            .foregroundStyle(Color("MyWhite"))
-                            .font(.title)
-                            .padding(15)
-                            .background(
-                                RoundedRectangle(cornerRadius: 25)
-                                    .foregroundStyle(Color.green)
-                            )
-                        })
-                        .padding(.trailing, 10)
+                        Text(verbatim: "\(model.exerciseDescription.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count)/\(CreateExerciseViewModel.maxDescriptionLength)")
+                            .monospacedDigit()
                     }
                 }
 
+                musclesSection
+                detailsSection
+                metricSection
 
+                if isEditing {
+                    Section {
+                        Button(role: .destructive) {
+                            model.requestDeletion()
+                        } label: {
+                            Label("Delete exercise", systemImage: "trash")
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(isEditing ? "Edit exercise" : "New exercise")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        if model.save() {
+                            dismiss()
+                        }
+                    }
+                    .fontWeight(.semibold)
+                }
             }
         }
-        .alert("You can't delete this exercise!", isPresented: Binding(get: { model.nonDeletableReason != nil }, set: { if !$0 { model.nonDeletableReason = nil } })) {
+        .alert("You can't delete this exercise", isPresented: Binding(get: { model.nonDeletableReason != nil }, set: { if !$0 { model.nonDeletableReason = nil } })) {
             Button("Got it", role: .cancel) {}
         } message: {
             Text(model.nonDeletableReason ?? "")
         }
-        .alert("Delete", isPresented: $model.showsDeleteConfirmation) {
+        .alert("Delete this exercise?", isPresented: $model.showsDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 model.delete()
                 dismiss()
                 deletedExercise = true
             }
-            Button("Go back", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to delete this exercise?")
+            Text("It can't be recovered.")
         }
-
-        .ignoresSafeArea(.keyboard)
-        .confirmationDialog("Muscle Group", isPresented: $model.showsMuscleGroupDialog, titleVisibility: .visible) {
+        .confirmationDialog("Muscle group", isPresented: $model.showsMuscleGroupDialog, titleVisibility: .visible) {
             ForEach(allMuscleGroups) { currentMuscleGroup in
                 Button(currentMuscleGroup.name) {
                     model.muscleGroup = currentMuscleGroup
@@ -317,16 +170,15 @@ private struct CreateExerciseContentView: View {
             // a muscle is either primary or secondary, the server refuses it in both lists
             switch role {
             case .primary:
-                MusclePickerView(title: "Primary Muscles", allMuscles: allMuscles, selected: $model.primaryMuscles, other: $model.secondaryMuscles)
+                MusclePickerView(title: "Main muscles", allMuscles: allMuscles, selected: $model.primaryMuscles, other: $model.secondaryMuscles)
             case .secondary:
-                MusclePickerView(title: "Secondary Muscles", allMuscles: allMuscles, selected: $model.secondaryMuscles, other: $model.primaryMuscles)
+                MusclePickerView(title: "Secondary muscles", allMuscles: allMuscles, selected: $model.secondaryMuscles, other: $model.primaryMuscles)
             }
         }
-        .task(id: model.selectedPhotos){
+        .task(id: model.selectedPhotos) {
             await model.loadSelectedPhotos()
         }
-
-        .onAppear{
+        .onAppear {
             model.onAppear(muscleGroups: allMuscleGroups, muscles: allMuscles, equipment: allEquipment)
         }
         // the system may end the app in the background, MainView then opens this view again with the draft
@@ -340,97 +192,261 @@ private struct CreateExerciseContentView: View {
         }
     }
 
-    // Other names like "Military Press" for "Barbell Shoulder Press", so that the exercise is found by them
-    var aliasSelection: some View {
+    // MARK: - Images
+
+    private var imagesSection: some View {
         @Bindable var model = model
-        return VStack(alignment: .leading){
-            Text("Other Names:")
-                .font(.headline)
-            ScrollView(.horizontal){
-                HStack{
-                    ForEach(model.aliases, id: \.self) { alias in
-                        Button(action: {
-                            model.removeAlias(alias)
-                        }, label: {
-                            HStack(spacing: 4){
-                                Text(alias)
-                                Image(systemName: "xmark")
-                                    .font(.caption2)
-                            }
-                            .font(.subheadline)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .foregroundStyle(userSettings.appColorForeground)
-                            .background(
-                                Capsule()
-                                    .fill(userSettings.appColor)
-                            )
-                        })
-                        .accessibilityLabel("Remove \(alias)")
+        // read here, the label of the photos picker isn't isolated to the main actor
+        let imageCount = model.imageCount
+        return Section {
+            ExerciseImagesView(
+                images: ExerciseImageItem.items(imageUrls: model.imageUrls, pendingImages: model.photos.map { (id: $0.id.uuidString, data: $0.data) }),
+                showsTrailing: model.imageCount < Exercise.maxImages,
+                onRemove: model.removeImage
+            ) {
+                Image(systemName: "photo")
+                    .font(.largeTitle)
+                    .foregroundStyle(.secondary)
+            } trailing: {
+                PhotosPicker(selection: $model.selectedPhotos, maxSelectionCount: max(1, Exercise.maxImages - model.imageCount), matching: .images, photoLibrary: .shared()) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "photo.badge.plus")
+                            .font(.largeTitle)
+                        Text(imageCount > 0 ? "Add more images" : "Add images")
+                            .font(.subheadline.weight(.medium))
+                        if imageCount == 0 {
+                            Text("e.g. one per step of the movement")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    if model.aliases.count < CreateExerciseViewModel.maxAliasCount {
-                        TextField("Add a name", text: $model.newAlias)
-                            .autocorrectionDisabled()
-                            .submitLabel(.done)
-                            .onSubmit(model.addAlias)
-                            .font(.subheadline)
-                            .foregroundStyle(model.aliasProblem != nil ? Color.red : Color("MyBlack"))
-                            .frame(width: 150)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(Color.gray.opacity(0.2))
-                            )
-                    }
+                    .foregroundStyle(userSettings.appColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Add images")
             }
-            .scrollIndicators(.hidden)
-            Text("Only used to find the exercise when searching.")
-                .font(.caption)
-                .foregroundStyle(Color.secondary)
+            .aspectRatio(imageCount == 0 ? 2 : 1, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .background(Color(.tertiarySystemFill))
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        } header: {
+            Text("Images · \(imageCount)/\(Exercise.maxImages)")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    var metricSelection: some View {
-        VStack(alignment: .leading){
-            Text("Tracked per Set:")
-                .font(.headline)
-                .foregroundStyle(model.missingSelectionWarning && model.trackedMetrics.isEmpty ? Color.red : Color("MyBlack"))
-            ScrollView(.horizontal){
-                HStack{
-                    ForEach(SetMetric.allCases, id: \.self) { metric in
-                        let selected = model.trackedMetrics.contains(metric)
-                        Button(action: {
-                            model.toggle(metric)
-                        }, label: {
-                            Text(metric.name)
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .foregroundStyle(selected ? userSettings.appColorForeground : Color("MyBlack"))
-                                .background(
-                                    Capsule()
-                                        .fill(selected ? userSettings.appColor : Color.gray.opacity(0.2))
-                                )
-                        })
-                        .disabled(!model.canChangeTrackedMetrics)
+    // MARK: - Aliases
+
+    // Other names like "Military press" for "Barbell shoulder press", so that the exercise is found by them
+    private var aliasSection: some View {
+        @Bindable var model = model
+        return Section {
+            if !model.aliases.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(model.aliases, id: \.self) { alias in
+                        Button {
+                            withAnimation(.snappy(duration: 0.2)) { model.removeAlias(alias) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(alias)
+                                Image(systemName: "xmark")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(Color.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color(.tertiarySystemFill), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(alias)")
                     }
                 }
+                .padding(.vertical, 4)
             }
-            .scrollIndicators(.hidden)
-            if !model.canChangeTrackedMetrics {
-                Text("You have already done a workout with this exercise, so the tracked values can't be changed.")
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
+            if model.aliases.count < CreateExerciseViewModel.maxAliasCount {
+                HStack {
+                    TextField("Add another name", text: $model.newAlias)
+                        .autocorrectionDisabled()
+                        .submitLabel(.done)
+                        .onSubmit(addAlias)
+                        .foregroundStyle(model.aliasProblem != nil ? Color.red : Color.primary)
+                    Button(action: addAlias) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(model.trimmedNewAlias.isEmpty || model.aliasProblem != nil)
+                    .accessibilityLabel("Add name")
+                }
+            }
+        } header: {
+            Text("Also known as")
+        } footer: {
+            if let problem = model.aliasProblem {
+                ProblemText(problem)
+            } else {
+                Text("Only used to find the exercise when searching.")
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func addAlias() {
+        withAnimation(.snappy(duration: 0.2)) { model.addAlias() }
+    }
+
+    // MARK: - Muscles
+
+    private var musclesSection: some View {
+        Section {
+            HStack(spacing: 16) {
+                HighlightedBodyView(primaryMuscles: model.primaryMuscles, secondaryMuscles: model.secondaryMuscles)
+                    .frame(height: 170)
+                VStack(alignment: .leading, spacing: 12) {
+                    MuscleLegend(color: MuscleLegend.primaryColor, title: "Main", muscles: model.primaryMuscles)
+                    MuscleLegend(color: MuscleLegend.secondaryColor, title: "Also", muscles: model.secondaryMuscles)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.vertical, 4)
+
+            Button {
+                model.musclePicker = .primary
+            } label: {
+                FormValueRow(title: "Main muscles", systemImage: "", iconColor: MuscleLegend.primaryColor, value: count(model.primaryMuscles))
+            }
+            Button {
+                model.musclePicker = .secondary
+            } label: {
+                FormValueRow(title: "Secondary muscles", systemImage: "", iconColor: MuscleLegend.secondaryColor, value: count(model.secondaryMuscles))
+            }
+        } header: {
+            Text("Muscles")
+        }
+    }
+
+    private func count(_ muscles: [Muscle]) -> String {
+        muscles.isEmpty ? "None" : "\(muscles.count)"
+    }
+
+    // MARK: - Details
+
+    private var detailsSection: some View {
+        Section {
+            Button {
+                model.showsMuscleGroupDialog = true
+            } label: {
+                FormValueRow(title: "Muscle group", systemImage: "figure.strengthtraining.traditional", value: model.muscleGroup?.name ?? "Select", isMissing: model.missingSelectionWarning && model.muscleGroup == nil)
+            }
+            Button {
+                model.showsEquipmentDialog = true
+            } label: {
+                FormValueRow(title: "Equipment", systemImage: "dumbbell", value: model.equipment?.name ?? "Select", isMissing: model.missingSelectionWarning && model.equipment == nil)
+            }
+        } header: {
+            Text("Details")
+        }
+    }
+
+    // MARK: - Tracked values
+
+    private var metricSection: some View {
+        Section {
+            FlowLayout(spacing: 8) {
+                ForEach(SetMetric.allCases, id: \.self) { metric in
+                    let selected = model.trackedMetrics.contains(metric)
+                    Button {
+                        model.toggle(metric)
+                    } label: {
+                        HStack(spacing: 4) {
+                            if selected {
+                                Image(systemName: "checkmark")
+                                    .font(.caption.weight(.bold))
+                            }
+                            Text(metric.name)
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .foregroundStyle(selected ? userSettings.appColorForeground : Color.primary)
+                        .background(selected ? userSettings.appColor : Color(.tertiarySystemFill), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!model.canChangeTrackedMetrics)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Tracked per set")
+                .foregroundStyle(model.missingSelectionWarning && model.trackedMetrics.isEmpty ? Color.red : Color.secondary)
+        } footer: {
+            if !model.canChangeTrackedMetrics {
+                Text("You have already done a workout with this exercise, so the tracked values can't be changed.")
+            } else if model.missingSelectionWarning && model.trackedMetrics.isEmpty {
+                ProblemText("Select at least one value.")
+            }
+        }
     }
 }
 
-/// Which muscles of the exercise are picked in the muscle picker
+/// A row of the form that opens a choice, with the chosen value on the right, red while it's missing
+private struct FormValueRow: View {
+
+    let title: String
+    let systemImage: String
+    var iconColor: Color? = nil
+    let value: String
+    var isMissing = false
+
+    @Environment(UserSettings.self) private var userSettings
+
+    var body: some View {
+        HStack {
+            Label {
+                Text(title)
+                    .foregroundStyle(isMissing ? Color.red : Color.primary)
+            } icon: {
+                if let iconColor {
+                    // the dot of the muscle legend
+                    Circle()
+                        .fill(iconColor)
+                        .frame(width: 10, height: 10)
+                } else {
+                    Image(systemName: systemImage)
+                        .foregroundStyle(userSettings.appColor)
+                }
+            }
+            Spacer()
+            Text(value)
+                .foregroundStyle(isMissing ? Color.red : Color.secondary)
+                .lineLimit(1)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(Color(.tertiaryLabel))
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+/// A problem of the input below its field
+private struct ProblemText: View {
+
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.circle.fill")
+            .foregroundStyle(.red)
+    }
+}
+
 enum MuscleRole: Identifiable {
     case primary, secondary
 

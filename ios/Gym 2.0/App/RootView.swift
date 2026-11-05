@@ -44,7 +44,7 @@ struct RootView: View {
         .animation(.default, value: appUpdateService.isUpdateRequired)
         .alert("Update available", isPresented: $appUpdateService.showsUpdateNotice) {
             Button("Later", role: .cancel) {}
-            Button("Open App Store") {
+            Button("Open the App Store") {
                 openURL(AppUpdateService.appStoreURL)
             }
         } message: {

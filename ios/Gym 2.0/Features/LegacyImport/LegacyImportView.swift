@@ -25,7 +25,7 @@ struct LegacyImportView: View {
             content
                 .padding()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("Your Data")
+                .navigationTitle("Moving your data")
                 .navigationBarTitleDisplayMode(.inline)
         }
         .tint(userSettings.appColor)
@@ -35,7 +35,7 @@ struct LegacyImportView: View {
             await legacyImportService.importData()
         }
         .confirmationDialog("Continue without your old data?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
-            Button("Continue Without Old Data", role: .destructive, action: discard)
+            Button("Continue without old data", role: .destructive, action: discard)
         } message: {
             Text("Your old workouts, schemes and exercises are removed from this device. Download them first if you want to keep them.")
         }
@@ -110,11 +110,10 @@ struct LegacyImportView: View {
             Button {
                 Task { await legacyImportService.importData() }
             } label: {
-                Label("Try Again", systemImage: "arrow.clockwise")
+                Label("Try again", systemImage: "arrow.clockwise")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(PrimaryButtonStyle())
         }
     }
 
@@ -153,27 +152,25 @@ struct LegacyImportView: View {
             if exportedFiles.isEmpty {
                 Button {
                 } label: {
-                    Label("Download Old Data", systemImage: "square.and.arrow.down")
+                    Label("Download old data", systemImage: "square.and.arrow.down")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(PrimaryButtonStyle())
                 .disabled(true)
             } else {
                 ShareLink(items: exportedFiles) {
-                    Label("Download Old Data", systemImage: "square.and.arrow.down")
+                    Label("Download old data", systemImage: "square.and.arrow.down")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(PrimaryButtonStyle())
             }
 
             HStack {
-                Button("Try Again") {
+                Button("Try again") {
                     Task { await legacyImportService.importData() }
                 }
                 Spacer()
-                Button("Continue Without", role: .destructive) {
+                Button("Continue without", role: .destructive) {
                     confirmsDiscard = true
                 }
             }

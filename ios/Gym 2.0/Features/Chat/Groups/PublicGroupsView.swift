@@ -98,11 +98,11 @@ private struct PublicGroupsContentView: View {
                     Button("Try again") { Task { await model.load() } }
                 }
             } else if filteredGroups.isEmpty {
-                ContentUnavailableView("No Public Groups", systemImage: "globe", description: Text("Create a group and make it public so others can join."))
+                ContentUnavailableView("No public groups yet", systemImage: "globe", description: Text("Create a group and make it public so others can join."))
             }
         }
         .searchable(text: $model.searchText)
-        .navigationTitle("Public Groups")
+        .navigationTitle("Public groups")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await model.load() }
         .task { await model.load() }

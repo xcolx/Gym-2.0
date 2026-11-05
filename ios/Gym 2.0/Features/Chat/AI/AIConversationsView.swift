@@ -54,31 +54,51 @@ struct AIConversationsView: View {
             }
         }
         .navigationTitle("Gym-AI")
-        .navigationBarTitleDisplayMode(.inline)
+        // the warning has its own heading
+        .navigationBarTitleDisplayMode(acceptedAIWarning ? .automatic : .inline)
     }
 
     private var conversationList: some View {
         List {
-            ForEach(viewModel.conversations) { conversation in
-                NavigationLink(value: AIChatRoute.conversation(conversation)) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(conversation.title ?? "New conversation")
-                            .lineLimit(1)
-                        Text(conversation.updatedAt, format: .relative(presentation: .named))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+            if !viewModel.conversations.isEmpty {
+                Section {
+                    NavigationLink(value: AIChatRoute.new) {
+                        HStack(spacing: 12) {
+                            ConversationIcon(systemImage: "plus")
+                            Text("New conversation")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(userSettings.appColor)
+                        }
                     }
                 }
-                .swipeActions {
-                    Button("Delete", role: .destructive) {
-                        guard let aiService else { return }
-                        Task { await viewModel.delete(conversation, using: aiService) }
+
+                Section {
+                    ForEach(viewModel.conversations) { conversation in
+                        NavigationLink(value: AIChatRoute.conversation(conversation)) {
+                            HStack(spacing: 12) {
+                                ConversationIcon(systemImage: "bubble.left.and.text.bubble.right")
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(conversation.title ?? "New conversation")
+                                        .font(.body.weight(.medium))
+                                        .lineLimit(1)
+                                    Text("Updated \(conversation.updatedAt.formatted(.relative(presentation: .named)))")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .swipeActions {
+                            Button("Delete", role: .destructive) { delete(conversation) }
+                            Button("Rename") { rename(conversation) }
+                                .tint(userSettings.appColor)
+                        }
+                        .contextMenu {
+                            Button("Rename", systemImage: "pencil") { rename(conversation) }
+                            Button("Delete", systemImage: "trash", role: .destructive) { delete(conversation) }
+                        }
                     }
-                    Button("Rename") {
-                        newTitle = conversation.title ?? ""
-                        renamedConversation = conversation
-                    }
-                    .tint(userSettings.appColor)
+                } header: {
+                    Text(viewModel.conversations.count == 1 ? "1 conversation" : "\(viewModel.conversations.count) conversations")
                 }
             }
         }
@@ -103,6 +123,8 @@ struct AIConversationsView: View {
                 } actions: {
                     NavigationLink(value: AIChatRoute.new) {
                         Text("New conversation")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(userSettings.appColorForeground)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(userSettings.appColor)
@@ -136,6 +158,16 @@ struct AIConversationsView: View {
         }
     }
 
+    private func rename(_ conversation: AIConversationDTO) {
+        newTitle = conversation.title ?? ""
+        renamedConversation = conversation
+    }
+
+    private func delete(_ conversation: AIConversationDTO) {
+        guard let aiService else { return }
+        Task { await viewModel.delete(conversation, using: aiService) }
+    }
+
     private var isRenaming: Binding<Bool> {
         Binding(
             get: { renamedConversation != nil },
@@ -156,40 +188,41 @@ struct AIConversationsView: View {
     }
 }
 
-/// A thin banner that opens the conversations with the Gym-AI.
-struct AIConversationsBannerView: View {
+/// The icon of a row of the conversations, in the app color
+private struct ConversationIcon: View {
 
-    @Environment(UserSettings.self) var userSettings
+    let systemImage: String
+
+    @Environment(UserSettings.self) private var userSettings
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(userSettings.appColor)
+            .frame(width: 40, height: 40)
+            .background(userSettings.appColor.opacity(0.15), in: Circle())
+    }
+}
+
+/// The row at the top of the chats that opens the conversations with the Gym-AI
+struct AIConversationsBannerView: View {
 
     var body: some View {
         NavigationLink(value: AIChatRoute.conversations) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image("Gym-AI")
                     .resizable()
-                    .frame(width: 28, height: 28)
+                    .frame(width: 44, height: 44)
                     .clipShape(Circle())
 
-                VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text("Gym-AI")
+                        .font(.body.weight(.semibold))
+                    Text("Ask about your training")
                         .font(.subheadline)
-                        .bold()
-                    Text("Open your AI conversations")
-                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            // Without ignoresSafeAreaEdges the color would extend up behind the navigation bar
-            .background(userSettings.appColor.opacity(0.15), ignoresSafeAreaEdges: [])
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 }

@@ -44,6 +44,7 @@ private struct ChatInfoContentView: View {
     @Environment(\.chatService) private var chatService
     @Environment(SyncService.self) private var syncService
     @Environment(AuthService.self) private var authService
+    @Environment(UserSettings.self) private var userSettings
 
     @Query private var users: [User]
     @Query(filter: #Predicate<User> { $0.isCurrentUser }) private var currentUsers: [User]
@@ -66,7 +67,7 @@ private struct ChatInfoContentView: View {
     var body: some View {
         // Removed by a sync, e.g. after the user was removed from the group
         if chat.modelContext == nil || chat.isDeleted {
-            ContentUnavailableView("Chat Not Available", systemImage: "bubble.left.and.exclamationmark.bubble.right", description: Text("You're no longer a member of this chat."))
+            ContentUnavailableView("Chat not available", systemImage: "bubble.left.and.exclamationmark.bubble.right", description: Text("You're no longer a member of this chat."))
         } else {
             content
         }
@@ -77,35 +78,65 @@ private struct ChatInfoContentView: View {
         let users = User.byServerId(users)
         let membership = membership
         return Form {
-            if chat.groupChat {
-                groupSection
-            }
-
             Section {
-                if membership.isAdmin && !chat.isPublic {
-                    Button("Add Members", systemImage: "person.badge.plus") { model.showsAddMembers = true }
+                header(users: users)
+            }
+            .listRowBackground(Color.clear)
+
+            if chat.groupChat {
+                if membership.isAdmin {
+                    groupSection
                 }
-                ForEach(membership.sortedMembers(users: users), id: \.userId) { member in
-                    memberRow(member, user: users[member.userId])
+
+                Section {
+                    if membership.isAdmin && !chat.isPublic {
+                        Button {
+                            model.showsAddMembers = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.badge.plus")
+                                    .font(.body.weight(.medium))
+                                    .foregroundStyle(userSettings.appColor)
+                                    .frame(width: 40, height: 40)
+                                    .background(userSettings.appColor.opacity(0.15), in: Circle())
+                                Text("Add members")
+                                    .foregroundStyle(userSettings.appColor)
+                            }
+                        }
+                    }
+                    ForEach(membership.sortedMembers(users: users), id: \.userId) { member in
+                        memberRow(member, user: users[member.userId])
+                    }
+                } header: {
+                    Text(chat.members.count == 1 ? "1 member" : "\(chat.members.count) members")
+                } footer: {
+                    if let message = model.message {
+                        Text(message)
+                    }
                 }
-            } header: {
-                Text(chat.groupChat ? "\(chat.members.count) Members" : "Member")
-            } footer: {
-                if let message = model.message {
-                    Text(message)
+            } else if let otherId = chat.otherMemberId(currentUserId: currentUserId), let other = users[otherId] {
+                Section {
+                    directActions(for: other)
+                } footer: {
+                    if let message = model.message {
+                        Text(message)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
             }
 
             Section {
                 if chat.groupChat {
-                    Button("Report Group…", role: .destructive) {
+                    Button("Report group…", systemImage: "exclamationmark.bubble", role: .destructive) {
                         model.reportTarget = .chat(id: chat.serverId, name: chat.name ?? "Group")
                     }
                     Button(role: .destructive) {
                         model.confirmation = .leave
                     } label: {
                         HStack {
-                            Text("Leave Group")
+                            Label("Leave group", systemImage: "rectangle.portrait.and.arrow.right")
                             if model.isLeaving {
                                 Spacer()
                                 ProgressView()
@@ -119,7 +150,7 @@ private struct ChatInfoContentView: View {
                         model.confirmation = .delete
                     } label: {
                         HStack {
-                            Text(chat.groupChat ? "Delete Group" : "Delete Chat")
+                            Label(chat.groupChat ? "Delete group" : "Delete chat", systemImage: "trash")
                             if model.isDeleting {
                                 Spacer()
                                 ProgressView()
@@ -129,6 +160,7 @@ private struct ChatInfoContentView: View {
                     .disabled(model.isLeaving || model.isDeleting)
                 }
             }
+            .foregroundStyle(.red)
         }
         .sheet(isPresented: $model.showsAddMembers) {
             AddMembersView(model: AddMembersViewModel(chat: chat, chatService: chatService, syncService: syncService))
@@ -150,16 +182,16 @@ private struct ChatInfoContentView: View {
         .confirmationDialog(model.confirmationTitle(), isPresented: Binding(get: { model.confirmation != nil }, set: { if !$0 { model.confirmation = nil } }), titleVisibility: .visible, presenting: model.confirmation) { confirmation in
             switch confirmation {
             case .remove(let id, _):
-                Button("Remove Friend", role: .destructive) { Task { await model.removeFriend(id: id) } }
+                Button("Remove friend", role: .destructive) { Task { await model.removeFriend(id: id) } }
             case .removeFromGroup(let id, _):
-                Button("Remove from Group", role: .destructive) { Task { await model.removeFromGroup(id) } }
+                Button("Remove from group", role: .destructive) { Task { await model.removeFromGroup(id) } }
             case .leave:
-                Button("Leave Group", role: .destructive) { Task { await model.leave(currentUserId: currentUserId) } }
+                Button("Leave group", role: .destructive) { Task { await model.leave(currentUserId: currentUserId) } }
             case .delete:
-                Button(chat.groupChat ? "Delete Group" : "Delete Chat", role: .destructive) { Task { await model.delete() } }
+                Button(chat.groupChat ? "Delete group" : "Delete chat", role: .destructive) { Task { await model.delete() } }
             case .block(let id, let username):
                 Button("Block", role: .destructive) { Task { await model.block(id: id) } }
-                Button("Block and Report…", role: .destructive) {
+                Button("Block and report…", role: .destructive) {
                     model.reportTarget = .user(id: id, username: username, blocks: true)
                 }
             }
@@ -189,49 +221,134 @@ private struct ChatInfoContentView: View {
         }
     }
 
+    // MARK: - Header
+
+    /// The large image with the name, and what kind of chat it is below
+    private func header(users: [Int: User]) -> some View {
+        @Bindable var model = model
+        let title = chat.title(users: users, currentUserId: currentUserId)
+        let subtitle: String? = if chat.groupChat {
+            "\(chat.isPublic ? "Public group" : "Private group") · \(chat.members.count == 1 ? "1 member" : "\(chat.members.count) members")"
+        } else {
+            membership.relation(to: chat.otherMemberId(currentUserId: currentUserId).flatMap { users[$0] })
+        }
+        return VStack(spacing: 10) {
+            if chat.groupChat && membership.isAdmin {
+                PhotosPicker(selection: $model.selectedPhoto, matching: .images, photoLibrary: .shared()) {
+                    ChatImageView(chat: chat, users: users, currentUserId: currentUserId, size: 96, opensPhotoViewer: false)
+                        .overlay {
+                            if model.isSavingGroup {
+                                Circle()
+                                    .fill(.black.opacity(0.35))
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                        }
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "camera.fill")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(userSettings.appColorForeground)
+                                .frame(width: 30, height: 30)
+                                .background(userSettings.appColor, in: Circle())
+                                .overlay { Circle().strokeBorder(Color(.systemGroupedBackground), lineWidth: 3) }
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isSavingGroup)
+                .accessibilityLabel("Change group image")
+            } else {
+                ChatImageView(chat: chat, users: users, currentUserId: currentUserId, size: 96)
+            }
+            VStack(spacing: 2) {
+                Text(title)
+                    .font(.title2.bold())
+                    .multilineTextAlignment(.center)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Direct chat
+
+    /// The friend actions for the other member of a direct chat, as buttons below the header
+    @ViewBuilder
+    private func directActions(for user: User) -> some View {
+        let userId = user.serverId
+        let isBusy = model.busyIds.contains(userId)
+        HStack(spacing: 10) {
+            if !user.isBlocked {
+                if user.isFriend {
+                    ActionTile(title: "Remove friend", systemImage: "person.badge.minus", isDestructive: true) {
+                        model.confirmation = .remove(id: userId, username: user.username)
+                    }
+                } else {
+                    ActionTile(title: "Add friend", systemImage: "person.badge.plus") {
+                        Task { await model.sendRequest(to: userId) }
+                    }
+                }
+                ActionTile(title: "Block", systemImage: "hand.raised", isDestructive: true) {
+                    model.confirmation = .block(id: userId, username: user.username)
+                }
+            }
+            ActionTile(title: "Report", systemImage: "exclamationmark.bubble", isDestructive: true) {
+                model.reportTarget = .user(id: userId, username: user.username)
+            }
+        }
+        .disabled(isBusy)
+        .opacity(isBusy ? 0.5 : 1)
+        .overlay {
+            if isBusy {
+                ProgressView()
+            }
+        }
+    }
+
     // MARK: - Group
 
+    /// The name, the image and the visibility of the group, only for its admins
     private var groupSection: some View {
         @Bindable var model = model
-        let isAdmin = membership.isAdmin
         return Section {
-            HStack(spacing: 16) {
-                GroupImagePicker(image: nil, hash: chat.imageUrl, selection: $model.selectedPhoto)
-                    .disabled(model.isSavingGroup)
-                    .allowsHitTesting(isAdmin)
-                if isAdmin {
-                    TextField("Group name", text: $model.name)
-                        .submitLabel(.done)
-                        .onSubmit(saveName)
-                } else {
-                    Text(chat.name ?? "")
-                }
+            HStack {
+                TextField("Group name", text: $model.name)
+                    .submitLabel(.done)
+                    .onSubmit(saveName)
                 if model.isSavingGroup {
                     ProgressView()
                 } else if model.nameChanged {
                     Button("Save", action: saveName)
+                        .fontWeight(.semibold)
                         .disabled(!model.canSaveName)
                 }
             }
-            if isAdmin && chat.imageUrl != nil {
-                Button("Remove Group Image", role: .destructive) {
+            HStack {
+                Toggle(isOn: Binding(get: { chat.isPublic }, set: { isPublic in Task { await model.setPublic(isPublic) } })) {
+                    SettingsLabel("Public", systemImage: "globe")
+                }
+                .disabled(model.isChangingPublic)
+                if model.isChangingPublic {
+                    ProgressView()
+                }
+            }
+            if chat.imageUrl != nil {
+                Button("Remove group image", systemImage: "photo.badge.minus", role: .destructive) {
                     Task { await model.removeGroupImage() }
                 }
+                .foregroundStyle(.red)
                 .disabled(model.isSavingGroup)
             }
-            if isAdmin {
-                HStack {
-                    Toggle("Public", isOn: Binding(get: { chat.isPublic }, set: { isPublic in Task { await model.setPublic(isPublic) } }))
-                        .disabled(model.isChangingPublic)
-                    if model.isChangingPublic {
-                        ProgressView()
-                    }
-                }
-            }
+        } header: {
+            Text("Group")
         } footer: {
             Text(chat.isPublic
-                 ? "Public group: everyone can find and join it. Members can't be added or removed."
-                 : "Private group: only its members can see it, and its admins can add and remove members.")
+                 ? "Everyone can find and join the group. Members can't be added or removed."
+                 : "Only its members can see the group, and its admins can add and remove members.")
         }
     }
 
@@ -246,29 +363,42 @@ private struct ChatInfoContentView: View {
         let userId = member.userId
         let username = user?.username ?? "Unknown user"
         let membership = membership
+        let details = [userId == currentUserId ? "You" : nil, membership.relation(to: user)].compactMap { $0 }
         HStack(spacing: 12) {
             ProfileIconView(hash: user?.profileIconUrl ?? "", size: 40, color: user?.schemeColor, imageHash: user?.profileImageUrl)
-            VStack(alignment: .leading) {
-                Text(userId == currentUserId ? "\(username) (You)" : username)
-                if let status = membership.status(of: member, user: user) {
-                    Text(status)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(username)
+                    .lineLimit(1)
+                if !details.isEmpty {
+                    Text(details.joined(separator: " · "))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            Spacer()
+            Spacer(minLength: 8)
+            if membership.isAdmin(member) {
+                Text("Admin")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(userSettings.appColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(userSettings.appColor.opacity(0.15), in: Capsule())
+            }
             if model.busyIds.contains(userId) {
                 ProgressView()
+                    .frame(width: 28)
             } else if (userId != currentUserId && user != nil) || membership.canRemove(userId) || membership.adminChange(for: member) != nil {
                 Menu {
                     memberActions(member, user: user, username: username)
                 } label: {
                     Image(systemName: "ellipsis.circle")
                         .font(.title3)
+                        .frame(width: 28)
                 }
                 .accessibilityLabel("Actions for \(username)")
             }
         }
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -282,11 +412,11 @@ private struct ChatInfoContentView: View {
                         Task { await model.openDirectChat(with: userId) }
                     }
                 }
-                Button("Remove Friend", systemImage: "person.badge.minus", role: .destructive) {
+                Button("Remove friend", systemImage: "person.badge.minus", role: .destructive) {
                     model.confirmation = .remove(id: userId, username: username)
                 }
             } else {
-                Button("Add Friend", systemImage: "person.badge.plus") {
+                Button("Add friend", systemImage: "person.badge.plus") {
                     Task { await model.sendRequest(to: userId) }
                 }
             }
@@ -300,12 +430,12 @@ private struct ChatInfoContentView: View {
             }
         }
         if let makesAdmin = membership.adminChange(for: member) {
-            Button(makesAdmin ? "Make Admin" : "Remove Admin", systemImage: makesAdmin ? "checkmark.shield" : "xmark.shield") {
+            Button(makesAdmin ? "Make admin" : "Remove admin", systemImage: makesAdmin ? "checkmark.shield" : "xmark.shield") {
                 Task { await model.setAdmin(makesAdmin, userId: userId) }
             }
         }
         if membership.canRemove(userId) {
-            Button("Remove from Group", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
+            Button("Remove from group", systemImage: "person.crop.circle.badge.minus", role: .destructive) {
                 model.confirmation = .removeFromGroup(id: userId, username: username)
             }
         }
@@ -343,10 +473,10 @@ private struct AddMembersView: View {
             }
             .overlay {
                 if candidates.isEmpty {
-                    ContentUnavailableView("No Friends to Add", systemImage: "person.2", description: Text("All your friends are already in the group."))
+                    ContentUnavailableView("No friends to add", systemImage: "person.2", description: Text("All your friends are already in the group."))
                 }
             }
-            .navigationTitle("Add Members")
+            .navigationTitle("Add members")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -375,5 +505,35 @@ private struct AddMembersView: View {
                 dismiss()
             }
         }
+    }
+}
+
+/// A button with its icon above its title, for the actions of a direct chat
+private struct ActionTile: View {
+
+    let title: String
+    let systemImage: String
+    var isDestructive = false
+    let action: () -> Void
+
+    @Environment(UserSettings.self) private var userSettings
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(.title3)
+                    .frame(height: 24)
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(isDestructive ? Color.red : userSettings.appColor)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }

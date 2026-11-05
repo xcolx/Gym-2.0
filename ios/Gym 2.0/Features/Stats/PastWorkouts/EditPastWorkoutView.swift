@@ -36,6 +36,7 @@ private struct EditPastWorkoutContentView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(UserSettings.self) private var userSettings
 
     // The view model is created once, later ones of the parent's body are discarded
     init(model: EditPastWorkoutViewModel) {
@@ -46,60 +47,108 @@ private struct EditPastWorkoutContentView: View {
         @Bindable var model = model
         // The copy in the scratch context that the fields change
         @Bindable var workout = model.workout
-        VStack{
+        let exercises = workout.workoutExercises.sorted { $0.index < $1.index }
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    details(workout)
 
-            HStack{
-                Button(action: {
-                    dismiss()
-                }, label: {
-                    Image(systemName: "xmark")
-                        .font(.title)
-                        .foregroundStyle(Color.red)
-                        .padding(.leading, 10)
-                        .accessibilityLabel("Cancel")
-                })
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Exercises")
+                            .font(.title3.bold())
+                        Spacer()
+                        Button {
+                            model.showEditSheet.toggle()
+                        } label: {
+                            Label("Edit", systemImage: "list.bullet")
+                                .font(.subheadline.weight(.medium))
+                        }
+                        .accessibilityLabel("Edit exercises")
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.top, 12)
 
-                TextField("Name of the Workout", text: $workout.name)
+                    if exercises.isEmpty {
+                        Text("This workout has no exercises. Add them with Edit.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .cardBackground()
+                    }
+
+                    ForEach(Array(exercises.enumerated()), id: \.element.persistentModelID) { index, workoutExercise in
+                        exerciseCard(workoutExercise, number: index + 1)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 24)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Edit workout")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .fontWeight(.semibold)
+                        .disabled(model.trimmedName.isEmpty)
+                }
+            }
+        }
+        .modelContext(model.editContext)
+        .onAppear{
+            model.onAppear()
+        }
+        .sheet(isPresented: $model.showEditSheet, content:{
+            EditPerformingWorkoutView(workout: workout, defersDeletions: true, exercisesContext: context, showsName: false)
+                .modelContext(model.editContext)
+        })
+    }
+
+    /// The name, the date and the duration
+    private func details(_ workout: Workout) -> some View {
+        @Bindable var model = model
+        @Bindable var workout = workout
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Workout name", text: $workout.name)
+                    .font(.title3.weight(.semibold))
                     .autocorrectionDisabled()
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding(.vertical, 10)
-                    .font(.title)
                     .onChange(of: workout.name) {
                         model.nameChanged()
                     }
-                Button(action: save, label: {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.title)
-                        .foregroundStyle(model.trimmedName.isEmpty ? Color.gray : Color.green)
-                        .padding(.trailing, 10)
-                        .padding(.vertical, 10)
-                        .accessibilityLabel("Save")
-                })
-                .disabled(model.trimmedName.isEmpty)
+                if model.trimmedName.isEmpty {
+                    Text("Enter a name.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
             }
+            .padding(.vertical, 12)
 
-            if model.trimmedName.isEmpty {
-                Text("Enter a name.")
-                    .font(.caption)
-                    .foregroundStyle(Color.red)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
+            Divider()
+
+            DatePicker(selection: $workout.date, in: ...Date.now, displayedComponents: .date) {
+                detailLabel("Date", systemImage: "calendar")
             }
+            .padding(.vertical, 8)
 
-            DatePicker(selection: $workout.date, in: ...Date.now, displayedComponents: .date){
-                Text("Date")
-                    .font(.headline)
-            }
-            .padding(10)
+            Divider()
 
-            HStack{
-                Text("Duration in Minutes")
+            HStack {
+                detailLabel("Duration", systemImage: "clock")
                 Spacer()
-                TextField("", text: $model.enteredTime)
-                    .font(.headline)
+                TextField("0", text: $model.enteredTime)
+                    .font(.body.weight(.semibold))
+                    .fontDesign(.rounded)
+                    .monospacedDigit()
                     .multilineTextAlignment(.center)
                     .keyboardType(.numberPad)
-                    .background(Color.gray.opacity(0.3), in: .rect(cornerRadius: 10))
+                    .frame(width: 64, height: 36)
+                    .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .focused($timeFieldFocused)
                     .onChange(of: model.enteredTime){
                         model.enteredTimeChanged()
@@ -109,47 +158,43 @@ private struct EditPastWorkoutContentView: View {
                             model.timeFieldLeft()
                         }
                     }
+                Text("min")
+                    .foregroundStyle(.secondary)
             }
-            .padding(10)
-            .padding(.bottom, 10)
-
-            HStack{
-                Text("Exercises")
-                    .font(.title)
-                Button(action: {
-                    model.showEditSheet.toggle()
-                }, label: {
-                    Image(systemName: "pencil")
-                        .accessibilityLabel("Edit exercises")
-                })
-            }
-
-
-
-            ScrollView{
-                VStack{
-                    ForEach(workout.workoutExercises.sorted(by: {$0.index < $1.index}), id: \.persistentModelID) { workoutExercise in
-                        Text(workoutExercise.exercise?.name ?? "")
-                            .padding(.leading, 10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .font(.headline)
-                        EditWorkoutExerciseView(workoutExercise: workoutExercise)
-                            .padding(.bottom, 30)
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-
-
+            .padding(.vertical, 8)
         }
-        .modelContext(model.editContext)
-        .onAppear{
-            model.onAppear()
+        .padding(.horizontal)
+        .cardBackground()
+    }
+
+    private func detailLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundStyle(userSettings.appColor)
         }
-        .sheet(isPresented: $model.showEditSheet, content:{
-            EditPerformingWorkoutView(workout: workout, defersDeletions: true, exercisesContext: context)
-                .modelContext(model.editContext)
-        })
+    }
+
+    private func exerciseCard(_ workoutExercise: WorkoutExercise, number: Int) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Text("\(number)")
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(userSettings.appColor)
+                    .frame(width: 28, height: 28)
+                    .background(userSettings.appColor.opacity(0.15), in: Circle())
+                    .accessibilityHidden(true)
+                ExerciseNameText(name: workoutExercise.exercise?.name ?? "", verified: workoutExercise.exercise?.verified ?? false)
+                    .font(.headline)
+                    .lineLimit(1)
+            }
+            // all sets: the page scrolls
+            EditWorkoutExerciseView(workoutExercise: workoutExercise, limitsRows: false)
+        }
+        .padding()
+        .cardBackground()
     }
 
     // Copies the changes of the copy to the workout. Only what changed is marked for the sync.

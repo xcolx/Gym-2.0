@@ -10,8 +10,10 @@ import SwiftData
 
 extension WorkoutScheme {
     
+    // Without the exercises that were deleted, e.g. by a sync, but are still referenced until the context saves:
+    // reading them crashes
     var sortedExercises: [Exercise] {
-        exercises.sorted { $0.index < $1.index }.compactMap(\.exercise)
+        exercises.sorted { $0.index < $1.index }.compactMap(\.exercise).filter { !$0.isGone }
     }
     
     // Replaces the complete exercise list, like the server does on an update. The existing rows are updated in place

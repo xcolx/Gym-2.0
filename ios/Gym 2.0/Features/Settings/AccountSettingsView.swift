@@ -11,23 +11,49 @@ import SwiftData
 
 // The account of the current user. Unlike the other settings, these changes need a connection.
 
-/// Profile image, username, email, password, data takeout, logout and deleting the account
-struct AccountSection: View {
-
-    let user: User
+/// The services of the account settings, read from the environment
+private struct AccountServicesReader<Content: View>: View {
 
     @Environment(\.modelContext) private var context
     @Environment(AuthService.self) private var authService
     @Environment(SyncService.self) private var syncService
     @Environment(\.userService) private var userService
 
+    @ViewBuilder let content: (AccountServices) -> Content
+
     var body: some View {
-        let services = AccountServices(auth: authService, sync: syncService, userService: userService, users: UserRepository(context: context))
-        AccountSectionContentView(model: AccountSectionViewModel(services: services), user: user, services: services)
+        content(AccountServices(auth: authService, sync: syncService, userService: userService, users: UserRepository(context: context)))
     }
 }
 
-private struct AccountSectionContentView: View {
+/// The card at the top of the settings with the profile image and username, which opens the account
+struct AccountProfileLink: View {
+
+    let user: User
+
+    var body: some View {
+        NavigationLink {
+            AccountServicesReader { services in
+                AccountView(model: AccountSectionViewModel(services: services), user: user, services: services)
+            }
+        } label: {
+            HStack(spacing: 14) {
+                ProfileIconView(hash: user.profileIconUrl, size: 60, color: user.schemeColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(user.username)
+                        .font(.title3.weight(.semibold))
+                    Text("Account, password and data")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+}
+
+/// Profile image, username, email, password, data takeout and deleting the account
+private struct AccountView: View {
 
     @State private var model: AccountSectionViewModel
     let user: User
@@ -42,61 +68,71 @@ private struct AccountSectionContentView: View {
 
     var body: some View {
         @Bindable var model = model
-        Section {
-            ProfileImageRow(model: ProfileImageViewModel(user: user, services: services))
-            NavigationLink {
-                ChangeUsernameView(model: ChangeUsernameViewModel(user: user, services: services))
-            } label: {
-                LabeledContent("Username", value: user.username)
+        Form {
+            Section {
+                ProfileImageRow(model: ProfileImageViewModel(user: user, services: services))
             }
-            NavigationLink {
-                ChangeEmailView(model: ChangeEmailViewModel(user: user, services: services))
-            } label: {
-                LabeledContent("Email", value: user.email ?? "")
-            }
-            NavigationLink("Password") {
-                ChangePasswordView(model: ChangePasswordViewModel(services: services))
-            }
-            NavigationLink("Data Takeout") {
-                DataTakeoutView(model: DataTakeoutViewModel(services: services))
-            }
-            Button {
-                model.showsLogoutConfirmation = true
-            } label: {
-                HStack {
-                    Text("Log Out")
-                    Spacer()
-                    if model.isLoggingOut { ProgressView() }
+            .listRowBackground(Color.clear)
+
+            Section {
+                NavigationLink {
+                    ChangeUsernameView(model: ChangeUsernameViewModel(user: user, services: services))
+                } label: {
+                    LabeledContent {
+                        Text(user.username)
+                    } label: {
+                        SettingsLabel("Username", systemImage: "person")
+                    }
+                }
+                NavigationLink {
+                    ChangeEmailView(model: ChangeEmailViewModel(user: user, services: services))
+                } label: {
+                    LabeledContent {
+                        Text(user.email ?? "")
+                    } label: {
+                        SettingsLabel("Email", systemImage: "envelope")
+                    }
+                }
+                NavigationLink {
+                    ChangePasswordView(model: ChangePasswordViewModel(services: services))
+                } label: {
+                    SettingsLabel("Password", systemImage: "key")
                 }
             }
-            .disabled(model.isLoggingOut)
-            Button(role: .destructive) {
-                model.showsDeleteConfirmation = true
-            } label: {
-                HStack {
-                    Text("Delete Account")
-                    Spacer()
-                    if model.isDeleting { ProgressView() }
+
+            Section {
+                NavigationLink {
+                    DataTakeoutView(model: DataTakeoutViewModel(services: services))
+                } label: {
+                    SettingsLabel("Download your data", systemImage: "square.and.arrow.down")
+                }
+            } footer: {
+                Text("Download a copy of everything Gym 2.0 stores about you.")
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    model.showsDeleteConfirmation = true
+                } label: {
+                    HStack {
+                        Spacer()
+                        if model.isDeleting {
+                            ProgressView()
+                        } else {
+                            Text("Delete account")
+                        }
+                        Spacer()
+                    }
+                }
+                .disabled(model.isDeleting)
+            } footer: {
+                if let errorMessage = model.errorMessage {
+                    Text(errorMessage).foregroundStyle(.red)
                 }
             }
-            .disabled(model.isDeleting)
-        } header: {
-            Text("Account")
-        } footer: {
-            if let errorMessage = model.errorMessage {
-                Text(errorMessage).foregroundStyle(.red)
-            }
         }
-        .confirmationDialog("Log out?", isPresented: $model.showsLogoutConfirmation, titleVisibility: .visible) {
-            Button("Log Out", role: .destructive) { logout(force: false) }
-        }
-        .alert("Not everything is uploaded", isPresented: $model.showsUnpushedChanges) {
-            Button("Try Again") { logout(force: false) }
-            Button("Log Out Anyway", role: .destructive) { logout(force: true) }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(UnpushedChanges.message)
-        }
+        .navigationTitle("Account")
+        .navigationBarTitleDisplayMode(.inline)
         .alert("Delete your account?", isPresented: $model.showsDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 model.confirmDeletion()
@@ -121,6 +157,61 @@ private struct AccountSectionContentView: View {
             Text("All of your progress and all data stored on Gym 2.0 will be deleted: your workouts, workout schemes, exercises, stats, chats, friends and your profile. This can't be undone. Enter your password to confirm.")
         }
     }
+}
+
+/// The logout at the end of the settings, which warns about changes that aren't uploaded yet
+struct LogoutSection: View {
+
+    var body: some View {
+        AccountServicesReader { services in
+            LogoutSectionContentView(model: AccountSectionViewModel(services: services))
+        }
+    }
+}
+
+private struct LogoutSectionContentView: View {
+
+    @State private var model: AccountSectionViewModel
+
+    // The view model is created once, later ones of the parent's body are discarded
+    init(model: AccountSectionViewModel) {
+        _model = State(initialValue: model)
+    }
+
+    var body: some View {
+        @Bindable var model = model
+        Section {
+            Button {
+                model.showsLogoutConfirmation = true
+            } label: {
+                HStack {
+                    Spacer()
+                    if model.isLoggingOut {
+                        ProgressView()
+                    } else {
+                        Text("Log out")
+                    }
+                    Spacer()
+                }
+            }
+            .foregroundStyle(.red)
+            .disabled(model.isLoggingOut)
+        } footer: {
+            if let errorMessage = model.errorMessage {
+                Text(errorMessage).foregroundStyle(.red)
+            }
+        }
+        .confirmationDialog("Log out?", isPresented: $model.showsLogoutConfirmation, titleVisibility: .visible) {
+            Button("Log out", role: .destructive) { logout(force: false) }
+        }
+        .alert("Not everything is uploaded", isPresented: $model.showsUnpushedChanges) {
+            Button("Try again") { logout(force: false) }
+            Button("Log out anyway", role: .destructive) { logout(force: true) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(UnpushedChanges.message)
+        }
+    }
 
     private func logout(force: Bool) {
         Task { await model.logout(force: force) }
@@ -140,16 +231,26 @@ private struct ProfileImageRow: View {
     var body: some View {
         @Bindable var model = model
         let user = model.user
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 16) {
-                ProfileIconView(hash: user.profileIconUrl, size: 64, color: user.schemeColor, imageHash: user.profileImageUrl)
-                    .overlay {
-                        if model.isUploading {
-                            ProgressView()
-                        }
+        VStack(spacing: 12) {
+            // The full image, the icon would be blurry at this size
+            ServerImageView(hash: user.profileImageUrl.isEmpty ? nil : user.profileImageUrl, contentMode: .fill) {
+                Image(systemName: "person.crop.circle.fill")
+                    .resizable()
+                    .foregroundStyle(.gray)
+            }
+            .frame(width: 104, height: 104)
+            .clipShape(Circle())
+            .profileBorder(color: user.schemeColor, size: 104)
+            .opensPhotoViewer(hash: user.profileImageUrl)
+                .overlay {
+                    if model.isUploading {
+                        ProgressView()
                     }
+                }
+            HStack(spacing: 20) {
                 PhotosPicker(selection: $model.selectedPhoto, matching: .images, photoLibrary: .shared()) {
-                    Text(user.profileImageUrl.isEmpty ? "Add Profile Image" : "Change Profile Image")
+                    Text(user.profileImageUrl.isEmpty ? "Add photo" : "Change photo")
+                        .fontWeight(.medium)
                 }
                 .buttonStyle(.borderless)
                 .disabled(model.isUploading)
@@ -165,8 +266,10 @@ private struct ProfileImageRow: View {
                 Text(errorMessage)
                     .font(.footnote)
                     .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
             }
         }
+        .frame(maxWidth: .infinity)
         .task(id: model.selectedPhoto) {
             await model.loadSelectedPhoto()
         }
@@ -330,14 +433,14 @@ private struct DataTakeoutView: View {
                     Button {
                         model.showsShareSheet = true
                     } label: {
-                        Label("Save or Share File", systemImage: "square.and.arrow.up")
+                        Label("Save or share file", systemImage: "square.and.arrow.up")
                     }
                 } else {
                     Button {
                         Task { await model.load() }
                     } label: {
                         HStack {
-                            Text("Request Data")
+                            Text("Request data")
                             Spacer()
                             if model.isLoading { ProgressView() }
                         }
@@ -352,7 +455,7 @@ private struct DataTakeoutView: View {
                 }
             }
         }
-        .navigationTitle("Data Takeout")
+        .navigationTitle("Download your data")
         .navigationBarTitleDisplayMode(.inline)
         // The file holds personal data, so it's removed once it was saved or shared, or the sheet was closed
         .sheet(isPresented: $model.showsShareSheet, onDismiss: model.removeFile) {

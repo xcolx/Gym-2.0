@@ -37,6 +37,8 @@ private struct FriendsContentView: View {
     @Query(filter: #Predicate<User> { $0.isFriend }, sort: \User.username) private var friends: [User]
     @Query private var users: [User]
 
+    @Environment(UserSettings.self) private var userSettings
+
     // The view model is created once, later ones of the parent's body are discarded
     init(model: FriendsViewModel) {
         _model = State(initialValue: model)
@@ -44,12 +46,12 @@ private struct FriendsContentView: View {
 
     var body: some View {
         List {
-            addFriendSection
+            searchSection
             requestsSection
+            sentSection
             friendsSection
         }
         .navigationTitle("Friends")
-        .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             await model.refresh()
         }
@@ -62,10 +64,10 @@ private struct FriendsContentView: View {
         .confirmationDialog(model.confirmationTitle, isPresented: Binding(get: { model.confirmation != nil }, set: { if !$0 { model.confirmation = nil } }), titleVisibility: .visible, presenting: model.confirmation) { confirmation in
             switch confirmation {
             case .remove(let id, _):
-                Button("Remove Friend", role: .destructive) { Task { await model.removeFriend(id: id) } }
+                Button("Remove friend", role: .destructive) { Task { await model.removeFriend(id: id) } }
             case .block(let id, let username, let profile):
                 Button("Block", role: .destructive) { Task { await model.block(id: id, profile: profile) } }
-                Button("Block and Report…", role: .destructive) {
+                Button("Block and report…", role: .destructive) {
                     model.reportTarget = .user(id: id, username: username, profile: profile, blocks: true)
                 }
             }
@@ -82,22 +84,35 @@ private struct FriendsContentView: View {
         }
     }
 
-    // MARK: - Add friend
+    // MARK: - Search
 
-    private var addFriendSection: some View {
+    /// The exact username, and the user found with it
+    private var searchSection: some View {
         @Bindable var model = model
+        let canSearch = !model.searchText.trimmingCharacters(in: .whitespaces).isEmpty
         return Section {
-            HStack {
-                TextField("Exact username", text: $model.searchText)
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Add by username", text: $model.searchText)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
                     .onSubmit(search)
                 if model.isSearching {
                     ProgressView()
-                } else {
+                } else if canSearch {
+                    Button {
+                        model.searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear")
                     Button("Search", action: search)
-                        .disabled(model.searchText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .fontWeight(.semibold)
+                        .buttonStyle(.borderless)
                 }
             }
             .onChange(of: model.searchText) {
@@ -107,9 +122,11 @@ private struct FriendsContentView: View {
 
             if let foundUser = model.foundUser {
                 HStack(spacing: 12) {
-                    ProfileIconView(hash: foundUser.profileIconUrl, size: 40, color: foundUser.schemeColor, imageHash: foundUser.profileImageUrl)
+                    ProfileIconView(hash: foundUser.profileIconUrl, size: 44, color: foundUser.schemeColor, imageHash: foundUser.profileImageUrl)
                     Text(foundUser.username)
-                    Spacer()
+                        .font(.body.weight(.medium))
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
                     foundUserAction(foundUser)
                 }
                 .contextMenu {
@@ -119,31 +136,10 @@ private struct FriendsContentView: View {
                 }
             }
             if let searchMessage = model.searchMessage {
-                Text(searchMessage)
-                    .font(.footnote)
+                Label(searchMessage, systemImage: "person.fill.questionmark")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-
-            ForEach(model.sentRequests, id: \.receiver.id) { request in
-                HStack(spacing: 12) {
-                    ProfileIconView(hash: request.receiver.profileIconUrl, size: 40, color: request.receiver.schemeColor, imageHash: request.receiver.profileImageUrl)
-                    VStack(alignment: .leading) {
-                        Text(request.receiver.username)
-                        Text("Sent \(request.timestamp, format: .relative(presentation: .named))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if model.busyIds.contains(request.receiver.id) {
-                        ProgressView()
-                    } else {
-                        Button("Cancel") { Task { await model.cancelRequest(to: request.receiver.id) } }
-                            .buttonStyle(.bordered)
-                    }
-                }
-            }
-        } header: {
-            Text("Add Friend")
         } footer: {
             Text("Usernames are case-sensitive.")
         }
@@ -153,21 +149,36 @@ private struct FriendsContentView: View {
     private func foundUserAction(_ user: UserDTO) -> some View {
         let stored = User.byServerId(users)[user.id]
         if stored?.isCurrentUser ?? false {
-            Text("That's you").foregroundStyle(.secondary)
+            StatusText("That's you")
         } else if stored?.isFriend ?? false {
-            Text("Friends").foregroundStyle(.secondary)
+            StatusText("Friends")
         } else if stored?.isBlocked ?? false {
-            Text("Blocked").foregroundStyle(.secondary)
+            StatusText("Blocked")
         } else if model.busyIds.contains(user.id) {
             ProgressView()
         } else if model.sentRequests.contains(where: { $0.receiver.id == user.id }) {
-            Button("Cancel Request") { Task { await model.cancelRequest(to: user.id) } }
-                .buttonStyle(.bordered)
+            Menu {
+                Button("Cancel request", systemImage: "xmark", role: .destructive) {
+                    Task { await model.cancelRequest(to: user.id) }
+                }
+            } label: {
+                Label("Requested", systemImage: "clock")
+                    .font(.subheadline.weight(.medium))
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .tint(.secondary)
         } else {
-            Button("Add") {
+            Button {
                 Task { await model.sendRequest(to: user.id) }
+            } label: {
+                Text("Add")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 6)
+                    .foregroundStyle(userSettings.appColorForeground)
             }
             .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
         }
     }
 
@@ -177,40 +188,80 @@ private struct FriendsContentView: View {
 
     // MARK: - Requests
 
+    /// The requests sent to the user, first since they wait for an answer
     @ViewBuilder
     private var requestsSection: some View {
         if !model.requests.isEmpty || model.requestsError != nil {
-            Section("Friend Requests") {
+            Section {
                 if let requestsError = model.requestsError {
-                    Text(requestsError)
+                    Label(requestsError, systemImage: "exclamationmark.triangle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 ForEach(model.requests, id: \.sender.id) { request in
-                    HStack(spacing: 12) {
-                        ProfileIconView(hash: request.sender.profileIconUrl, size: 40, color: request.sender.schemeColor, imageHash: request.sender.profileImageUrl)
-                        VStack(alignment: .leading) {
-                            Text(request.sender.username)
-                            Text(request.timestamp, format: .relative(presentation: .named))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
+                    VStack(spacing: 12) {
+                        PersonRow(user: request.sender, detail: request.timestamp.formatted(.relative(presentation: .named)))
                         if model.busyIds.contains(request.sender.id) {
                             ProgressView()
+                                .frame(maxWidth: .infinity, minHeight: 34)
                         } else {
-                            Button("Accept") { Task { await model.answer(request, accept: true) } }
+                            HStack(spacing: 10) {
+                                Button {
+                                    Task { await model.answer(request, accept: true) }
+                                } label: {
+                                    Text("Accept")
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(userSettings.appColorForeground)
+                                        .frame(maxWidth: .infinity)
+                                }
                                 .buttonStyle(.borderedProminent)
-                            Button("Decline") { Task { await model.answer(request, accept: false) } }
+                                Button {
+                                    Task { await model.answer(request, accept: false) }
+                                } label: {
+                                    Text("Decline")
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.primary)
+                                        .frame(maxWidth: .infinity)
+                                }
                                 .buttonStyle(.bordered)
+                                .tint(.secondary)
+                            }
+                            .buttonBorderShape(.roundedRectangle(radius: 10))
                         }
                     }
+                    .padding(.vertical, 4)
                     .contextMenu {
                         Button("Report…", systemImage: "exclamationmark.bubble") {
                             model.reportTarget = .user(id: request.sender.id, username: request.sender.username)
                         }
                         Button("Block", systemImage: "hand.raised", role: .destructive) {
                             model.confirmation = .block(id: request.sender.id, username: request.sender.username, profile: request.sender)
+                        }
+                    }
+                }
+            } header: {
+                // without a count if only the error is shown
+                Text(model.requests.isEmpty ? "Friend requests" : model.requests.count == 1 ? "1 friend request" : "\(model.requests.count) friend requests")
+            }
+        }
+    }
+
+    /// The requests the user sent that weren't answered yet
+    @ViewBuilder
+    private var sentSection: some View {
+        if !model.sentRequests.isEmpty {
+            Section("Sent") {
+                ForEach(model.sentRequests, id: \.receiver.id) { request in
+                    HStack(spacing: 12) {
+                        PersonRow(user: request.receiver, detail: "Waiting · sent \(request.timestamp.formatted(.relative(presentation: .named)))")
+                        if model.busyIds.contains(request.receiver.id) {
+                            ProgressView()
+                        } else {
+                            Button("Cancel") { Task { await model.cancelRequest(to: request.receiver.id) } }
+                                .font(.subheadline.weight(.medium))
+                                .buttonStyle(.bordered)
+                                .buttonBorderShape(.capsule)
+                                .tint(.secondary)
                         }
                     }
                 }
@@ -223,22 +274,41 @@ private struct FriendsContentView: View {
     private var friendsSection: some View {
         Section {
             if friends.isEmpty {
-                Text("No friends yet. Search for their username above.")
-                    .foregroundStyle(.secondary)
+                VStack(spacing: 8) {
+                    Image(systemName: "person.2")
+                        .font(.largeTitle)
+                        .foregroundStyle(userSettings.appColor)
+                    Text("No friends yet")
+                        .font(.headline)
+                    Text("Search for a username to add someone.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
             }
             ForEach(friends) { friend in
                 Button {
                     openChat(with: friend.serverId)
                 } label: {
                     HStack(spacing: 12) {
-                        ProfileIconView(hash: friend.profileIconUrl, size: 40, color: friend.schemeColor, imageHash: friend.profileImageUrl)
+                        ProfileIconView(hash: friend.profileIconUrl, size: 44, color: friend.schemeColor, imageHash: friend.profileImageUrl)
                         Text(friend.username)
-                            .foregroundStyle(.primary)
+                            .font(.body.weight(.medium))
+                            // not tinted like the button
+                            .foregroundStyle(Color.primary)
+                            .lineLimit(1)
                         Spacer()
                         if model.busyIds.contains(friend.serverId) {
                             ProgressView()
                         } else {
-                            Image(systemName: "bubble.left")
+                            Image(systemName: "bubble.left.fill")
+                                .font(.subheadline)
+                                .foregroundStyle(userSettings.appColor)
+                                .frame(width: 34, height: 34)
+                                .background(userSettings.appColor.opacity(0.15), in: Circle())
+                                .accessibilityLabel("Message")
                         }
                     }
                 }
@@ -254,7 +324,7 @@ private struct FriendsContentView: View {
                 }
                 .contextMenu {
                     Button("Message", systemImage: "bubble.left") { openChat(with: friend.serverId) }
-                    Button("Remove Friend", systemImage: "person.badge.minus", role: .destructive) {
+                    Button("Remove friend", systemImage: "person.badge.minus", role: .destructive) {
                         model.confirmation = .remove(id: friend.serverId, username: friend.username)
                     }
                     Button("Report…", systemImage: "exclamationmark.bubble") {
@@ -266,11 +336,52 @@ private struct FriendsContentView: View {
                 }
             }
         } header: {
-            Text("Friends")
+            if !friends.isEmpty {
+                Text(friends.count == 1 ? "1 friend" : "\(friends.count) friends")
+            }
         }
     }
 
     private func openChat(with friendId: Int) {
         Task { await model.openDirectChat(with: friendId) }
+    }
+}
+
+/// The picture and the username of a user from the server, with a line below
+private struct PersonRow: View {
+
+    let user: UserDTO
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ProfileIconView(hash: user.profileIconUrl, size: 44, color: user.schemeColor, imageHash: user.profileImageUrl)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(user.username)
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Why a found user can't be added, in place of the button
+private struct StatusText: View {
+
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
     }
 }

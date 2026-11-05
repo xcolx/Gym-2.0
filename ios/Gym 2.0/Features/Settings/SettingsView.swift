@@ -19,55 +19,63 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // Can only be changed once the first sync loaded the current user
-                Group {
-                    BodyweightSection()
-                    unitsSection
-                    appColorSection
-                    blockedUsersSection
-                }
-                .disabled(!userSettings.isAvailable)
-                // Only stored on the device, so it can always be changed
-                appearanceSection
                 if let user = currentUsers.first {
-                    AccountSection(user: user)
+                    Section {
+                        AccountProfileLink(user: user)
+                    }
                 }
-                ResyncSection()
-                AboutDeveloperSection()
+
+                // Can only be changed once the first sync loaded the current user
+                trainingSection
+                    .disabled(!userSettings.isAvailable)
+                appearanceSection
+                privacySection
+                    .disabled(!userSettings.isAvailable)
+
+                AboutSection()
+
+                if currentUsers.first != nil {
+                    LogoutSection()
+                }
+
+                Section {
+                } footer: {
+                    Text("Gym 2.0 \(version)")
+                        .frame(maxWidth: .infinity)
+                }
             }
             .navigationTitle("Settings")
         }
     }
 
-    // MARK: - Units
+    /// Like "3.0.2 (3)"
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? ""
+        let build = info?["CFBundleVersion"] as? String ?? ""
+        return "\(version) (\(build))"
+    }
 
-    private var unitsSection: some View {
+    // MARK: - Training
+
+    private var trainingSection: some View {
         Section {
-            unitPicker("Weight", metric: "kg", imperial: "lbs", selection: Binding(get: { userSettings.weightUnit }, set: { userSettings.setWeightUnit($0) }))
-            unitPicker("Distance", metric: "m", imperial: "ft", selection: Binding(get: { userSettings.distanceUnit }, set: { userSettings.setDistanceUnit($0) }))
+            BodyweightRow()
+            unitPicker("Weight", systemImage: "scalemass", metric: "kg", imperial: "lbs", selection: Binding(get: { userSettings.weightUnit }, set: { userSettings.setWeightUnit($0) }))
+            unitPicker("Distance", systemImage: "ruler", metric: "m", imperial: "ft", selection: Binding(get: { userSettings.distanceUnit }, set: { userSettings.setDistanceUnit($0) }))
         } header: {
-            Text("Units")
+            Text("Training")
+        } footer: {
+            Text("Your bodyweight is used as the weight of bodyweight exercises.")
         }
     }
 
-    // A segmented picker hides its label in a form
-    private func unitPicker(_ title: String, metric: String, imperial: String, selection: Binding<UnitSystem>) -> some View {
-        LabeledContent(title) {
-            Picker(title, selection: selection) {
-                Text(metric).tag(UnitSystem.metric)
-                Text(imperial).tag(UnitSystem.imperial)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 140)
-        }
-    }
-
-    // MARK: - App color
-
-    private var appColorSection: some View {
-        Section {
-            ColorPicker("App Color", selection: Binding(get: { userSettings.appColor }, set: { userSettings.setColor($0) }), supportsOpacity: false)
+    private func unitPicker(_ title: String, systemImage: String, metric: String, imperial: String, selection: Binding<UnitSystem>) -> some View {
+        LabeledContent {
+            AppColorSegmentedPicker(options: [UnitSystem.metric, .imperial], selection: selection) { $0 == .metric ? metric : imperial }
+                .frame(width: 120)
+        } label: {
+            SettingsLabel(title, systemImage: systemImage)
         }
     }
 
@@ -75,30 +83,48 @@ struct SettingsView: View {
 
     private var appearanceSection: some View {
         Section {
-            Picker("Appearance", selection: $theme) {
-                ForEach(AppTheme.allCases) { theme in
-                    Text(theme.title).tag(theme)
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                SettingsLabel("App color", systemImage: "paintpalette")
+                AppColorSwatches()
             }
+            .padding(.vertical, 4)
+            .disabled(!userSettings.isAvailable)
+
+            // Only stored on the device, so it can always be changed
+            LabeledContent {
+                AppColorSegmentedPicker(options: AppTheme.allCases, selection: $theme) { $0.title }
+                    .frame(width: 190)
+            } label: {
+                SettingsLabel("Theme", systemImage: "circle.lefthalf.filled")
+            }
+        } header: {
+            Text("Appearance")
         }
     }
 
-    // MARK: - Blocked users
+    // MARK: - Privacy and data
 
-    private var blockedUsersSection: some View {
+    private var privacySection: some View {
         Section {
             NavigationLink {
                 BlockedUsersView()
             } label: {
-                LabeledContent("Blocked Users", value: "\(blockedUsers.count)")
+                LabeledContent {
+                    Text("\(blockedUsers.count)")
+                } label: {
+                    SettingsLabel("Blocked users", systemImage: "hand.raised")
+                }
             }
+            SyncLink()
+        } header: {
+            Text("Privacy and data")
         }
     }
 }
 
 // MARK: - Bodyweight
 
-private struct BodyweightSection: View {
+private struct BodyweightRow: View {
 
     @Environment(UserSettings.self) var userSettings
 
@@ -122,9 +148,9 @@ private struct BodyweightSection: View {
     }
 
     var body: some View {
-        Section {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Bodyweight")
+                SettingsLabel("Bodyweight", systemImage: "figure.stand")
                 Spacer()
                 TextField("–", text: $text)
                     .focused($isFocused)
@@ -135,12 +161,10 @@ private struct BodyweightSection: View {
                 Text(unit.weightSymbol)
                     .foregroundStyle(.secondary)
             }
-        } footer: {
             if !isValid {
                 Text("Enter a weight between 0 and \(UnitSystem.number(unit.weight(fromKilograms: 1000), maxDecimals: 0)) \(unit.weightSymbol).")
+                    .font(.footnote)
                     .foregroundStyle(.red)
-            } else {
-                Text("Used as the weight of bodyweight exercises.")
             }
         }
         .onAppear(perform: showStoredValue)
@@ -163,9 +187,87 @@ private struct BodyweightSection: View {
     }
 }
 
-// MARK: - Manual resync
+// MARK: - App color
 
-private struct ResyncSection: View {
+/// A choice of colors that work as the app color, and the color picker for any other
+private struct AppColorSwatches: View {
+
+    private static let presets = ["#FF0000", "#FF9500", "#FFCC00", "#34C759", "#00C7BE", "#007AFF", "#5856D6", "#AF52DE", "#FF2D55"]
+
+    @Environment(UserSettings.self) var userSettings
+
+    private var isCustom: Bool {
+        !Self.presets.contains(userSettings.schemeColor.uppercased())
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Self.presets, id: \.self) { hex in
+                let isSelected = userSettings.schemeColor.uppercased() == hex
+                Button {
+                    userSettings.setColor(Color(hex: hex)!)
+                } label: {
+                    Circle()
+                        .fill(Color(hex: hex)!)
+                        .frame(width: 26, height: 26)
+                        .padding(3)
+                        .overlay {
+                            if isSelected {
+                                Circle().strokeBorder(Color.primary.opacity(0.8), lineWidth: 2)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(hex)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+
+            // Any other color, with a ring like the selected presets while one is chosen
+            ColorPicker("Other color", selection: Binding(get: { userSettings.appColor }, set: { userSettings.setColor($0) }), supportsOpacity: false)
+                .labelsHidden()
+                .padding(3)
+                .overlay {
+                    if isCustom {
+                        Circle().strokeBorder(Color.primary.opacity(0.8), lineWidth: 2)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+// MARK: - Sync
+
+/// Opens the state of the sync, with the problems in red
+private struct SyncLink: View {
+
+    @Environment(SyncService.self) private var syncService
+
+    var body: some View {
+        NavigationLink {
+            SyncView()
+        } label: {
+            LabeledContent {
+                if !syncService.problems.isEmpty {
+                    Text(syncService.problems.count == 1 ? "1 problem" : "\(syncService.problems.count) problems")
+                        .foregroundStyle(.red)
+                } else {
+                    switch syncService.state {
+                    case .idle: Text("Up to date")
+                    case .syncing: Text("Syncing…")
+                    case .failed: Text("Failed").foregroundStyle(.red)
+                    }
+                }
+            } label: {
+                SettingsLabel("Sync", systemImage: "arrow.triangle.2.circlepath")
+            }
+        }
+    }
+}
+
+/// The state of the sync, the manual resync and what is out of sync
+private struct SyncView: View {
 
     @Environment(SyncService.self) private var syncService
 
@@ -173,100 +275,135 @@ private struct ResyncSection: View {
     @State private var didFinish = false
 
     var body: some View {
-        Section {
-            Button {
-                Task {
-                    isResyncing = true
-                    didFinish = false
-                    await syncService.resync()
-                    isResyncing = false
-                    didFinish = true
-                }
-            } label: {
-                HStack {
-                    Text("Manual Resync")
-                    Spacer()
-                    if isResyncing {
-                        ProgressView()
+        Form {
+            Section {
+                LabeledContent("Status") {
+                    switch syncService.state {
+                    case .idle: Text("Up to date")
+                    case .syncing: Text("Syncing…")
+                    case .failed: Text("Failed").foregroundStyle(.red)
                     }
                 }
+                if let lastSyncDate = syncService.lastSyncDate {
+                    LabeledContent("Last synced") {
+                        Text(lastSyncDate, format: .relative(presentation: .named))
+                    }
+                }
+                if case .failed(let message) = syncService.state {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
             }
-            .disabled(isResyncing)
 
-            // Only while something is out of sync
             if !syncService.problems.isEmpty {
-                NavigationLink {
-                    SyncProblemsView()
-                } label: {
-                    LabeledContent {
-                        Text("\(syncService.problems.count)")
-                            .foregroundStyle(.red)
+                Section {
+                    NavigationLink {
+                        SyncProblemsView()
                     } label: {
-                        Label("Sync Problems", systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
+                        LabeledContent {
+                            Text("\(syncService.problems.count)")
+                                .foregroundStyle(.red)
+                        } label: {
+                            Label("Sync problems", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
             }
-        } footer: {
-            if didFinish, case .failed(let message) = syncService.state {
-                Text("The resync failed: \(message)")
-                    .foregroundStyle(.red)
-            } else if didFinish {
-                Text("Everything was reloaded from the server.")
-            } else {
-                Text("Uploads all changes that are not on the server yet and then loads everything again. Use it if something seems out of sync.")
+
+            Section {
+                Button {
+                    Task {
+                        isResyncing = true
+                        didFinish = false
+                        await syncService.resync()
+                        isResyncing = false
+                        didFinish = true
+                    }
+                } label: {
+                    HStack {
+                        Text("Resync everything")
+                        Spacer()
+                        if isResyncing {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isResyncing)
+            } footer: {
+                if didFinish, case .failed(let message) = syncService.state {
+                    Text("The resync failed: \(message)")
+                        .foregroundStyle(.red)
+                } else if didFinish {
+                    Text("Everything was reloaded from the server.")
+                } else {
+                    Text("Uploads all changes that are not on the server yet and then loads everything again. Use it if something seems out of sync.")
+                }
             }
         }
+        .navigationTitle("Sync")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-// MARK: - About the developer
+// MARK: - About
 
-private struct AboutDeveloperSection: View {
+private struct AboutSection: View {
 
     private static let email = "gym2@colinrueegg.com"
 
     @Environment(\.openURL) private var openURL
-    /// The link to open once the user confirmed leaving the app
+    /// The web page or email to open once the user confirmed leaving the app
     @State private var pendingURL: URL?
 
     var body: some View {
         Section {
             Button {
-                pendingURL = URL(string: "https://github.com/xcolx")
+                pendingURL = URL(string: "mailto:\(Self.email)")
             } label: {
-                LabeledContent("GitHub", value: "xcolx")
+                LinkRow(title: "Contact and feedback", systemImage: "envelope")
             }
             Button {
                 pendingURL = URL(string: "https://github.com/xcolx/Gym-2.0")
             } label: {
-                LabeledContent("Source Code", value: "Gym-2.0")
+                LinkRow(title: "Source code", systemImage: "chevron.left.forwardslash.chevron.right")
             }
             Button {
-                pendingURL = URL(string: "mailto:\(Self.email)")
-            } label: {
-                LabeledContent("Email", value: Self.email)
-            }
-            Button("Terms of Use") {
                 pendingURL = URL(string: "https://gym2.app/tos")
+            } label: {
+                LinkRow(title: "Terms of use", systemImage: "doc.text")
             }
-            Button("Privacy Policy") {
+            Button {
                 pendingURL = URL(string: "https://gym2.app/privacy")
+            } label: {
+                LinkRow(title: "Privacy policy", systemImage: "lock.shield")
             }
         } header: {
-            Text("About the Developer")
-        } footer: {
-            Text("Questions, feedback, bugs or suggestions? Send me an email.")
+            Text("About")
         }
-        .font(.footnote)
         .alert("Leave Gym 2.0?", isPresented: Binding(get: { pendingURL != nil }, set: { if !$0 { pendingURL = nil } })) {
-            Button("Yes") {
+            Button("Open") {
                 if let pendingURL { openURL(pendingURL) }
             }
-            .keyboardShortcut(.defaultAction)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Do you want to open this link and leave the app?")
+            Text(pendingURL?.scheme == "mailto" ? "This opens your mail app to write an email to \(Self.email)." : "This opens the page in your browser.")
+        }
+    }
+}
+
+private struct LinkRow: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack {
+            SettingsLabel(title, systemImage: systemImage)
+            Spacer()
+            Image(systemName: "arrow.up.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
     }
 }

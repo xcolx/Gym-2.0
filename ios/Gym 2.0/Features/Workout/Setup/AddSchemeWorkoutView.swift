@@ -19,25 +19,15 @@ struct AddSchemeWorkoutView: View {
     
     var body: some View {
         
-        EditWorkoutView(navStackTitle: "Add Workout Scheme", workoutTitle: $localName, exerciseList: $localExercises)
-        
-        HStack{
-            Spacer()
-            
-            Button(action: {
+        EditWorkoutView(navStackTitle: "New workout", workoutTitle: $localName, exerciseList: $localExercises) {
+            Button {
                 WorkoutSchemeRepository(context: context).create(workoutScheme, name: localName, exercises: localExercises)
                 dismiss()
-            }, label: {
-                Text("Save Workout")
-                    .foregroundStyle(Color("MyWhite"))
-                    .font(.title)
-                    .padding(15)
-                    .background(
-                        RoundedRectangle(cornerRadius: 25)
-                            .tint(Color("MyBlack"))
-                    )
-            })
-            Spacer()
-        }.padding(.bottom, 10)
+            } label: {
+                Label("Save workout", systemImage: "checkmark")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(localExercises.isEmpty || localName.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
     }
 }

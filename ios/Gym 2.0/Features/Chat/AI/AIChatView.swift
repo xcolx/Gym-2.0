@@ -6,17 +6,13 @@
 //
 
 import SwiftUI
-import SwiftData
 
 /// A conversation with the Gym-AI. Without a conversation, a new one is started with the first message.
 struct AIChatView: View {
 
     @Environment(\.aiService) private var aiService
-    @Environment(UserSettings.self) var userSettings
-
     @State private var viewModel: AIChatViewModel
     @State private var userInput: String = ""
-    @Query(filter: #Predicate<User> { $0.isCurrentUser }) private var currentUsers: [User]
 
     private let bottomID = "bottom"
 
@@ -29,28 +25,24 @@ struct AIChatView: View {
         return viewModel.canSend && !content.isEmpty && content.count <= AIChatViewModel.maxMessageLength
     }
 
+    /// Tapped in an empty conversation, they fill the field
+    private static let examples = [
+        "How many sets per week for chest?",
+        "What should I eat after training?",
+        "Give me a 3-day full body plan",
+    ]
+
     var body: some View {
-
-        VStack (spacing: 0) {
-
-            ScrollViewReader{ proxy in
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
+                    LazyVStack(spacing: 12) {
                         ForEach(viewModel.messages) { message in
-                            HStack{
-                                if message.role == .user {
-                                    Spacer(minLength: 40)
-                                }
-                                AIMessageView(
-                                    message: message,
-                                    currentUser: currentUsers.first,
-                                    onRetry: { retry(message) },
-                                    onDiscard: { viewModel.discard(message) }
-                                )
-                                if message.role == .assistant {
-                                    Spacer(minLength: 40)
-                                }
-                            }
+                            AIMessageView(
+                                message: message,
+                                onRetry: { retry(message) },
+                                onDiscard: { viewModel.discard(message) }
+                            )
                         }
 
                         if viewModel.isWaitingForAnswer {
@@ -61,9 +53,11 @@ struct AIChatView: View {
                             .frame(height: 1)
                             .id(bottomID)
                     }
-                    .padding()
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
                 }
                 .defaultScrollAnchor(.bottom)
+                .scrollDismissesKeyboard(.interactively)
                 .onChange(of: viewModel.messages.count) {
                     withAnimation { proxy.scrollTo(bottomID, anchor: .bottom) }
                 }
@@ -82,35 +76,27 @@ struct AIChatView: View {
                     } actions: {
                         Button("Try again") { load() }
                     }
-                } else if viewModel.messages.isEmpty {
+                } else if viewModel.messages.isEmpty && !viewModel.isWaitingForAnswer {
                     emptyState
                 }
             }
 
-            Divider()
-
-            HStack (alignment: .bottom) {
-                TextField("Ask Gym-AI...", text: $userInput, axis: .vertical)
+            HStack(alignment: .bottom, spacing: 4) {
+                TextField("Ask Gym-AI…", text: $userInput, axis: .vertical)
                     .lineLimit(1...5)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
                     .autocorrectionDisabled()
+                    .padding(.leading, 14)
+                    .padding(.vertical, 8)
 
-                Button(action: sendMessage) {
-                    if viewModel.isWaitingForAnswer {
-                        ProgressView()
-                            .padding(7)
-                    } else {
-                        Text("Send")
-                            .padding(7)
-                            .background(canSend ? userSettings.appColor : Color.gray)
-                            .foregroundStyle(.white)
-                            .clipShape(.rect(cornerRadius: 10))
-                    }
-                }
-                .disabled(!canSend)
+                SendButton(isSending: viewModel.isWaitingForAnswer, canSend: canSend, action: sendMessage)
+                    .padding(3)
             }
-            .padding()
+            .messageFieldBackground()
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(.bar)
         }
+        .background(Color(.systemGroupedBackground))
         .navigationTitle(viewModel.title ?? "New conversation")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadIfNeeded() }
@@ -120,17 +106,34 @@ struct AIChatView: View {
         VStack(spacing: 12) {
             Image("Gym-AI")
                 .resizable()
-                .frame(width: 70, height: 70)
+                .frame(width: 72, height: 72)
                 .clipShape(Circle())
+                .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
             Text("Ask Gym-AI")
-                .font(.title2)
-                .bold()
+                .font(.title2.bold())
             Text("Questions about training, exercises, workout plans, recovery or nutrition.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                ForEach(Self.examples, id: \.self) { example in
+                    Button {
+                        userInput = example
+                    } label: {
+                        Text(example)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 8)
         }
-        .padding(.horizontal, 40)
+        .padding(.horizontal, 32)
     }
 
     private func sendMessage() {

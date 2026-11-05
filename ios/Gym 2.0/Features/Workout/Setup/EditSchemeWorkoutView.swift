@@ -23,63 +23,39 @@ struct EditSchemeWorkoutView: View {
     
     var body: some View {
         
-        VStack{
-            EditWorkoutView(navStackTitle: "Edit: " + workoutScheme.name, workoutTitle: $localName, exerciseList: $localExercises)
-            
-            HStack{
-                
-                Spacer()
-                Spacer()
-                
-                Button(action: {
-                    WorkoutSchemeRepository(context: context).update(workoutScheme, name: localName, exercises: localExercises)
-                    
-                    navigationStackPath = []
-                }, label: {
-                    Text("Save Workout")
-                        .foregroundStyle(Color("MyWhite"))
-                        .font(.title)
-                        .padding(15)
-                        .background(
-                            RoundedRectangle(cornerRadius: 25)
-                                .tint(Color("MyBlack"))
-                        )
-                })
-                
-                Spacer()
-                
-                Button(action: {
-                    showDeleteAlert.toggle()
-                }, label: {
-                    Image(systemName: "trash")
-                        .font(.title)
-                        .foregroundStyle(.red)
-                        .padding(15)
-                        .accessibilityLabel("Delete workout scheme")
-                        .background(
-                            Circle()
-                                .stroke(lineWidth: 2)
-                                .foregroundStyle(.red)
-                        )
-                })
+        EditWorkoutView(navStackTitle: "Edit workout", workoutTitle: $localName, exerciseList: $localExercises) {
+            Button {
+                showDeleteAlert.toggle()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.headline)
+                    .foregroundStyle(.red)
+                    .frame(width: 52, height: 52)
+                    .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
-            .padding(10)
-            .padding(.bottom, 10)
+            .accessibilityLabel("Delete workout")
+            Button {
+                WorkoutSchemeRepository(context: context).update(workoutScheme, name: localName, exercises: localExercises)
+                navigationStackPath = []
+            } label: {
+                Label("Save workout", systemImage: "checkmark")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(localExercises.isEmpty || localName.trimmingCharacters(in: .whitespaces).isEmpty)
         }
-            
         .onAppear {
             localName = workoutScheme.name
             
             localExercises = workoutScheme.sortedExercises
         }
-        .alert("Are you sure you want to delete this workout?", isPresented: $showDeleteAlert) {
+        .alert("Delete this workout?", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
                 WorkoutSchemeRepository(context: context).delete(workoutScheme)
                 navigationStackPath = []
             }
-            Button("Go back", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("There is no way to recover it.")
+            Text("It can't be recovered.")
         }
         
     }

@@ -18,7 +18,7 @@ enum ValueCriteria: String, CaseIterable, Identifiable{
 
 enum CategoryCriteria: String, CaseIterable, Identifiable{
     case muscle = "Muscle"
-    case muscleGroup = "Muscle Group"
+    case muscleGroup = "Muscle group"
     
     var id: String { rawValue }
 }
@@ -27,7 +27,8 @@ struct DistributionByMuscleView: View {
     
     @State var selectedValueCriteria: ValueCriteria = .sets
     @State var selectedCategoryCriteria: CategoryCriteria = .muscle
-    @State var percentages: [Double] = []
+    /// The value of every muscle or muscle group, in the order of the names
+    @State var values: [Double] = []
     
     @Query(
         filter: #Predicate <Workout> {$0.inProgress == false}
@@ -37,65 +38,86 @@ struct DistributionByMuscleView: View {
     @Query(sort: \MuscleGroup.name) var muscleGroups: [MuscleGroup]
     
     @Environment(UserSettings.self) var userSettings
+
+    // The names with their values, the most trained first
+    private var rows: [(name: String, value: Double)] {
+        let names = selectedCategoryCriteria == .muscle ? muscles.map(\.name) : muscleGroups.map(\.name)
+        return zip(names, values)
+            .map { (name: $0, value: $1) }
+            .sorted { $0.value != $1.value ? $0.value > $1.value : $0.name < $1.name }
+    }
     
     var body: some View {
-        VStack{
-            if workouts.count > 0{
-                HStack{
-                    VStack(spacing: 2){
-                        if selectedCategoryCriteria == .muscle{
-                            ForEach(muscles){ muscle in
-                                Text(muscle.name)
-                                    .frame(width: 100, height: 20, alignment: .leading)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if workouts.isEmpty {
+                    ContentUnavailableView("No workouts yet", systemImage: "figure.strengthtraining.traditional", description: Text("After your first workout you will see here how much you trained each muscle."))
+                        .padding(.top, 40)
+                } else {
+                    AppColorSegmentedPicker(options: CategoryCriteria.allCases, selection: $selectedCategoryCriteria) { $0.rawValue }
+                    AppColorSegmentedPicker(options: ValueCriteria.allCases, selection: $selectedValueCriteria) { $0.rawValue }
+
+                    let rows = rows
+                    let highest = max(rows.first?.value ?? 0, 1)
+                    Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 12) {
+                        ForEach(rows, id: \.name) { row in
+                            GridRow {
+                                Text(row.name)
+                                    .font(.subheadline)
+                                Capsule()
+                                    .fill(Color(.systemFill))
+                                    .frame(height: 10)
+                                    .overlay(alignment: .leading) {
+                                        GeometryReader { proxy in
+                                            Capsule()
+                                                .fill(userSettings.appColor)
+                                                .frame(width: proxy.size.width * row.value / highest)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                Text("\(Int(row.value.rounded()))")
+                                    .font(.subheadline)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                                    .gridColumnAlignment(.trailing)
                             }
-                        } else {
-                            ForEach(muscleGroups){ muscleGroup in
-                                Text(muscleGroup.name)
-                                    .frame(width: 100, height: 20, alignment: .leading)
-                            }
+                            .accessibilityElement(children: .combine)
                         }
                     }
-                    
-                    VStack(spacing: 2){
-                        ForEach(percentages, id: \.self) { percentage in
-                            GeometryReaderBarView(percentage: percentage)
-                                .frame(height: 20)
-                        }
+                    .padding()
+                    .cardBackground()
+                    .animation(.snappy, value: values)
+                    .padding(.top, 4)
+
+                    if selectedCategoryCriteria == .muscle && selectedValueCriteria != .workouts {
+                        Text("A secondary muscle counts a third of a set.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
                     }
                 }
-                .padding(10)
-                
-                Spacer()
-                
-                AppColorSegmentedPicker(options: CategoryCriteria.allCases, selection: $selectedCategoryCriteria) { $0.rawValue }
-                    .padding(.horizontal, 10)
-                
-                AppColorSegmentedPicker(options: ValueCriteria.allCases, selection: $selectedValueCriteria) { $0.rawValue }
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 10)
-                
-            } else {
-                Text("You haven't done any workouts yet. After your first workout you will see the muscle distribution here.")
-                    .padding(10)
             }
+            .padding()
         }
-        .navigationTitle("Muscle Distribution")
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Muscle distribution")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear{
-            getPercentages()
+            calculateValues()
         }
         .onChange(of: selectedValueCriteria){
-            getPercentages()
+            calculateValues()
         }
         .onChange(of: selectedCategoryCriteria){
-            getPercentages()
+            calculateValues()
         }
     }
     
-    func getPercentages(){
+    func calculateValues(){
         if selectedCategoryCriteria == .muscle{
-            percentages = Array(repeating: 0.0, count: muscles.count)
+            values = Array(repeating: 0.0, count: muscles.count)
         } else {
-            percentages = Array(repeating: 0.0, count: muscleGroups.count)
+            values = Array(repeating: 0.0, count: muscleGroups.count)
         }
         
         if (selectedValueCriteria == .sets || selectedValueCriteria == .reps) && selectedCategoryCriteria == .muscle{
@@ -121,7 +143,7 @@ struct DistributionByMuscleView: View {
                         }
                     }
                 }
-                percentages[muscleIndex] = count
+                values[muscleIndex] = count
                 muscleIndex += 1
                 count = 0
             }
@@ -136,7 +158,7 @@ struct DistributionByMuscleView: View {
                         count += 1
                     }
                 }
-                percentages[muscleIndex] = count
+                values[muscleIndex] = count
                 muscleIndex += 1
                 count = 0
             }
@@ -157,7 +179,7 @@ struct DistributionByMuscleView: View {
                         }
                     }
                 }
-                percentages[muscleIndex] = count
+                values[muscleIndex] = count
                 muscleIndex += 1
                 count = 0
             }
@@ -172,20 +194,12 @@ struct DistributionByMuscleView: View {
                         count += 1
                     }
                 }
-                percentages[muscleIndex] = count
+                values[muscleIndex] = count
                 muscleIndex += 1
                 count = 0
             }
         }
         
-        let highestValue: Double = percentages.max() ?? 0.0
-        guard highestValue > 0 else { return }
-        
-        var i: Int = 0
-        percentages.forEach{ percentage in
-            percentages[i] = percentage / (highestValue/100)
-            i += 1
-        }
     }
     
     func muscleInWorkout(workout: Workout, muscle: Muscle) -> Bool {

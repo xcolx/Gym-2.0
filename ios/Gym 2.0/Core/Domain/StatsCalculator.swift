@@ -87,7 +87,7 @@ enum StatsCalculator {
 
             if let weights = workoutExercise.weights {
                 for (index, weight) in weights.enumerated() where weight > 0 {
-                    let reps = workoutExercise.reps?[index] ?? 0
+                    let reps = workoutExercise.reps?[safe: index] ?? 0
                     if let record = summary.personalRecord, weight < record.weight || (weight == record.weight && reps <= record.reps) {
                         continue
                     }
@@ -109,6 +109,17 @@ extension StatsSummary {
             return "\(minutes) min"
         }
         return "\(minutes / 60) h \(minutes % 60) min"
+    }
+
+    /// Short for the totals, e.g. "45 min", "2.5 h" or "168 h"
+    static func formatHours(minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes) min"
+        } else if minutes < 598 { // 598 and 599 are rounded up to 10.0, which is ugly
+            return String(format: "%.1f h", Double(minutes) / 60)
+        } else {
+            return String(format: "%.0f h", Double(minutes) / 60)
+        }
     }
 
     /// e.g. "45 s", "2 min 5 s" or "1 h 2 min"

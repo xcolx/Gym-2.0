@@ -76,11 +76,11 @@ extension WorkoutFile {
                         sets: (0..<workoutExercise.entryCount).map { index in
                             SetEntry(
                                 side: workoutExercise.unilateral ? (index % 2 == 0 ? "R" : "L") : nil,
-                                reps: workoutExercise.reps?[index],
-                                weight: workoutExercise.weights?[index],
-                                time: workoutExercise.time?[index],
-                                intensity: workoutExercise.intensity?[index],
-                                distance: workoutExercise.distance?[index]
+                                reps: workoutExercise.reps?[safe: index],
+                                weight: workoutExercise.weights?[safe: index],
+                                time: workoutExercise.time?[safe: index],
+                                intensity: workoutExercise.intensity?[safe: index],
+                                distance: workoutExercise.distance?[safe: index]
                             )
                         }
                     )

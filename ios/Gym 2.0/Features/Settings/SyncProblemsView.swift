@@ -33,17 +33,17 @@ struct SyncProblemsView: View {
         }
         .overlay {
             if syncService.problems.isEmpty {
-                ContentUnavailableView("No Sync Problems", systemImage: "checkmark.icloud", description: Text("Everything is in sync with the server."))
+                ContentUnavailableView("Everything is synced", systemImage: "checkmark.icloud", description: Text("Everything is in sync with the server."))
             }
         }
-        .navigationTitle("Sync Problems")
+        .navigationTitle("Sync problems")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if isSyncing {
                     ProgressView()
                 } else {
-                    Button("Sync Again", systemImage: "arrow.clockwise") {
+                    Button("Sync again", systemImage: "arrow.clockwise") {
                         Task {
                             isSyncing = true
                             await syncService.sync()

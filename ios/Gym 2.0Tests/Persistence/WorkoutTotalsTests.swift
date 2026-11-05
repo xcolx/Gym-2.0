@@ -24,6 +24,8 @@ struct WorkoutTotalsTests {
         #expect(totals.summary?.workouts == 1)
         #expect(totals.summary?.duration == 60)
         #expect(totals.summary?.sets == 2)
+        #expect(totals.overview?.exerciseCount == 1)
+        #expect(totals.overview?.minutesByDay.values.reduce(0, +) == 60)
     }
 
     @Test func calculatesAgainAfterASave() async throws {
