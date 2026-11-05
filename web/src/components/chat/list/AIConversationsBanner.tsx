@@ -1,20 +1,18 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
-/** AIConversationsBannerView of AIConversationsView.swift: a thin banner that opens the conversations with the Gym-AI */
+import { GymAIImage } from "@/components/chat/ai-messages";
+
+/** AIConversationsBannerView of AIConversationsView.swift: the row at the top of the chats that opens the Gym-AI */
 export function AIConversationsBanner() {
   return (
-    <Link
-      href="/chat/ai"
-      className="flex shrink-0 items-center gap-2.5 bg-app/15 px-4 py-2 active:opacity-70"
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element -- a small static image */}
-      <img src="/images/gym-ai.jpg" alt="" className="h-7 w-7 rounded-full" />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-[15px] font-bold leading-5">Gym-AI</span>
-        <span className="text-[12px] leading-4 text-secondary-label">Open your AI conversations</span>
+    <Link href="/chat/ai" className="flex items-center gap-3 px-4 py-3 hover:bg-field/15 active:bg-field/40">
+      <GymAIImage size={44} />
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
+        <span className="font-semibold">Gym-AI</span>
+        <span className="truncate text-subheadline text-secondary-label">Ask about your training</span>
       </span>
-      <ChevronRight size={16} strokeWidth={2.5} className="text-secondary-label" aria-hidden />
+      <ChevronRight size={18} strokeWidth={2.5} className="-mr-1 shrink-0 text-tab-inactive/70" aria-hidden />
     </Link>
   );
 }

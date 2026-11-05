@@ -88,7 +88,7 @@ function NewGroupForm({ onClose, onCreate }: { onClose: () => void; onCreate: (c
     <Sheet
       open
       onClose={onClose}
-      title="New Group"
+      title="New group"
       grouped
       leading={<SheetButton onClick={onClose}>Cancel</SheetButton>}
       trailing={

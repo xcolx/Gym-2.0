@@ -8,6 +8,7 @@ import { ContentUnavailable } from "@/components/ui/ContentUnavailable";
 import { ExerciseName } from "@/components/ui/ExerciseName";
 import { Menu } from "@/components/ui/Menu";
 import { Page, PageHeader } from "@/components/ui/Page";
+import { SearchField } from "@/components/ui/SearchField";
 import {
   countOf,
   EXERCISE_STATS_SORTS,
@@ -46,19 +47,7 @@ export default function ExercisesStatsPage() {
           </Menu>
         }
       />
-      <label className="focus-ring-within mx-4 mb-3 flex items-center gap-1.5 rounded-xl bg-field/40 px-2.5 py-2">
-        <Search size={18} className="shrink-0 text-secondary-label" aria-hidden />
-        <input
-          type="search"
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-          placeholder="Search"
-          aria-label="Search exercises"
-          autoCorrect="off"
-          autoComplete="off"
-          className="w-full bg-transparent text-body outline-none placeholder:text-secondary-label"
-        />
-      </label>
+      <SearchField value={searchText} onChange={setSearchText} label="Search exercises" className="mx-4 mb-3" />
 
       {rows && shownRows && (
         <div className="px-4 pb-6">

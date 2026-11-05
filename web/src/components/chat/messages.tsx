@@ -1,19 +1,27 @@
 "use client";
 
-import { CircleArrowUp } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import { useLayoutEffect, useRef, type ComponentProps, type PointerEvent } from "react";
 
 import { ServerImage } from "@/components/ui/ServerImage";
-import { formatMessageTime } from "@/lib/domain/chat-feature";
+import { formatDaySeparator, formatMessageTime } from "@/lib/domain/chat-feature";
 import type { Message } from "@/types/models";
 import { Spinner } from "@/components/ui/controls";
-import { SECONDARY_BACKGROUND } from "./chat-controls";
 
-/** MessageBubbleView of ChatView.swift: a message as a bubble, the own ones on the right in the app color */
+const ROUND = 18;
+/** The corners where the bubbles of a run meet */
+const JOINED = 5;
+
+/**
+ * MessageBubbleView of ChatView.swift: a message as a bubble, the own ones on the right in the app color. The messages
+ * a sender sent in a row are grouped: their bubbles are close together, with the time below the last one.
+ */
 export function MessageBubble({
   message,
   isOwn,
   senderName,
+  startsRun = true,
+  endsRun = true,
   onTapPhoto,
   onOpenMenu,
 }: {
@@ -21,35 +29,44 @@ export function MessageBubble({
   isOwn: boolean;
   /** Shown above the bubble, for the messages of others in groups */
   senderName: string | null;
+  /** The first message of the sender's run, with a round corner at the top */
+  startsRun?: boolean;
+  /** The last message of the sender's run, with a round corner at the bottom and the time below it */
+  endsRun?: boolean;
   onTapPhoto: (hash: string) => void;
   /** The context menu of the message (`.contextMenu` on iOS): a long press, or a right click with a mouse */
   onOpenMenu: () => void;
 }) {
   const menu = useLongPressMenu(onOpenMenu);
+  const top = startsRun ? ROUND : JOINED;
+  const bottom = endsRun ? ROUND : JOINED;
+  // top left, top right, bottom right, bottom left
+  const radius = isOwn ? `${ROUND}px ${top}px ${bottom}px ${ROUND}px` : `${top}px ${ROUND}px ${ROUND}px ${bottom}px`;
   return (
     <div className={`flex ${isOwn ? "justify-end pl-[60px]" : "justify-start pr-[60px]"}`}>
-      <div className={`flex min-w-0 flex-col gap-0.5 ${isOwn ? "items-end" : "items-start"}`}>
-        {senderName && <span className="px-1 text-[12px] font-bold text-secondary-label">{senderName}</span>}
+      <div className={`flex min-w-0 flex-col gap-[3px] ${isOwn ? "items-end" : "items-start"}`}>
+        {senderName && <span className="px-3 text-caption1 font-semibold text-secondary-label">{senderName}</span>}
         <div
           {...menu}
+          style={{ borderRadius: radius }}
           // No text selection or iOS callout on the long press, the menu has "Copy"
-          className={`flex min-w-0 max-w-full select-none flex-col gap-1.5 rounded-2xl px-3 py-2 [-webkit-touch-callout:none] ${
-            isOwn ? "bg-app text-white" : `${SECONDARY_BACKGROUND} text-foreground`
+          className={`flex min-w-0 max-w-full select-none flex-col [-webkit-touch-callout:none] ${
+            isOwn ? "bg-app text-app-foreground" : "bg-cell text-foreground"
           }`}
         >
           {message.imageUrl && (
             <button
               type="button"
               aria-label="Photo"
-              className="block overflow-hidden rounded-xl active:opacity-80"
+              className="m-1 block overflow-hidden rounded-[14px] active:opacity-80"
               onClick={() => onTapPhoto(message.imageUrl!)}
             >
               <ServerImage
                 hash={message.imageUrl}
                 intrinsic
-                imageClassName="max-h-[320px] max-w-[min(240px,100%)] rounded-xl object-contain"
+                imageClassName="max-h-[320px] max-w-[min(240px,100%)] rounded-[14px] object-contain"
                 placeholder={
-                  <span className="flex h-[200px] w-[200px] items-center justify-center rounded-xl bg-[#8e8e93]/30">
+                  <span className="flex h-[200px] w-[200px] items-center justify-center rounded-[14px] bg-[#8e8e93]/30">
                     <Spinner />
                   </span>
                 }
@@ -57,12 +74,29 @@ export function MessageBubble({
             </button>
           )}
           {message.content !== null && (
-            <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</p>
+            <p
+              className={`whitespace-pre-wrap break-words px-3 pb-2 [overflow-wrap:anywhere] ${message.imageUrl ? "pt-1" : "pt-2"}`}
+            >
+              {message.content}
+            </p>
           )}
-          <span className="self-end text-[11px] leading-[13px] opacity-70">{formatMessageTime(message.createdAt)}</span>
         </div>
+        {endsRun && (
+          <span className="px-2 text-[11px] leading-[13px] text-secondary-label">{formatMessageTime(message.createdAt)}</span>
+        )}
       </div>
     </div>
+  );
+}
+
+/** DaySeparator of ChatView.swift: the day above its first message, as a small capsule */
+export function DaySeparator({ date }: { date: Date }) {
+  return (
+    <p className="flex justify-center pb-1 pt-4">
+      <span className="rounded-full bg-field/40 px-2.5 py-1 text-caption1 font-medium text-secondary-label">
+        {formatDaySeparator(date)}
+      </span>
+    </p>
   );
 }
 
@@ -119,41 +153,81 @@ function useLongPressMenu(open: () => void) {
 }
 
 /** A TextField with `axis: .vertical` and `lineLimit(1...5)`: grows with the text up to five lines */
-export function GrowingTextarea({ value, className = "", ...props }: ComponentProps<"textarea"> & { value: string }) {
+export function GrowingTextarea({ value, className = "", ref: outerRef, ...props }: ComponentProps<"textarea"> & { value: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const setRef = (element: HTMLTextAreaElement | null) => {
+    ref.current = element;
+    if (typeof outerRef === "function") outerRef(element);
+    else if (outerRef) outerRef.current = element;
+  };
   useLayoutEffect(() => {
     const textarea = ref.current;
     if (!textarea) return;
     textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight + 2}px`;
+    textarea.style.height = `${textarea.scrollHeight}px`;
   }, [value]);
   return (
     <textarea
-      ref={ref}
+      ref={setRef}
       rows={1}
       value={value}
       {...props}
-      className={`max-h-[126px] min-h-[36px] resize-none overflow-y-auto rounded-[8px] border border-separator bg-background px-2.5 py-[6px] text-body outline-none focus:border-app disabled:opacity-60 ${className}`}
+      className={`max-h-[136px] resize-none overflow-y-auto bg-transparent text-body outline-none placeholder:text-tab-inactive disabled:opacity-60 ${className}`}
     />
   );
 }
 
-/** The send button of the input bars (`arrow.up.circle.fill`) */
+/**
+ * The rounded field of a message with its send button inside (`messageFieldBackground()` and SendButton of
+ * MessageComposer.swift), for the chats, the Gym-AI and the caption of a photo
+ */
+export function MessageField({
+  canSend,
+  isSending,
+  onSend,
+  sendLabel = "Send",
+  ...props
+}: ComponentProps<"textarea"> & {
+  value: string;
+  canSend: boolean;
+  isSending: boolean;
+  onSend: () => void;
+  sendLabel?: string;
+}) {
+  return (
+    <div className="focus-ring-within flex min-w-0 flex-1 items-end gap-1 rounded-[18px] border border-separator/50 bg-cell">
+      <GrowingTextarea
+        {...props}
+        onKeyDown={(event) => {
+          // Enter sends with a keyboard, Shift+Enter adds a line. Not on phones, where Enter is the line break.
+          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && window.matchMedia("(pointer: fine)").matches) {
+            event.preventDefault();
+            if (canSend) onSend();
+          }
+        }}
+        className="min-w-0 flex-1 py-[7px] pl-3.5"
+      />
+      <SendButton canSend={canSend} isSending={isSending} onSend={onSend} label={sendLabel} />
+    </div>
+  );
+}
+
+/** SendButton of MessageComposer.swift: the round send button in the app color, gray while nothing can be sent */
 export function SendButton({
-  enabled,
-  busy,
+  canSend,
+  isSending,
   onSend,
   label = "Send",
 }: {
-  enabled: boolean;
-  busy: boolean;
+  canSend: boolean;
+  isSending: boolean;
   onSend: () => void;
   label?: string;
 }) {
-  if (busy) {
+  if (isSending) {
     return (
-      <span className="flex h-[36px] w-[34px] items-center justify-center">
-        <Spinner />
+      <span className="m-[3px] flex size-[30px] shrink-0 items-center justify-center" role="status" aria-label="Sending">
+        <Spinner size={18} />
       </span>
     );
   }
@@ -161,13 +235,15 @@ export function SendButton({
     <button
       type="button"
       aria-label={label}
-      disabled={!enabled}
+      disabled={!canSend}
       // Keeps the keyboard open: the text field doesn't lose the focus
       onPointerDown={(event) => event.preventDefault()}
       onClick={onSend}
-      className={`flex h-[36px] w-[34px] shrink-0 items-center justify-center ${enabled ? "text-app" : "text-tab-inactive"}`}
+      className={`m-[3px] flex size-[30px] shrink-0 items-center justify-center rounded-full transition-[background-color,scale] duration-200 active:scale-90 ${
+        canSend ? "bg-app text-app-foreground" : "bg-[#c7c7cc] text-background dark:bg-[#48484a]"
+      }`}
     >
-      <CircleArrowUp size={32} fill="currentColor" strokeWidth={2} className="[&>path]:fill-none [&>path]:stroke-white" aria-hidden />
+      <ArrowUp size={17} strokeWidth={3} aria-hidden />
     </button>
   );
 }

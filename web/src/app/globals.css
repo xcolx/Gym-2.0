@@ -224,6 +224,24 @@ input[type="range"].ios-slider::-moz-range-thumb {
   }
 }
 
+/* A dot of the typing indicator of the Gym-AI, fading in and out one after the other (AITypingIndicatorView) */
+@keyframes typing-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Something that appears, e.g. the note below the typing indicator */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* The landing page (components/landing): the cards floating around the start button and the pulse of the button */
 @keyframes landing-float {
   0%,

@@ -28,6 +28,17 @@ export function chatPreview(chat: Chat, users: ReadonlyMap<number, User>, curren
   return `${sender}: ${text}`;
 }
 
+/** The first letters of the first two words of a group name, e.g. "LD" for "Leg day crew" (ChatImageView.initials) */
+export function groupInitials(name: string | null): string | null {
+  const letters = (name ?? "")
+    .split(/\s+/u)
+    .filter((word) => word !== "")
+    .slice(0, 2)
+    .map((word) => Array.from(word).find((character) => /[\p{L}\p{N}]/u.test(character)))
+    .filter((letter) => letter !== undefined);
+  return letters.length > 0 ? letters.join("").toLocaleUpperCase() : null;
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
@@ -46,9 +57,18 @@ export function formatMessageTime(date: Date, locale: string = appLocale()): str
   return date.toLocaleTimeString(locale, { hour: twentyFourHours ? "2-digit" : "numeric", minute: "2-digit" });
 }
 
-/** The day above the first message of a day (`.dateTime.weekday(.wide).day().month(.wide)`) */
-export function formatDaySeparator(date: Date, locale: string = appLocale()): string {
-  return date.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
+/**
+ * The day above the first message of a day (DaySeparator of ChatView.swift): "Today", "Yesterday", the weekday, day and
+ * month in this year and the day, month and year before
+ */
+export function formatDaySeparator(date: Date, locale: string = appLocale(), now: Date = new Date()): string {
+  if (isSameDay(date, now)) return "Today";
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (isSameDay(date, yesterday)) return "Yesterday";
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
+  }
+  return date.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
 }
 
 /** The date of an AI message: the time for today (`timeFromDate`), otherwise the day, month and time */
@@ -66,27 +86,50 @@ interface MessageRow {
   isOwn: boolean;
   /** The sender's name above the first of their messages in a row in groups, null otherwise */
   senderName: string | null;
+  /** The first message of the sender's run, with a round corner at the top */
+  startsRun: boolean;
+  /** The last message of the sender's run, with a round corner at the bottom and the time below it */
+  endsRun: boolean;
 }
 
-/** The messages (sorted from oldest to newest) with what ChatView shows around each */
+/** How long after a message the next one of the same sender still joins its run */
+const RUN_GAP_MS = 5 * 60 * 1000;
+
+/** Whether the second message joins the run of the first: the same sender, the same day and at most a few minutes later */
+function continuesRun(first: Message, second: Message): boolean {
+  return (
+    first.senderId === second.senderId &&
+    isSameDay(first.createdAt, second.createdAt) &&
+    second.createdAt.getTime() - first.createdAt.getTime() < RUN_GAP_MS
+  );
+}
+
+/**
+ * The messages (sorted from oldest to newest) with what ChatView shows around each. With `isPending` a text that wasn't
+ * sent yet follows the last message, so that one doesn't end its run.
+ */
 export function messageRows(
   messages: readonly Message[],
   chat: Chat,
   users: ReadonlyMap<number, User>,
   currentUserId: number | null,
+  isPending = false,
 ): MessageRow[] {
   return messages.map((message, index) => {
     const previous = index > 0 ? messages[index - 1] : null;
-    const previousSenderId = previous ? previous.senderId : null;
+    const next = index < messages.length - 1 ? messages[index + 1] : null;
     const isOwn = message.senderId === currentUserId;
-    const showsSender = chat.groupChat && !isOwn && previousSenderId !== message.senderId;
+    const startsRun = previous === null || !continuesRun(previous, message);
     return {
       message,
       daySeparator: previous === null || !isSameDay(previous.createdAt, message.createdAt) ? message.createdAt : null,
       isOwn,
-      senderName: showsSender
-        ? ((message.senderId === null ? undefined : users.get(message.senderId)?.username) ?? "Unknown user")
-        : null,
+      senderName:
+        chat.groupChat && !isOwn && startsRun
+          ? ((message.senderId === null ? undefined : users.get(message.senderId)?.username) ?? "Unknown user")
+          : null,
+      startsRun,
+      endsRun: next === null ? !isPending : !continuesRun(message, next),
     };
   });
 }
@@ -124,11 +167,27 @@ export function sortedChatMembers(
     });
 }
 
-/** "Friend", "Blocked", and "Admin" for the admins of a group */
-export function memberStatus(chat: Chat, member: ChatMember, user: User | undefined): string | null {
-  const relation = user?.isBlocked ? "Blocked" : user?.isFriend ? "Friend" : null;
-  if (!(chat.groupChat && member.admin === true)) return relation;
-  return relation ? `Admin · ${relation}` : "Admin";
+/** "Blocked" or "Friend", null for anyone else (ChatMembership.relation) */
+export function userRelation(user: User | undefined): string | null {
+  return user?.isBlocked ? "Blocked" : user?.isFriend ? "Friend" : null;
+}
+
+/** The line below a member: "You" for the current user and the relation, null for neither */
+export function memberDetails(userId: number, user: User | undefined, currentUserId: number | null): string | null {
+  const details = [userId === currentUserId ? "You" : null, userRelation(user)].filter((detail) => detail !== null);
+  return details.length > 0 ? details.join(" · ") : null;
+}
+
+/** The line below the name in the header of the chat info: the kind of group and its members, or the relation */
+export function chatInfoSubtitle(chat: ChatWithMembers, users: ReadonlyMap<number, User>, currentUserId: number | null): string | null {
+  if (chat.groupChat) return `${chat.isPublic ? "Public group" : "Private group"} · ${memberCountText(chat.members.length)}`;
+  const otherId = chat.members.find((member) => member.userId !== currentUserId)?.userId;
+  return userRelation(otherId === undefined ? undefined : users.get(otherId));
+}
+
+/** Whether the member has the "Admin" badge, only in groups */
+export function isMemberAdmin(chat: Chat, member: ChatMember): boolean {
+  return chat.groupChat && member.admin === true;
 }
 
 /** Admins can remove other members (admins too) from private groups */
@@ -187,12 +246,12 @@ export function isValidGroupName(name: string): boolean {
 /** A user, group chat or message to report (ReportTarget of ReportAlert.swift) */
 export type ReportTarget =
   /**
-   * With `blocks` the user is blocked as well ("Block and Report…"). `profile` is for users that aren't stored yet,
+   * With `blocks` the user is blocked as well ("Block and report…"). `profile` is for users that aren't stored yet,
    * e.g. the sender of a friend request.
    */
   | { kind: "user"; id: number; username: string; profile?: UserDTO | null; blocks?: boolean }
   | { kind: "chat"; id: number; name: string }
-  /** With `deletes` the message is deleted for everyone after the report ("Delete and Report…", for group admins). */
+  /** With `deletes` the message is deleted for everyone after the report ("Delete and report…", for group admins). */
   | { kind: "message"; id: number; senderName: string | null; deletes?: boolean };
 
 export function reportTitle(target: ReportTarget): string {
@@ -202,7 +261,7 @@ export function reportTitle(target: ReportTarget): string {
     case "chat":
       return `Report ${target.name}`;
     case "message":
-      return target.senderName === null ? "Report Message" : `Report Message from ${target.senderName}`;
+      return target.senderName === null ? "Report message" : `Report message from ${target.senderName}`;
   }
 }
 

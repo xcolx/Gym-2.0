@@ -152,9 +152,9 @@ export function useChatConversation(chat: ChatWithMembers) {
         case "copy":
           return { label: "Copy", onSelect: () => void navigator.clipboard?.writeText(message.content ?? "").catch(() => {}) };
         case "delete":
-          return { label: "Delete for Everyone", destructive: true, onSelect: () => void removeMessage(message) };
+          return { label: "Delete for everyone", destructive: true, onSelect: () => void removeMessage(message) };
         case "deleteAndReport":
-          return { label: "Delete and Report…", destructive: true, onSelect: () => report(true) };
+          return { label: "Delete and report…", destructive: true, onSelect: () => report(true) };
         case "report":
           return { label: "Report…", destructive: true, onSelect: () => report(false) };
       }

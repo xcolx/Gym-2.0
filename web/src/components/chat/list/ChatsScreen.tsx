@@ -2,32 +2,45 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Globe, MessagesSquare, SquarePen, Users, UsersRound } from "lucide-react";
+import { ChevronRight, Globe, MessagesSquare, Search, SquarePen, UserPlus, Users, UsersRound } from "lucide-react";
 import { useState } from "react";
 
 import { Page, PageHeader } from "@/components/ui/Page";
-import { ContentUnavailable, Menu, PLAIN_BUTTON } from "@/components/chat/chat-controls";
+import { SearchField } from "@/components/ui/SearchField";
+import { SecondaryButton } from "@/components/ui/PrimaryButton";
+import { ContentUnavailable, Menu } from "@/components/chat/chat-controls";
 import { NewGroupSheet } from "@/components/chat/NewGroupSheet";
+import { chatTitle } from "@/lib/domain/chat";
+import { fuzzyFilter } from "@/lib/domain/fuzzy-search";
 import { useChatList, useCurrentUserId, useUsersById } from "@/lib/repo";
 
 import { AIConversationsBanner } from "./AIConversationsBanner";
 import { ChatRow } from "./ChatRow";
 import { useFriendRequestCount } from "./use-friend-request-count";
 
-/** Port of ChatsView.swift */
+/**
+ * Port of ChatsView.swift: the Gym-AI, the pending friend requests and the direct and group chats of the user, newest
+ * first, which can be searched by name
+ */
 export function ChatsScreen() {
   const router = useRouter();
   const currentUserId = useCurrentUserId();
   const items = useChatList(currentUserId);
   const users = useUsersById();
   const [showsNewGroup, setShowsNewGroup] = useState(false);
+  const [searchText, setSearchText] = useState("");
   const friendRequestCount = useFriendRequestCount();
 
   // The chats are polled by the SyncRunner of the AppShell on every /chat route (no push updates yet)
 
+  const shownItems =
+    items && users && searchText.trim() !== ""
+      ? fuzzyFilter(items, searchText, ({ chat }) => [chatTitle(chat, users, currentUserId)])
+      : items;
+
   return (
-    <Page>
-      <PageHeader inline
+    <Page className="bg-grouped">
+      <PageHeader
         title="Chats"
         leading={
           <Link
@@ -43,41 +56,64 @@ export function ChatsScreen() {
           <Menu
             label="New chat"
             items={[
-              { label: "New Group", icon: UsersRound, onSelect: () => setShowsNewGroup(true) },
-              { label: "Public Groups", icon: Globe, onSelect: () => router.push("/chat/groups") },
+              { label: "New group", icon: UsersRound, onSelect: () => setShowsNewGroup(true) },
+              { label: "Public groups", icon: Globe, onSelect: () => router.push("/chat/groups") },
+              { label: "Friends", icon: Users, onSelect: () => router.push("/chat/friends") },
             ]}
           >
             <SquarePen size={23} aria-hidden />
           </Menu>
         }
       />
+      <SearchField value={searchText} onChange={setSearchText} label="Search chats" placeholder="Search chats" className="mx-4 mb-4" />
 
-      <AIConversationsBanner />
+      <div className="flex flex-1 flex-col gap-5 px-4 pb-6">
+        {searchText === "" && (
+          <div className="card overflow-hidden">
+            <AIConversationsBanner />
+            {friendRequestCount > 0 && (
+              <>
+                <div className="ml-[72px] border-t border-separator" />
+                <FriendRequestsRow count={friendRequestCount} />
+              </>
+            )}
+          </div>
+        )}
 
-      {items !== undefined && users !== undefined && (
-        <>
-          <ul>
-            {items.map((item) => (
-              <ChatRow key={item.chat.serverId} item={item} users={users} currentUserId={currentUserId} />
-            ))}
-          </ul>
-          {items.length === 0 && (
-            <ContentUnavailable
-              icon={MessagesSquare}
-              title="No Chats"
-              description="Add friends to chat with them, or join a public group."
-              className="flex-1"
-            >
-              <Link href="/chat/friends" className={PLAIN_BUTTON}>
-                Friends
-              </Link>
-              <Link href="/chat/groups" className={PLAIN_BUTTON}>
-                Public Groups
-              </Link>
-            </ContentUnavailable>
-          )}
-        </>
-      )}
+        {shownItems !== undefined && users !== undefined && (
+          <>
+            {shownItems.length > 0 && (
+              <ul className="card overflow-hidden" aria-label="Chats">
+                {shownItems.map((item) => (
+                  <ChatRow key={item.chat.serverId} item={item} users={users} currentUserId={currentUserId} />
+                ))}
+              </ul>
+            )}
+            {items?.length === 0 ? (
+              <ContentUnavailable
+                icon={MessagesSquare}
+                title="No chats yet"
+                description="Add friends to chat with them, or join a public group."
+                className="flex-1"
+              >
+                <div className="flex w-56 flex-col gap-2.5">
+                  <SecondaryButton onClick={() => router.push("/chat/friends")}>Friends</SecondaryButton>
+                  <SecondaryButton onClick={() => router.push("/chat/groups")}>Public groups</SecondaryButton>
+                </div>
+              </ContentUnavailable>
+            ) : (
+              shownItems.length === 0 && (
+                <ContentUnavailable
+                  icon={Search}
+                  title={`No results for “${searchText}”`}
+                  description="Check the spelling or try a new search."
+                  className="flex-1"
+                />
+              )
+            )}
+          </>
+        )}
+      </div>
 
       <NewGroupSheet
         open={showsNewGroup}
@@ -85,5 +121,19 @@ export function ChatsScreen() {
         onCreate={(chatId) => router.push(`/chat/${chatId}`)}
       />
     </Page>
+  );
+}
+
+/** Only while friend requests are pending */
+function FriendRequestsRow({ count }: { count: number }) {
+  return (
+    <Link href="/chat/friends" className="flex items-center gap-3 px-4 py-3 hover:bg-field/15 active:bg-field/40">
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-app/15 text-app" aria-hidden>
+        <UserPlus size={21} />
+      </span>
+      <span className="flex-1 font-medium">{count === 1 ? "1 friend request" : `${count} friend requests`}</span>
+      <span className="rounded-full bg-[#ff3b30] px-[7px] py-[2px] text-caption1 font-bold text-white">{count}</span>
+      <ChevronRight size={18} strokeWidth={2.5} className="-mr-1 shrink-0 text-tab-inactive/70" aria-hidden />
+    </Link>
   );
 }

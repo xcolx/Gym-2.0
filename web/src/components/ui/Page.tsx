@@ -16,18 +16,22 @@ export function Page({ children, className = "" }: { children: ReactNode; classN
  * NavigationStack bar + `.navigationTitle`, large or inline. The back link pops the screen when the parent is the
  * previous history entry and opens the parent in its place otherwise (`goBack`). `leading` and `trailing` are the
  * toolbar items. With an inline title a long back label (e.g. the name of a chat) is shortened, so it never covers it.
+ * `principal` takes the place of an inline title (`ToolbarItem(placement: .principal)`), e.g. a button with the image
+ * and name of a chat.
  */
 export function PageHeader({
   title,
   back,
   leading,
   trailing,
+  principal,
   inline = false,
 }: {
   title: string;
   back?: { href: string; label: string };
   leading?: ReactNode;
   trailing?: ReactNode;
+  principal?: ReactNode;
   /** `.navigationBarTitleDisplayMode(.inline)` */
   inline?: boolean;
 }) {
@@ -52,7 +56,13 @@ export function PageHeader({
           )}
           {leading && <div className={`flex items-center gap-4 ${back ? "" : "pl-1"}`}>{leading}</div>}
         </div>
-        {inline && (
+        {inline && principal && (
+          <div className="absolute inset-x-[110px] flex justify-center">
+            <h1 className="sr-only">{title}</h1>
+            {principal}
+          </div>
+        )}
+        {inline && !principal && (
           <h1 className="pointer-events-none absolute inset-x-[110px] truncate text-center text-headline font-semibold">
             {title}
           </h1>

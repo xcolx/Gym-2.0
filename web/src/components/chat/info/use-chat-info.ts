@@ -140,14 +140,14 @@ export function useChatInfo(chat: ChatWithMembers, users: Map<number, User>) {
           });
         }
         items.push({
-          label: "Remove Friend",
+          label: "Remove friend",
           icon: UserMinus,
           destructive: true,
           onSelect: () => setConfirmation({ kind: "remove", id: userId, username }),
         });
       } else {
         items.push({
-          label: "Add Friend",
+          label: "Add friend",
           icon: UserPlus,
           onSelect: () =>
             void run(userId, async () => {
@@ -173,14 +173,14 @@ export function useChatInfo(chat: ChatWithMembers, users: Map<number, User>) {
     const makesAdmin = adminChange(chat, member, isAdmin, currentUserId);
     if (makesAdmin !== null) {
       items.push({
-        label: makesAdmin ? "Make Admin" : "Remove Admin",
+        label: makesAdmin ? "Make admin" : "Remove admin",
         icon: makesAdmin ? ShieldCheck : ShieldOff,
         onSelect: () => void run(userId, () => setGroupAdmin(chatId, userId, makesAdmin)),
       });
     }
     if (canRemoveMember(chat, userId, isAdmin, currentUserId)) {
       items.push({
-        label: "Remove from Group",
+        label: "Remove from group",
         icon: UserRoundX,
         destructive: true,
         onSelect: () => setConfirmation({ kind: "removeFromGroup", id: userId, username }),

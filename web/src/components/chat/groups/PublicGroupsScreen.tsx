@@ -3,6 +3,7 @@
 import { Globe, Search, WifiOff } from "lucide-react";
 
 import { Page, PageHeader } from "@/components/ui/Page";
+import { SearchField } from "@/components/ui/SearchField";
 import { ContentUnavailable, PLAIN_BUTTON } from "@/components/chat/chat-controls";
 import { Alert, MessageAlert } from "@/components/ui/Alert";
 import { ActionSheet } from "@/components/ui/ActionSheet";
@@ -18,57 +19,61 @@ export function PublicGroupsScreen() {
   const { filtered, loadError, joiningId, menuGroup, pendingJoin } = screen;
 
   return (
-    <Page>
-      <PageHeader inline title="Public Groups" back={{ href: "/chat", label: "Chats" }} />
-      <div className="px-4 pb-2">
-        <label className="focus-ring-within flex items-center gap-1.5 rounded-[10px] bg-field/40 px-2 py-[7px] text-secondary-label">
-          <Search size={17} aria-hidden />
-          <input
-            type="search"
-            value={screen.searchText}
-            onChange={(event) => screen.setSearchText(event.target.value)}
-            placeholder="Search"
-            aria-label="Search"
-            enterKeyHint="search"
-            className="min-w-0 flex-1 bg-transparent text-body text-foreground outline-none placeholder:text-secondary-label"
-          />
-        </label>
+    <Page className="bg-grouped">
+      <PageHeader inline title="Public groups" back={{ href: "/chat", label: "Chats" }} />
+      <SearchField
+        value={screen.searchText}
+        onChange={screen.setSearchText}
+        label="Search public groups"
+        className="mx-4 mb-4"
+      />
+
+      <div className="flex flex-1 flex-col px-4 pb-6">
+        {filtered.length > 0 && (
+          <ul className="card overflow-hidden">
+            {filtered.map((group) => (
+              <PublicGroupRow
+                key={group.id}
+                group={group}
+                joined={screen.isJoined(group)}
+                isJoining={joiningId === group.id}
+                disabled={joiningId !== null}
+                onOpen={() => void screen.open(group)}
+                onOpenMenu={() => screen.openMenu(group)}
+              />
+            ))}
+          </ul>
+        )}
+
+        {screen.isLoading ? (
+          <div className="flex flex-1 items-center justify-center">
+            <Spinner />
+          </div>
+        ) : loadError !== null ? (
+          <ContentUnavailable icon={WifiOff} title="Could not load the groups" description={loadError} className="flex-1">
+            <button type="button" className={PLAIN_BUTTON} onClick={() => void screen.reload()}>
+              Try again
+            </button>
+          </ContentUnavailable>
+        ) : (
+          filtered.length === 0 &&
+          (screen.searchText.trim() === "" ? (
+            <ContentUnavailable
+              icon={Globe}
+              title="No public groups yet"
+              description="Create a group and make it public so others can join."
+              className="flex-1"
+            />
+          ) : (
+            <ContentUnavailable
+              icon={Search}
+              title={`No results for “${screen.searchText}”`}
+              description="Check the spelling or try a new search."
+              className="flex-1"
+            />
+          ))
+        )}
       </div>
-
-      <ul>
-        {filtered.map((group) => (
-          <PublicGroupRow
-            key={group.id}
-            group={group}
-            joined={screen.isJoined(group)}
-            isJoining={joiningId === group.id}
-            disabled={joiningId !== null}
-            onOpen={() => void screen.open(group)}
-            onOpenMenu={() => screen.openMenu(group)}
-          />
-        ))}
-      </ul>
-
-      {screen.isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner />
-        </div>
-      ) : loadError !== null ? (
-        <ContentUnavailable icon={WifiOff} title="Could not load the groups" description={loadError} className="flex-1">
-          <button type="button" className={PLAIN_BUTTON} onClick={() => void screen.reload()}>
-            Try again
-          </button>
-        </ContentUnavailable>
-      ) : (
-        filtered.length === 0 && (
-          <ContentUnavailable
-            icon={Globe}
-            title="No Public Groups"
-            description="Create a group and make it public so others can join."
-            className="flex-1"
-          />
-        )
-      )}
 
       <Alert
         open={pendingJoin !== null}

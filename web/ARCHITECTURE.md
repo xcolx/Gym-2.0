@@ -74,11 +74,14 @@ web/
       chat/                 the chat tab: the shared parts (ChatScreen, messages, images, chat-controls, ReportDialog,
                             NewGroupSheet, AIChat, ...) and one folder per screen
         list/               ChatsScreen.tsx, ChatRow.tsx, AIConversationsBanner.tsx, use-friend-request-count.ts
-        conversation/       ChatConversationScreen.tsx (ChatView), ChatComposer, PendingMessage, PhotoCompose,
+        conversation/       ChatConversationScreen.tsx (ChatView: runs of bubbles, DaySeparator), ChatComposer,
+                            PendingMessage, PhotoCompose,
                             use-chat-conversation.ts (draft, sending, polling, the menu of a message)
-        info/               ChatInfoScreen.tsx, MembersSection, GroupSection, AddMembersSheet, use-chat-info.ts
+        info/               ChatInfoScreen.tsx, ChatInfoHeader, DirectChatActions (the tiles of a direct chat),
+                            MembersSection, GroupSection, AddMembersSheet, use-chat-info.ts
                             (useChatInfo, useAddMembers), use-group-section.ts
-        friends/            FriendsScreen.tsx, AddFriendSection, FriendRequestsSection, FriendsListSection,
+        friends/            FriendsScreen.tsx, AddFriendSection, FriendRequestsSection (+ SentRequestsSection),
+                            FriendsListSection, PersonRow,
                             use-friends-screen.ts, use-context-menu.tsx (long press / right click → ActionSheet)
         groups/             PublicGroupsScreen.tsx, PublicGroupRow.tsx, use-public-groups.ts
       stats/                the stats tab
@@ -569,8 +572,11 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   inset separators like iOS. Used by the settings, auth and chat screens.
 - `ui/Menu.tsx`: `Menu` (the "…" and sort menus of the toolbars, items with an icon, `destructive`, `disabled` or
   `checked`); `ui/ContentUnavailable.tsx` (ContentUnavailableView); `ui/ExerciseName.tsx` (ExerciseNameText.swift: the
-  name with the verified badge in the app color); `BottomActionBar` of `ui/PrimaryButton.tsx` (`.bottomActionBar`).
-  components/chat/chat-controls.tsx only keeps what the chat alone uses: the button styles and colors.
+  name with the verified badge in the app color); `BottomActionBar` of `ui/PrimaryButton.tsx` (`.bottomActionBar`);
+  `ui/SearchField.tsx` (`.searchable`, e.g. of the exercise stats, the chats and the public groups).
+  components/chat/chat-controls.tsx only keeps what the chat alone uses: the plain button style and the red text.
+- The message composer of the chats and the Gym-AI (MessageComposer.swift) is `MessageField` of
+  components/chat/messages.tsx: the rounded field with the round `SendButton` inside. Enter sends with a keyboard.
 
 ## Domain logic (`lib/domain`, pure, unit tested)
 

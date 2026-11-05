@@ -50,7 +50,7 @@ export function ChatScreen({ children }: { children: ReactNode }) {
   return (
     <div
       style={style}
-      className="fixed inset-x-0 top-0 z-10 flex h-dvh flex-col bg-background pb-[var(--chat-bottom)] [--chat-bottom:calc(var(--tabbar-h)+env(safe-area-inset-bottom))] md:left-[var(--sidebar-w)] md:[--chat-bottom:0px]"
+      className="fixed inset-x-0 top-0 z-10 flex h-dvh flex-col bg-grouped pb-[var(--chat-bottom)] [--chat-bottom:calc(var(--tabbar-h)+env(safe-area-inset-bottom))] md:left-[var(--sidebar-w)] md:[--chat-bottom:0px]"
     >
       <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">{children}</div>
     </div>
