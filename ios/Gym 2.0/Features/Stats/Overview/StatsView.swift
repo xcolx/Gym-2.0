@@ -17,7 +17,6 @@ enum StatsRoute: Hashable {
     case exercise(Exercise)
     case pastWorkouts
     case pastWorkout(Workout)
-    case facts
 }
 
 /// The overview of the stats: the totals, the activity of the last year, the links to the exercises and the past
@@ -85,8 +84,6 @@ struct StatsView: View {
                     PastWorkoutsView()
                 case .pastWorkout(let workout):
                     PastWorkoutDetailView(workout: workout, tabSelection: $tabSelection, workoutNavigationStackPath: $workoutNavigationStackPath)
-                case .facts:
-                    InterestingFactsView()
                 }
             }
         }
