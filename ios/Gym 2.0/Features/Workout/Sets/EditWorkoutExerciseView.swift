@@ -11,6 +11,8 @@ import SwiftUI
 struct EditWorkoutExerciseView: View {
 
     @State var workoutExercise: WorkoutExercise
+    /// See NumberInsertView.limitsRows
+    var limitsRows = true
     @Environment(UserSettings.self) var userSettings
 
     private var bodyWeight: Double {
@@ -24,7 +26,7 @@ struct EditWorkoutExerciseView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            NumberInsertView(workoutExercise: workoutExercise)
+            NumberInsertView(workoutExercise: workoutExercise, limitsRows: limitsRows)
 
             HStack(spacing: 8) {
                 Button(action: addSet) {

@@ -10,6 +10,8 @@ import SwiftUI
 struct NumberInsertView: View {
 
     @Bindable var workoutExercise: WorkoutExercise
+    /// In the workout in progress: at most four rows, more scroll. Editing a past workout shows all of them.
+    var limitsRows = true
     @Environment(UserSettings.self) var userSettings
     @Environment(StopwatchStore.self) var stopwatchStore: StopwatchStore?
 
@@ -46,17 +48,21 @@ struct NumberInsertView: View {
             .foregroundStyle(.secondary)
             .frame(height: 20)
 
-            // At most four rows are shown, more scroll, so that the buttons below stay in place
-            ScrollView {
+            if limitsRows {
+                // At most four rows are shown, more scroll, so that the buttons below stay in place
+                ScrollView {
+                    rows
+                }
+                .frame(height: rowsHeight)
+                // The last sets are shown, and an added set scrolls into view as the rows grow. Scrolling to it from
+                // the change of the count ran before the new row was laid out, then only every second add scrolled.
+                .defaultScrollAnchor(.bottom)
+                .scrollBounceBehavior(.basedOnSize)
+                // shows that there are more sets than the four rows
+                .scrollIndicatorsFlash(onAppear: true)
+            } else {
                 rows
             }
-            .frame(height: rowsHeight)
-            // The last sets are shown, and an added set scrolls into view as the rows grow. Scrolling to it from
-            // the change of the count ran before the new row was laid out, then only every second add scrolled.
-            .defaultScrollAnchor(.bottom)
-            .scrollBounceBehavior(.basedOnSize)
-            // shows that there are more sets than the four rows
-            .scrollIndicatorsFlash(onAppear: true)
         }
             .toolbar {
                 // The decimal pad has no minus key, only the intensity can be negative

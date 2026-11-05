@@ -24,6 +24,8 @@ struct EditPerformingWorkoutView: View {
     var onSelect: ((WorkoutExercise) -> Void)? = nil
     /// Set in the workout in progress: "Cancel workout" at the bottom, asked twice before it deletes the workout
     var onDeleteWorkout: (() -> Void)? = nil
+    /// False when the name is already edited around the sheet, as when editing a past workout
+    var showsName = true
 
     @Environment(\.modelContext) private var context
 
@@ -33,7 +35,8 @@ struct EditPerformingWorkoutView: View {
             exercisesContext: exercisesContext ?? context,
             currentExercise: currentExercise,
             onSelect: onSelect,
-            onDeleteWorkout: onDeleteWorkout
+            onDeleteWorkout: onDeleteWorkout,
+            showsName: showsName
         )
     }
 }
@@ -45,6 +48,7 @@ private struct EditPerformingWorkoutContentView: View {
     let currentExercise: WorkoutExercise?
     let onSelect: ((WorkoutExercise) -> Void)?
     let onDeleteWorkout: (() -> Void)?
+    let showsName: Bool
 
     @State private var asksToDelete = false
 
@@ -52,12 +56,13 @@ private struct EditPerformingWorkoutContentView: View {
     @Environment(UserSettings.self) var userSettings
 
     // The view model is created once, later ones of the parent's body are discarded
-    init(model: EditPerformingWorkoutViewModel, exercisesContext: ModelContext, currentExercise: WorkoutExercise?, onSelect: ((WorkoutExercise) -> Void)?, onDeleteWorkout: (() -> Void)?) {
+    init(model: EditPerformingWorkoutViewModel, exercisesContext: ModelContext, currentExercise: WorkoutExercise?, onSelect: ((WorkoutExercise) -> Void)?, onDeleteWorkout: (() -> Void)?, showsName: Bool) {
         _model = State(initialValue: model)
         self.exercisesContext = exercisesContext
         self.currentExercise = currentExercise
         self.onSelect = onSelect
         self.onDeleteWorkout = onDeleteWorkout
+        self.showsName = showsName
     }
 
     var body: some View {
@@ -65,13 +70,15 @@ private struct EditPerformingWorkoutContentView: View {
         let exercises = model.sortedExercises
         NavigationStack {
             List {
-                Section("Name") {
-                    TextField("Workout name", text: $model.title)
-                        .font(.title3.weight(.semibold))
-                        .autocorrectionDisabled()
-                        .onChange(of: model.title) {
-                            model.titleChanged()
-                        }
+                if showsName {
+                    Section("Name") {
+                        TextField("Workout name", text: $model.title)
+                            .font(.title3.weight(.semibold))
+                            .autocorrectionDisabled()
+                            .onChange(of: model.title) {
+                                model.titleChanged()
+                            }
+                    }
                 }
 
                 Section {
@@ -104,7 +111,7 @@ private struct EditPerformingWorkoutContentView: View {
                     }
                 }
             }
-            .navigationTitle("Workout")
+            .navigationTitle(showsName ? "Workout" : "Exercises")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
