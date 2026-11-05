@@ -189,11 +189,14 @@ export function SaveLabel() {
 export function SquareActionButton({
   label,
   destructive = false,
+  tinted = false,
   onClick,
   children,
 }: {
   label: string;
   destructive?: boolean;
+  /** in the app color, e.g. the button that adds exercises */
+  tinted?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -203,7 +206,7 @@ export function SquareActionButton({
       aria-label={label}
       onClick={onClick}
       className={`flex size-[52px] shrink-0 items-center justify-center rounded-2xl transition-[scale,opacity] active:scale-95 active:opacity-70 ${
-        destructive ? "bg-[#ff3b30]/12 text-[#ff3b30] dark:text-[#ff453a]" : "bg-field/40 text-app"
+        destructive ? "bg-[#ff3b30]/12 text-[#ff3b30] dark:text-[#ff453a]" : tinted ? "bg-app/15 text-app" : "bg-field/40 text-app"
       }`}
     >
       {children}

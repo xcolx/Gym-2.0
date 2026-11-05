@@ -61,8 +61,9 @@ describe("EditPerformingWorkout", () => {
     await user.type(name, "Chest Day");
     await waitFor(async () => expect((await db.workouts.get(workout.id))?.name).toBe("Chest Day"));
 
-    await user.click(screen.getByRole("button", { name: "Delete Bench Press" }));
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    // the keyboard on the handle, like swiping the row to the left
+    screen.getByRole("button", { name: "Move Bench Press" }).focus();
+    await user.keyboard("{Delete}");
     await waitFor(async () => expect(await exerciseNames(workout.id)).toEqual(["Cable Fly"]));
   });
 
@@ -84,7 +85,7 @@ describe("EditPerformingWorkout", () => {
     render(<EditSheet workoutId={workout.id} />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("button", { name: "Add exercise" }));
+    await user.click(await screen.findByRole("button", { name: "Add exercises" }));
     await user.type(screen.getByPlaceholderText("Search"), "squ");
     expect(screen.queryByRole("button", { name: "Add Bench Press" })).toBeNull();
     // picked in the list, added with the button at the bottom

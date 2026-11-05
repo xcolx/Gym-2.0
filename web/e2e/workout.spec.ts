@@ -23,8 +23,8 @@ async function enterSet(page: Page, set: number, reps: string, kilograms: string
 }
 
 async function endWorkout(page: Page) {
-  await page.getByRole("tab", { name: "End Workout" }).click();
-  await page.getByRole("button", { name: "End Workout" }).click();
+  await page.getByRole("tab", { name: "Finish" }).click();
+  await page.getByRole("button", { name: "Finish workout" }).click();
   await expect(page).toHaveURL(/\/workout$/);
 }
 
@@ -37,7 +37,7 @@ test("logs a workout that reaches the server and the user's other devices", asyn
 
   await startBenchPress(page, "Push Day");
   await enterSet(page, 1, "10", "60");
-  await page.getByRole("button", { name: "add set" }).click();
+  await page.getByRole("button", { name: "Add set" }).click();
   await enterSet(page, 2, "8", "62.5");
   await endWorkout(page);
 

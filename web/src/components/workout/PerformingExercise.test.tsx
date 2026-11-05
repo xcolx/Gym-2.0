@@ -28,7 +28,15 @@ function WorkoutPage({ workoutId, onShowExercise = () => {} }: { workoutId: Loca
   const workout = useWorkout(workoutId);
   if (!workout) return null;
   const [first] = workout.workoutExercises;
-  return <PerformingExercise workoutExercise={first} workoutId={workout.id} onShowExercise={onShowExercise} />;
+  return (
+    <PerformingExercise
+      workoutExercise={first}
+      number={1}
+      exerciseCount={workout.workoutExercises.length}
+      workoutId={workout.id}
+      onShowExercise={onShowExercise}
+    />
+  );
 }
 
 async function benchPress() {
@@ -60,7 +68,7 @@ describe("PerformingExercise", () => {
 
     await user.type(await screen.findByLabelText("Reps of set 1"), "10");
     await user.type(screen.getByLabelText("kg of set 1"), "60");
-    await user.click(screen.getByRole("button", { name: "add set" }));
+    await user.click(screen.getByRole("button", { name: "Add set" }));
     await user.type(await screen.findByLabelText("Reps of set 2"), "8");
 
     await waitFor(async () => {
@@ -69,7 +77,7 @@ describe("PerformingExercise", () => {
       expect(stored.weights?.[0]).toBe(60);
     });
 
-    await user.click(screen.getByRole("button", { name: "remove set" }));
+    await user.click(screen.getByRole("button", { name: "Remove last set" }));
     await waitFor(async () => expect((await firstWorkoutExercise(workout.id)).reps).toEqual([10]));
     await waitFor(() => expect(screen.queryByLabelText("Reps of set 2")).toBeNull());
   });
@@ -97,7 +105,7 @@ describe("PerformingExercise", () => {
     render(<WorkoutPage workoutId={workout.id} onShowExercise={onShowExercise} />);
 
     expect(await screen.findByText(/You have never done this exercise/)).toBeTruthy();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Bench Press" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Details of Bench Press" }));
     expect(onShowExercise).toHaveBeenCalledWith(exercise.id);
   });
 });

@@ -99,7 +99,7 @@ function EditPastWorkout({ workout }: { workout: WorkoutWithExercises }) {
           {draft.workoutExercises.map((workoutExercise) => (
             <section key={workoutExercise.id} className="pb-[30px]">
               <h3 className="pb-1 pl-2.5 text-headline font-semibold">{workoutExercise.exercise?.name ?? ""}</h3>
-              <EditWorkoutExercise workoutExercise={workoutExercise} actions={editor.setActions} />
+              <EditWorkoutExercise workoutExercise={workoutExercise} limitsRows={false} actions={editor.setActions} />
             </section>
           ))}
         </div>

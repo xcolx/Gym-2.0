@@ -7,7 +7,7 @@ const DELETE_W = 80;
 
 /**
  * The rows of a List with `.onMove` and `.onDelete` in a card, always editable: a row is moved by dragging its handle
- * on the right and removed by swiping it to the left, which reveals "Delete". The rows have the same height, which the
+ * on the right and removed by swiping it to the left, which reveals "Delete" (or with the keys on the handle). The rows have the same height, which the
  * dragging is based on.
  */
 export function ReorderableList({
@@ -135,10 +135,12 @@ export function ReorderableList({
                   setDrag(null);
                 }}
                 onPointerCancel={() => setDrag(null)}
+                aria-keyshortcuts="ArrowUp ArrowDown Delete"
                 onKeyDown={(event) => {
-                  // the keyboard moves it one row up or down
+                  // the keyboard moves it one row up or down, or removes it
                   if (event.key === "ArrowUp" && index > 0) onMove(index, index - 1);
                   else if (event.key === "ArrowDown" && index < items.length - 1) onMove(index, index + 1);
+                  else if (event.key === "Delete" || event.key === "Backspace") onDelete(index);
                   else return;
                   event.preventDefault();
                 }}

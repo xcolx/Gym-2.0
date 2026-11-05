@@ -7,7 +7,7 @@ import type { UnitSystem } from "@/types/models";
 /**
  * Port of ExerciseHistoryCard.swift: the past times an exercise was done as a card, the newest first: the date, the
  * workout and every set, with the set of the personal record highlighted. With `scrolls` (while the exercise is done in
- * a workout) the card takes the space it gets and its rows scroll inside it.
+ * a workout) the card takes at most the space it gets and its rows scroll inside it.
  */
 export function ExerciseHistoryCard({
   history,
@@ -22,7 +22,7 @@ export function ExerciseHistoryCard({
   scrolls?: boolean;
 }) {
   return (
-    <div className={`card ${scrolls ? "min-h-0 flex-1 overflow-y-auto" : "overflow-hidden"}`}>
+    <div className={`card ${scrolls ? "min-h-0 overflow-y-auto overscroll-y-contain" : "overflow-hidden"}`}>
       <ul>
         {history.map((entry) => (
           <li

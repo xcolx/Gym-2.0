@@ -4,71 +4,182 @@
 // away.
 
 import { useState } from "react";
-import { CirclePlus } from "lucide-react";
+import { CirclePlus, Trash2 } from "lucide-react";
 
-import { ReorderableRows, WorkoutNameField } from "@/components/workout/EditWorkout";
+import { ButtonRow, FormRow, FormSection, FormStack } from "@/components/ui/Form";
+import { ReorderableList } from "@/components/ui/ReorderableList";
+import { afterOverlayClose, Sheet, SheetButton } from "@/components/ui/overlay";
+import { DeleteWorkoutConfirmation } from "@/components/workout/DeleteWorkoutConfirmation";
+import { WorkoutNameField } from "@/components/workout/EditWorkout";
 import { ExercisesSheet } from "@/components/workout/ExercisesSheet";
-import { Sheet } from "@/components/ui/overlay";
+import { doneSetsText } from "@/lib/domain/active-workout";
+import { exerciseCountText } from "@/lib/domain/workout-setup";
 import { addExercisesToWorkout, moveWorkoutExercise, removeExerciseFromWorkout, renameWorkout } from "@/lib/repo";
 import { useBoundText } from "@/lib/use-bound-text";
-import type { WorkoutWithExercises } from "@/types/models";
+import type { LocalId, WorkoutWithExercises } from "@/types/models";
+import { useDoneSetCounts } from "./active/use-active-workout";
 
-export function EditPerformingWorkout({ open, workout, onClose }: { open: boolean; workout: WorkoutWithExercises; onClose: () => void }) {
+const ROW_HEIGHT = 52;
+
+/**
+ * The name and the exercises of the workout in progress. Tapping an exercise shows it, its handle moves it and a swipe
+ * to the left removes it. "Cancel workout" at the bottom asks twice before it deletes the workout.
+ */
+export function EditPerformingWorkout({
+  open,
+  workout,
+  currentExerciseId,
+  onSelect,
+  onDeleteWorkout,
+  onClose,
+}: {
+  open: boolean;
+  workout: WorkoutWithExercises;
+  /** The exercise shown in the workout, highlighted in the list */
+  currentExerciseId?: LocalId | null;
+  /** Tapping an exercise shows it in the workout */
+  onSelect?: (index: number) => void;
+  onDeleteWorkout?: () => void;
+  onClose: () => void;
+}) {
   return (
-    <Sheet open={open} onClose={onClose} label="Edit Workout">
-      <EditPerformingWorkoutContent workout={workout} onClose={onClose} />
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Workout"
+      trailing={
+        <SheetButton bold onClick={onClose}>
+          Done
+        </SheetButton>
+      }
+      grouped
+    >
+      <EditPerformingWorkoutContent
+        workout={workout}
+        currentExerciseId={currentExerciseId}
+        onSelect={onSelect}
+        onDeleteWorkout={onDeleteWorkout}
+        onClose={onClose}
+      />
     </Sheet>
   );
 }
 
-function EditPerformingWorkoutContent({ workout, onClose }: { workout: WorkoutWithExercises; onClose: () => void }) {
+function EditPerformingWorkoutContent({
+  workout,
+  currentExerciseId,
+  onSelect,
+  onDeleteWorkout,
+  onClose,
+}: {
+  workout: WorkoutWithExercises;
+  currentExerciseId?: LocalId | null;
+  onSelect?: (index: number) => void;
+  onDeleteWorkout?: () => void;
+  onClose: () => void;
+}) {
   // Bound to the stored name, while the field is empty the workout keeps its last name (the server needs one character)
   const title = useBoundText(workout.name);
   const [showsExercises, setShowsExercises] = useState(false);
+  const [asksToDelete, setAsksToDelete] = useState(false);
+  const exercises = workout.workoutExercises;
+  const doneCounts = useDoneSetCounts(workout);
 
   return (
-    <>
-      <div className="flex h-11 shrink-0 items-center justify-end px-2">
-        <button type="button" className="h-11 px-2 text-body font-semibold text-app active:opacity-50" onClick={onClose}>
-          Done
-        </button>
-      </div>
-      <div className="flex shrink-0 items-center gap-1 pl-2.5">
-        <WorkoutNameField
-          value={title.text}
-          onChange={(name) => {
-            const trimmed = name.trim();
-            title.change(name, trimmed === "" ? null : trimmed);
-            void renameWorkout(workout.id, name);
-          }}
-          onBlur={title.end}
-          className="h-auto rounded-[10px] bg-field px-2.5 py-2.5"
-        />
-        <button
-          type="button"
-          aria-label="Add exercise"
-          onClick={() => setShowsExercises(true)}
-          className="flex h-[60px] w-[60px] shrink-0 items-center justify-center text-[#34c759] active:opacity-50"
-        >
-          <CirclePlus size={30} />
-        </button>
-      </div>
+    <FormStack>
+      <FormSection header="Name">
+        <FormRow className="py-0" rowClassName="focus-ring-within rounded-[20px]">
+          <WorkoutNameField
+            value={title.text}
+            onChange={(name) => {
+              const trimmed = name.trim();
+              title.change(name, trimmed === "" ? null : trimmed);
+              void renameWorkout(workout.id, name);
+            }}
+            onBlur={title.end}
+          />
+        </FormRow>
+      </FormSection>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-        <ReorderableRows
-          items={workout.workoutExercises.map((we) => ({ key: we.id, name: we.exercise?.name ?? "" }))}
-          editing
-          rowClassName="bg-[#34c759]"
-          onDelete={(index) => void removeExerciseFromWorkout(workout.workoutExercises[index].id)}
+      <FormSection
+        header={exerciseCountText(exercises.length)}
+        footer={
+          onSelect
+            ? "Tap an exercise to go to it, drag the handle to move it, swipe to remove it."
+            : "Drag the handle of an exercise to move it, swipe to remove it."
+        }
+      >
+        <ReorderableList
+          items={exercises.map((workoutExercise) => ({ key: workoutExercise.id, label: workoutExercise.exercise?.name ?? "" }))}
+          rowHeight={ROW_HEIGHT}
           onMove={(from, to) => void moveWorkoutExercise(workout.id, from, to)}
+          onDelete={(index) => void removeExerciseFromWorkout(exercises[index].id)}
+          renderRow={(index) => {
+            const workoutExercise = exercises[index];
+            const isCurrent = workoutExercise.id === currentExerciseId;
+            const done = doneCounts[index];
+            const row = (
+              <>
+                <span
+                  className={`flex size-[30px] shrink-0 items-center justify-center rounded-full text-subheadline font-semibold tabular-nums ${
+                    isCurrent ? "bg-app text-app-foreground" : "bg-app/15 text-app"
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                <span className={`min-w-0 flex-1 truncate ${isCurrent ? "font-semibold" : ""}`}>{workoutExercise.exercise?.name ?? ""}</span>
+                <span className={`shrink-0 text-subheadline ${isCurrent ? "text-app" : "text-secondary-label"}`}>
+                  {isCurrent ? "Now" : done === 0 ? "–" : doneSetsText(done)}
+                </span>
+              </>
+            );
+            return onSelect ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(index);
+                  onClose();
+                }}
+                className="flex w-full items-center gap-3 py-2 text-left"
+              >
+                {row}
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 py-2">{row}</div>
+            );
+          }}
         />
-      </div>
+        <ButtonRow onClick={() => setShowsExercises(true)}>
+          <CirclePlus size={22} className="fill-current [&>path]:stroke-[var(--cell-bg)]" aria-hidden />
+          Add exercises
+        </ButtonRow>
+      </FormSection>
+
+      {onDeleteWorkout && (
+        <FormSection>
+          <ButtonRow destructive onClick={() => setAsksToDelete(true)}>
+            <Trash2 size={20} aria-hidden />
+            Cancel workout
+          </ButtonRow>
+        </FormSection>
+      )}
 
       <ExercisesSheet
         open={showsExercises}
         onClose={() => setShowsExercises(false)}
-        onAdd={(exercises) => void addExercisesToWorkout(workout.id, exercises.map((exercise) => exercise.id))}
+        onAdd={(added) => void addExercisesToWorkout(workout.id, added.map((exercise) => exercise.id))}
       />
-    </>
+      {onDeleteWorkout && (
+        <DeleteWorkoutConfirmation
+          open={asksToDelete}
+          onClose={() => setAsksToDelete(false)}
+          onDelete={() => {
+            onClose();
+            // after the sheet removed its history entry, which would undo leaving the workout
+            afterOverlayClose(onDeleteWorkout);
+          }}
+        />
+      )}
+    </FormStack>
   );
 }

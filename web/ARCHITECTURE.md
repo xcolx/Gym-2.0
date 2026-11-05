@@ -564,8 +564,12 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   `ui/PrimaryButton.tsx`: `PrimaryButton` (PrimaryButtonStyle.swift: the filled main button of a screen in the app
   color, `isLoading` shows a spinner), `SecondaryButton` (the one below it), `primaryButtonClass` (e.g. for a link).
 - The `card` utility of globals.css is `.cardBackground()` (CardBackground.swift): the rounded card on `bg-grouped`.
-- `SetTable` (`{ workoutExercise, stopwatchWorkoutId? }`, the stopwatch only in the performing workout) and
-  `EditWorkoutExercise` read the units and reference data themselves; the set fields are `lib/domain/set-input.ts`.
+- `SetTable` (`{ workoutExercise, stopwatchWorkoutId?, limitsRows? }`, the stopwatch only in the performing workout,
+  at most four rows that scroll there, all of them in a past workout) and `EditWorkoutExercise` read the units and
+  reference data themselves; the set fields are `lib/domain/set-input.ts`.
+- The workout in progress: `WorkoutPager` (the pages with a bar per exercise and the finish page, `ref` to show a
+  page), `EditPerformingWorkout` (the overview sheet), `EndWorkout` (the finish page) and `DeleteWorkoutConfirmation`
+  (asks twice before the workout is deleted); `useDoneSetCounts` of `active/use-active-workout.ts`.
 - `PhotoViewer` / `OpensPhotoViewer`, `ServerImage`, `ProfileIcon` / `ProfileCircle`.
 - Forms and lists: `ui/Form.tsx` (`FormPage`, `FormStack` for the sections in a `grouped` sheet, `FormSection`,
   `FormRow` (content `className`, row `rowClassName` and props such as `onContextMenu`), `PressableRow` (a row that is
@@ -574,10 +578,12 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   inset separators like iOS. Used by the settings, auth and chat screens.
 - `ui/Menu.tsx`: `Menu` (the "…" and sort menus of the toolbars, items with an icon, `destructive`, `disabled` or
   `checked`); `ui/ContentUnavailable.tsx` (ContentUnavailableView); `ui/ExerciseName.tsx` (ExerciseNameText.swift: the
-  name with the verified badge in the app color); `BottomActionBar` of `ui/PrimaryButton.tsx` (`.bottomActionBar`);
+  name with the verified badge in the app color); `BottomActionBar` of `ui/PrimaryButton.tsx` (`.bottomActionBar`,
+  `inSheet` and `inPane` for the bottom of a sheet or of a page of the workout);
   `ui/SearchField.tsx` (`.searchable`, e.g. of the exercise stats, the chats and the public groups);
   `ui/MuscleLegend.tsx` (MuscleLegend.swift, the colors of the body); `ui/ReorderableList.tsx` (a List with `.onMove`
-  and `.onDelete`: drag the handle, swipe to the left), e.g. the exercises of EditWorkout.
+  and `.onDelete`: drag the handle, swipe to the left, or the arrow and delete keys on the handle), e.g. the exercises
+  of EditWorkout.
   components/chat/chat-controls.tsx only keeps what the chat alone uses: the plain button style and the red text.
 - The message composer of the chats and the Gym-AI (MessageComposer.swift) is `MessageField` of
   components/chat/messages.tsx: the rounded field with the round `SendButton` inside. Enter sends with a keyboard.
@@ -609,7 +615,8 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `home.ts` (HomeView helpers): `timeWorkedOutShort`, `progressPercentage`, `notTrainedMuscles`. `suggest.ts`: `suggestExercises`.
 - `workout-setup.ts` (the workout setup and the exercise picker): `musclesWorked` ([Exercise].musclesWorked),
   `schemeDetails`, `exerciseDetailsText` ("Chest · Barbell"), `pickedPositions`, `withoutLastPick`, `moved`,
-  `formatWorkoutMinutes`, `isAlwaysAvailable`.
+  `formatWorkoutMinutes`, `isAlwaysAvailable`. `active-workout.ts` (the workout in progress): `doneSetCount`,
+  `doneSetsText`, `exercisesWithSetsText`, `canRemoveSet`.
 
 ## Conventions for feature agents
 
