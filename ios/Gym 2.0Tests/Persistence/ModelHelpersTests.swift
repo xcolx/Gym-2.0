@@ -243,6 +243,20 @@ struct WorkoutHelpersTests {
         #expect(muscleNames(secondaryOfTwo) == ["Front Deltoid"])
     }
 
+    // A sync deleted an exercise of a workout scheme, reading it crashed until the context saved
+    @Test func skipsTheDeletedExercisesOfASchemeAndTheirMuscles() throws {
+        let bench = store.exercise("Bench", primaryMuscleIds: [1])
+        let squat = store.exercise("Squat", primaryMuscleIds: [4])
+        let scheme = WorkoutScheme(name: "Full body")
+        store.context.insert(scheme)
+        scheme.exercises = [WorkoutSchemeExercise(scheme: scheme, exercise: bench, index: 0), WorkoutSchemeExercise(scheme: scheme, exercise: squat, index: 1)]
+        store.context.delete(squat)
+
+        #expect(scheme.sortedExercises.map(\.name) == ["Bench"])
+        let worked = [bench, squat].musclesWorked(in: try store.context.fetchAll(Muscle.self))
+        #expect(muscleNames(worked.primary) == ["Chest"])
+    }
+
     // MARK: Recent days
 
     @Test func countsFinishedWorkoutsOfTodayAndTheTwoDaysBeforeAcrossWeekBorders() {
