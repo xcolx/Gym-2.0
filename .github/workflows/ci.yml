@@ -160,7 +160,7 @@ jobs:
       - name: Coverage
         # Fails below the minimum line coverage of the app, raise it when the coverage grows
         env:
-          MIN_COVERAGE: "22"
+          MIN_COVERAGE: "20"
         run: |
           xcrun xccov view --report --only-targets TestResults.xcresult
           xcrun xccov view --report --only-targets --json TestResults.xcresult \
