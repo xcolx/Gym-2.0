@@ -58,7 +58,7 @@ struct WorkoutExportView: View {
                 }
                 .disabled(workouts.isEmpty)
             }
-            .navigationTitle("Export Workouts")
+            .navigationTitle("Export workouts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

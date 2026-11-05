@@ -54,10 +54,10 @@ private struct BlockedUsersContentView: View {
         }
         .overlay {
             if blockedUsers.isEmpty {
-                ContentUnavailableView("No Blocked Users", systemImage: "person.crop.circle.badge.checkmark")
+                ContentUnavailableView("No blocked users", systemImage: "person.crop.circle.badge.checkmark", description: Text("People you block show up here."))
             }
         }
-        .navigationTitle("Blocked Users")
+        .navigationTitle("Blocked users")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Something went wrong", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("OK", role: .cancel) {}

@@ -80,7 +80,7 @@ private struct NewGroupChatContentView: View {
                     }
                 }
             }
-            .navigationTitle("New Group")
+            .navigationTitle("New group")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

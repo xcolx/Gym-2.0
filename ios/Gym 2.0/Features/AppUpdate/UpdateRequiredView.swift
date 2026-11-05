@@ -27,11 +27,10 @@ struct UpdateRequiredView: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Link(destination: AppUpdateService.appStoreURL) {
-                Label("Open App Store", systemImage: "arrow.up.forward.app")
+                Label("Open the App Store", systemImage: "arrow.up.forward.app")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(PrimaryButtonStyle())
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

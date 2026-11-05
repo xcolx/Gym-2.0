@@ -104,7 +104,7 @@ private struct AccountView: View {
                 NavigationLink {
                     DataTakeoutView(model: DataTakeoutViewModel(services: services))
                 } label: {
-                    SettingsLabel("Data takeout", systemImage: "square.and.arrow.down")
+                    SettingsLabel("Download your data", systemImage: "square.and.arrow.down")
                 }
             } footer: {
                 Text("Download a copy of everything Gym 2.0 stores about you.")
@@ -433,14 +433,14 @@ private struct DataTakeoutView: View {
                     Button {
                         model.showsShareSheet = true
                     } label: {
-                        Label("Save or Share File", systemImage: "square.and.arrow.up")
+                        Label("Save or share file", systemImage: "square.and.arrow.up")
                     }
                 } else {
                     Button {
                         Task { await model.load() }
                     } label: {
                         HStack {
-                            Text("Request Data")
+                            Text("Request data")
                             Spacer()
                             if model.isLoading { ProgressView() }
                         }
@@ -455,7 +455,7 @@ private struct DataTakeoutView: View {
                 }
             }
         }
-        .navigationTitle("Data Takeout")
+        .navigationTitle("Download your data")
         .navigationBarTitleDisplayMode(.inline)
         // The file holds personal data, so it's removed once it was saved or shared, or the sheet was closed
         .sheet(isPresented: $model.showsShareSheet, onDismiss: model.removeFile) {
