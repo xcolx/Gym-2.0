@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+/// The set table of an exercise of a workout, with the buttons to add and remove a set and the unilateral switch below
 struct EditWorkoutExerciseView: View {
 
     @State var workoutExercise: WorkoutExercise
@@ -16,93 +17,69 @@ struct EditWorkoutExerciseView: View {
         userSettings.bodyweight ?? 0
     }
 
-    // With more than two metrics the set table needs the full width, the buttons are shown above it
-    private var compact: Bool {
-        workoutExercise.trackedMetrics.count > 2
+    /// One set is always left, a unilateral set has an entry per side
+    private var canRemoveSet: Bool {
+        workoutExercise.entryCount > (workoutExercise.unilateral ? 2 : 1)
     }
 
     var body: some View {
-        if compact {
-            VStack{
-                HStack{
-                    addButton
-                    removeButton
-                    Spacer()
-                    unilateralToggle
+        VStack(spacing: 14) {
+            NumberInsertView(workoutExercise: workoutExercise)
+
+            HStack(spacing: 8) {
+                Button(action: addSet) {
+                    Label("Add set", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(userSettings.appColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(userSettings.appColor.opacity(0.15), in: Capsule())
+                        .fixedSize()
                 }
-                .padding(.horizontal, 10)
+                .buttonStyle(.plain)
 
-                NumberInsertView(workoutExercise: workoutExercise)
-            }
-        } else {
-            HStack{
-                VStack{
-                    addButton
-                    removeButton
-                    unilateralToggle
-
-                    HighlightedBodyView(primaryMuscles: workoutExercise.exercise?.primaryMuscles ?? [], secondaryMuscles: workoutExercise.exercise?.secondaryMuscles ?? [])
+                // only the icon, the row is too narrow for the toggle and two labels
+                Button(action: removeSet) {
+                    Image(systemName: "minus")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(canRemoveSet ? Color.primary : Color.secondary)
+                        .frame(width: 36, height: 36)
+                        .background(Color(.tertiarySystemFill), in: Circle())
                 }
+                .buttonStyle(.plain)
+                .disabled(!canRemoveSet)
+                .accessibilityLabel("Remove last set")
 
+                Spacer(minLength: 8)
 
-                NumberInsertView(workoutExercise: workoutExercise)
-
+                Toggle(isOn: Binding(get: { workoutExercise.unilateral }, set: { workoutExercise.setUnilateral($0) })) {
+                    Text("Unilateral")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize()
+                .tint(userSettings.appColor)
             }
         }
     }
 
-    var addButton: some View {
-        Button(action: {
-            if workoutExercise.unilateral{
+    private func addSet() {
+        withAnimation(.snappy(duration: 0.2)) {
+            if workoutExercise.unilateral {
                 workoutExercise.appendEntry(bodyWeight: bodyWeight)
             }
             workoutExercise.appendEntry(bodyWeight: bodyWeight)
-            workoutExercise.workout?.noteChange()
-        }, label: {
-            Text("add set")
-                .foregroundStyle(Color("MyWhite"))
-                .font(.headline)
-                .padding(.horizontal, 15)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 25)
-                        .tint(Color("MyBlack"))
-                )
-        })
+        }
+        workoutExercise.workout?.noteChange()
     }
 
-    var removeButton: some View {
-        Button(action: {
-            if workoutExercise.unilateral{
-                if workoutExercise.entryCount > 2{
-                    workoutExercise.removeEntry(at: workoutExercise.entryCount - 1)
-                    workoutExercise.removeEntry(at: workoutExercise.entryCount - 1)
-                }
-            } else {
-                if workoutExercise.entryCount > 1{
-                    workoutExercise.removeEntry(at: workoutExercise.entryCount - 1)
-                }
+    private func removeSet() {
+        guard canRemoveSet else { return }
+        withAnimation(.snappy(duration: 0.2)) {
+            if workoutExercise.unilateral {
+                workoutExercise.removeEntry(at: workoutExercise.entryCount - 1)
             }
-
-        }, label: {
-            Text("remove set")
-                .foregroundStyle(Color("MyWhite"))
-                .font(.headline)
-                .padding(.horizontal, 15)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: 25)
-                        .tint(Color("MyBlack"))
-                )
-        })
-    }
-
-    var unilateralToggle: some View {
-        HStack{
-            Text("unilateral")
-            Toggle("", isOn: Binding(get: { workoutExercise.unilateral }, set: { workoutExercise.setUnilateral($0) }))
-                .labelsHidden()
+            workoutExercise.removeEntry(at: workoutExercise.entryCount - 1)
         }
     }
-
 }

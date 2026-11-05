@@ -115,6 +115,21 @@ struct WorkoutExerciseHelpersTests {
         #expect(intensity.entryDescription(at: 0, weightUnit: .imperial, distanceUnit: .imperial) == "lvl 5.5")
     }
 
+    // A synced or imported workout can have set arrays of different lengths
+    @Test func handlesSetArraysOfDifferentLengths() {
+        let entry = workoutExercise(Sets(reps: [10, 8], weights: [50, 60], time: [30]))
+        #expect(entry.entryDescription(at: 1, weightUnit: .metric, distanceUnit: .metric) == "8x, 60.0 kg")
+        #expect(entry.value(of: .time, at: 1) == nil)
+        #expect(!entry.isEntryEmpty(at: 1, bodyWeight: 0))
+
+        entry.setValue(45, of: .time, at: 1)
+        #expect(entry.time == [30, 45])
+        entry.removeEntry(at: 1)
+        entry.removeEntry(at: 1)
+        #expect(entry.reps == [10])
+        #expect(entry.time == [30])
+    }
+
     @Test func hasTheLimitsOfTheServer() {
         #expect(SetMetric.reps.range == 0...999)
         #expect(SetMetric.reps.serverRange == 0...9999)

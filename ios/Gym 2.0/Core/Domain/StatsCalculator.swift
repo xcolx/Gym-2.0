@@ -87,7 +87,7 @@ enum StatsCalculator {
 
             if let weights = workoutExercise.weights {
                 for (index, weight) in weights.enumerated() where weight > 0 {
-                    let reps = workoutExercise.reps?[index] ?? 0
+                    let reps = workoutExercise.reps?[safe: index] ?? 0
                     if let record = summary.personalRecord, weight < record.weight || (weight == record.weight && reps <= record.reps) {
                         continue
                     }

@@ -14,12 +14,14 @@ struct WhilstWorkoutView: View {
     @Bindable var workout: Workout
     @Binding var navigationStackPath: [NavigationDestination]
     
-    @State var showAlert: Bool = false
-    @State var showEditSheet: Bool = false
+    @State var asksToDelete: Bool = false
+    @State var showOverview: Bool = false
     // The sheet of EndWorkoutView is presented here: as a page of the TabView, that view is created anew, e.g. when the
     // swipe to it ends after the tap, which reset its state and closed the sheet again
     @State var showExercisesView: Bool = false
     @State var exercisesToAdd: [Exercise] = []
+    /// The index of the exercise shown, the number of exercises for the finish page
+    @State private var page: Int = 0
 
     // The stopwatches of the time fields keep running while the workout is open
     @State var stopwatchStore = StopwatchStore()
@@ -37,34 +39,66 @@ struct WhilstWorkoutView: View {
                 }
         }
         else{
-            TabView{ 
-                ForEach(workout.workoutExercises.sorted(by: {$0.index < $1.index})){ exercise in
-                    PerformingExerciseView(workoutExercise: exercise, navigationStackPath: $navigationStackPath)
+            let exercises = workout.workoutExercises.sorted(by: {$0.index < $1.index})
+            TabView(selection: $page) {
+                ForEach(Array(exercises.enumerated()), id: \.element.persistentModelID) { index, exercise in
+                    PerformingExerciseView(workoutExercise: exercise, number: index + 1, exerciseCount: exercises.count, navigationStackPath: $navigationStackPath)
                         .ignoresSafeArea(.keyboard)
-                        .padding(.horizontal, 10)
+                        .tag(index)
                 }
                 
                 EndWorkoutView(workout: workout, navigationStackPath: $navigationStackPath, showExercisesView: $showExercisesView)
+                    .tag(exercises.count)
             }
-            .tabViewStyle(PageTabViewStyle())
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .background(Color(.systemGroupedBackground))
+            .safeAreaInset(edge: .top, spacing: 0) {
+                progressBars(exercises)
+            }
             .environment(stopwatchStore)
-            .navigationTitle("Workout")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    WorkoutClock(start: workout.date).frame(minWidth: 100)
+                    Button {
+                        asksToDelete = true
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Cancel workout")
+                    }
+                }
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 0) {
+                        Text(workout.name)
+                            .font(.headline)
+                            .lineLimit(1)
+                        WorkoutClock(start: workout.date)
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    toolbarButtons
+                    Button {
+                        showOverview = true
+                    } label: {
+                        Image(systemName: "list.bullet")
+                            .font(.body.weight(.semibold))
+                            .accessibilityLabel("Workout overview")
+                    }
                 }
             }
-            .alert("Cancel your workout?", isPresented: $showAlert) {
-                Button("Go back", role: .cancel) {}
-                Button("Delete", role: .destructive, action: cancelWorkout)
-            } message: {
-                Text("If you cancel your workout, nothing will be saved.")
-            }
-            .sheet(isPresented: $showEditSheet) {
-                EditPerformingWorkoutView(workout: workout)
+            .deleteWorkoutConfirmation(isPresented: $asksToDelete, onDelete: cancelWorkout)
+            .sheet(isPresented: $showOverview) {
+                EditPerformingWorkoutView(
+                    workout: workout,
+                    currentExercise: exercises.indices.contains(page) ? exercises[page] : nil,
+                    onSelect: { selected in
+                        let sorted = workout.workoutExercises.sorted(by: {$0.index < $1.index})
+                        if let index = sorted.firstIndex(of: selected) {
+                            page = index
+                        }
+                    },
+                    onDeleteWorkout: cancelWorkout
+                )
             }
             .sheet(isPresented: $showExercisesView, onDismiss: {
                 workout.addExercises(exercisesToAdd, bodyWeight: userSettings.bodyweight ?? 0)
@@ -74,6 +108,10 @@ struct WhilstWorkoutView: View {
             })
             .ignoresSafeArea(.keyboard)
             .navigationBarBackButtonHidden(true)
+            // removed exercises: stay inside the pages
+            .onChange(of: exercises.count) {
+                page = min(page, exercises.count)
+            }
             // finished on another device while it was open here, ending it here clears the path as well
             .onChange(of: workout.inProgress) {
                 if !workout.inProgress {
@@ -83,27 +121,40 @@ struct WhilstWorkoutView: View {
             }
         }
     }
-        
-    var toolbarButtons: some View{
-        HStack{
-            Button(action: {
-                showAlert.toggle()
-            }, label: {
-                Image(systemName: "xmark.circle")
-                    .font(.title)
-                    .foregroundStyle(Color.red)
-                    .accessibilityLabel("Cancel workout")
-            })
-            
-            Button(action: {
-                showEditSheet.toggle()
-            }, label: {
-                Image(systemName: "pencil")
-                    .font(.title)
-                    .accessibilityLabel("Edit workout")
-            })
-            
+
+    /// One bar per exercise: the shown one in the app color, the ones with sets faded, the empty ones grey
+    private func progressBars(_ exercises: [WorkoutExercise]) -> some View {
+        let bodyWeight = userSettings.bodyweight ?? 0
+        return HStack(spacing: 4) {
+            ForEach(Array(exercises.enumerated()), id: \.element.persistentModelID) { index, exercise in
+                let hasSets = (0..<exercise.entryCount).contains { !exercise.isEntryEmpty(at: $0, bodyWeight: bodyWeight) }
+                Button {
+                    withAnimation { page = index }
+                } label: {
+                    Capsule()
+                        .fill(index == page ? userSettings.appColor : hasSets ? userSettings.appColor.opacity(0.35) : Color(.systemFill))
+                        .frame(height: 4)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+            }
+            Button {
+                withAnimation { page = exercises.count }
+            } label: {
+                Image(systemName: "flag.checkered")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(page == exercises.count ? userSettings.appColor : Color.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
         }
+        .buttonStyle(.plain)
+        .frame(height: 28)
+        .padding(.horizontal)
+        .padding(.bottom, 4)
+        .animation(.snappy(duration: 0.2), value: page)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(page < exercises.count ? "Exercise \(page + 1) of \(exercises.count)" : "Finish")
     }
     
     func cancelWorkout() {
@@ -125,7 +176,9 @@ private struct WorkoutClock: View {
     var body: some View {
         TimelineView(.periodic(from: start, by: 1)) { context in
             Text(Self.format(context.date.timeIntervalSince(start)))
-                .font(.headline)
+                .font(.caption.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
         }
     }
 

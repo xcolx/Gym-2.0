@@ -193,15 +193,8 @@ struct ExercisesStatsDetailView: View {
     // MARK: - Personal record
 
     /// The set of the personal record, the first time it was done
-    private func recordSet(_ summary: StatsSummary) -> (workoutExercise: WorkoutExercise, index: Int)? {
-        guard exercise.tracksWeights, let record = summary.personalRecord else { return nil }
-        for workoutExercise in filteredPastWorkoutExercises.reversed() {
-            guard let weights = workoutExercise.weights else { continue }
-            for index in weights.indices where weights[index] == record.weight && (workoutExercise.reps?[safe: index] ?? 0) == record.reps {
-                return (workoutExercise, index)
-            }
-        }
-        return nil
+    private func recordSet(_ summary: StatsSummary) -> ExerciseHistoryCard.RecordSet? {
+        ExerciseHistoryCard.recordSet(of: exercise, in: filteredPastWorkoutExercises, summary: summary)
     }
 
     private func recordCard(_ record: (weight: Double, reps: Int), workoutExercise: WorkoutExercise) -> some View {
@@ -233,47 +226,13 @@ struct ExercisesStatsDetailView: View {
 
     // MARK: - History
 
-    private func history(record: (workoutExercise: WorkoutExercise, index: Int)?) -> some View {
+    private func history(record: ExerciseHistoryCard.RecordSet?) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("History")
                 .font(.title3.bold())
                 .padding(.horizontal, 4)
 
-            LazyVStack(spacing: 0) {
-                ForEach(filteredPastWorkoutExercises){ workoutExercise in
-                    HStack(alignment: .top){
-                        Text(formatDate(date: workoutExercise.workout?.date ?? .now))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(workoutExercise.workout?.name ?? "")
-                        Spacer()
-                        VStack(alignment: .trailing){
-                            ForEach(0..<workoutExercise.entryCount, id: \.self) {set in
-                                let isRecord = record?.workoutExercise == workoutExercise && record?.index == set
-                                HStack(spacing: 4) {
-                                    if isRecord {
-                                        Image(systemName: "trophy.fill")
-                                            .font(.caption)
-                                            .accessibilityLabel("Personal record")
-                                    }
-                                    Text(workoutExercise.entryDescription(at: set, weightUnit: userSettings.weightUnit, distanceUnit: userSettings.distanceUnit))
-                                        .fontWeight(isRecord ? .semibold : .regular)
-                                }
-                                .foregroundStyle(isRecord ? userSettings.appColor : .primary)
-                            }
-                        }
-                    }
-                    .font(.subheadline)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal)
-
-                    if workoutExercise != filteredPastWorkoutExercises.last {
-                        Divider()
-                            .padding(.leading)
-                    }
-                }
-            }
-            .cardBackground()
+            ExerciseHistoryCard(workoutExercises: filteredPastWorkoutExercises, record: record)
         }
     }
 }
@@ -359,11 +318,5 @@ enum ExerciseChartRange: String, Hashable, CaseIterable {
         case .year: calendar.date(byAdding: .year, value: -1, to: now)
         case .all: nil
         }
-    }
-}
-
-private extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }

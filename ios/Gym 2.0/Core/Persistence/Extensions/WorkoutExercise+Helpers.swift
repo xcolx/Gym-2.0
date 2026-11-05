@@ -103,11 +103,11 @@ extension WorkoutExercise {
     }
 
     func removeEntry(at index: Int) {
-        reps?.remove(at: index)
-        weights?.remove(at: index)
-        time?.remove(at: index)
-        intensity?.remove(at: index)
-        distance?.remove(at: index)
+        reps?.remove(safe: index)
+        weights?.remove(safe: index)
+        time?.remove(safe: index)
+        intensity?.remove(safe: index)
+        distance?.remove(safe: index)
         markChanged()
         workout?.noteChange()
     }
@@ -165,43 +165,68 @@ extension WorkoutExercise {
         }
     }
 
-    // Reps and time are stored as Int, they are converted from and to Double so that all metrics can be edited the same way
+    // Reps and time are stored as Int, they are converted from and to Double so that all metrics can be edited the same way.
+    // Nil if the metric is not tracked or its array is shorter, as in synced or imported workouts.
     func value(of metric: SetMetric, at index: Int) -> Double? {
         switch metric {
-        case .reps: reps.map { Double($0[index]) }
-        case .weights: weights?[index]
-        case .time: time.map { Double($0[index]) }
-        case .intensity: intensity?[index]
-        case .distance: distance?[index]
+        case .reps: reps?[safe: index].map(Double.init)
+        case .weights: weights?[safe: index]
+        case .time: time?[safe: index].map(Double.init)
+        case .intensity: intensity?[safe: index]
+        case .distance: distance?[safe: index]
         }
     }
 
-    // Does nothing if the metric is not tracked
+    // Does nothing if the metric is not tracked. A shorter array of a synced or imported workout is filled up with zeros.
     func setValue(_ value: Double, of metric: SetMetric, at index: Int) {
         switch metric {
-        case .reps: reps?[index] = Int(value.rounded())
-        case .weights: weights?[index] = value
-        case .time: time?[index] = Int(value.rounded())
-        case .intensity: intensity?[index] = value
-        case .distance: distance?[index] = value
+        case .reps: reps?.set(Int(value.rounded()), at: index, filling: 0)
+        case .weights: weights?.set(value, at: index, filling: 0)
+        case .time: time?.set(Int(value.rounded()), at: index, filling: 0)
+        case .intensity: intensity?.set(value, at: index, filling: 0)
+        case .distance: distance?.set(value, at: index, filling: 0)
         }
         markChanged()
         workout?.noteChange()
     }
 
-    // e.g. "R 10x, 50.0 kg" for the entry at the index, in the units the user picked
+    // e.g. "R 10x, 50.0 kg" for the entry at the index, in the units the user picked. A metric whose array is shorter, as
+    // in synced or imported workouts, is left out.
     func entryDescription(at index: Int, weightUnit: UnitSystem, distanceUnit: UnitSystem) -> String {
         var parts: [String] = []
-        if let reps { parts.append("\(reps[index])x") }
-        if let weights { parts.append(weightUnit.formatWeight(kilograms: weights[index])) }
-        if let time { parts.append(StatsSummary.formatSetTime(seconds: time[index])) }
-        if let intensity { parts.append(StatsSummary.formatIntensity(intensity[index])) }
-        if let distance { parts.append(distanceUnit.formatDistance(meters: distance[index])) }
+        if let reps = reps?[safe: index] { parts.append("\(reps)x") }
+        if let weight = weights?[safe: index] { parts.append(weightUnit.formatWeight(kilograms: weight)) }
+        if let time = time?[safe: index] { parts.append(StatsSummary.formatSetTime(seconds: time)) }
+        if let intensity = intensity?[safe: index] { parts.append(StatsSummary.formatIntensity(intensity)) }
+        if let distance = distance?[safe: index] { parts.append(distanceUnit.formatDistance(meters: distance)) }
 
         let description = parts.joined(separator: ", ")
         if unilateral {
             return (index % 2 == 0 ? "R " : "L ") + description
         }
         return description
+    }
+}
+
+// The set arrays of a workout exercise can differ in length when they come from the server or an import
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+
+    /// Does nothing if the index is out of range
+    mutating func remove(safe index: Int) {
+        if indices.contains(index) {
+            remove(at: index)
+        }
+    }
+
+    /// Appends `filling` up to the index first if the array is shorter
+    mutating func set(_ element: Element, at index: Int, filling: Element) {
+        guard index >= 0 else { return }
+        while count <= index {
+            append(filling)
+        }
+        self[index] = element
     }
 }
