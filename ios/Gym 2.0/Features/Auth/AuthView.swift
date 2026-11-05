@@ -97,7 +97,7 @@ private struct WelcomeView: View {
                 Button(action: showSignUp) {
                     AuthButtonLabel(title: "Create account", isLoading: false)
                 }
-                .buttonStyle(AuthPrimaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle())
 
                 Button(action: showLogin) {
                     Text("Log in")
@@ -180,7 +180,7 @@ struct LoginView: View {
             Button(action: login) {
                 AuthButtonLabel(title: "Log in", isLoading: model.isLoading)
             }
-            .buttonStyle(AuthPrimaryButtonStyle())
+            .buttonStyle(PrimaryButtonStyle())
             .disabled(!model.canSubmit)
 
             AuthSwitchLink(question: "New here?", action: "Create an account", perform: showSignUp)
@@ -256,7 +256,7 @@ struct SignUpView: View {
             Button(action: signUp) {
                 AuthButtonLabel(title: "Create account", isLoading: model.isLoading)
             }
-            .buttonStyle(AuthPrimaryButtonStyle())
+            .buttonStyle(PrimaryButtonStyle())
             .disabled(!model.canSubmit)
 
             AuthSwitchLink(question: "Already have an account?", action: "Log in", perform: showLogin)
@@ -308,7 +308,7 @@ struct ForgotPasswordView: View {
             Button(action: sendResetLink) {
                 AuthButtonLabel(title: "Send link", isLoading: model.isLoading)
             }
-            .buttonStyle(AuthPrimaryButtonStyle())
+            .buttonStyle(PrimaryButtonStyle())
             .disabled(!model.canSubmit)
         }
     }
@@ -364,7 +364,7 @@ struct CheckEmailView: View {
             Button(action: showLogin) {
                 AuthButtonLabel(title: "Go to log in", isLoading: false)
             }
-            .buttonStyle(AuthPrimaryButtonStyle())
+            .buttonStyle(PrimaryButtonStyle())
 
             Button {
                 Task { await model.resend() }
@@ -593,26 +593,6 @@ private struct AuthSwitchLink: View {
                 .fontWeight(.semibold)
         }
         .font(.subheadline)
-    }
-}
-
-/// The filled main button of a screen, dimmed while it can't be used
-private struct AuthPrimaryButtonStyle: ButtonStyle {
-
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(UserSettings.self) private var userSettings
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(userSettings.appColorForeground)
-            // the spinner while loading
-            .tint(userSettings.appColorForeground)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(userSettings.appColor, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.4)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

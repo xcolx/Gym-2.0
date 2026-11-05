@@ -6,132 +6,173 @@
 //
 
 import SwiftUI
+import SwiftData
 
+/// An exercise with its images, muscles, description and what's tracked per set. From the exercise list it can be
+/// added to the picked exercises, again if it's already picked.
 struct ExerciseDetailView: View {
-    
-    
+
     @State var exercise: Exercise
-    
-    @Binding var exerciseList: [Exercise]
-    @Binding var showExercisesView: Bool
-    // false in the performing workout, there the exercise is already part of it
-    var showAddButton: Bool = true
+    /// The exercises picked in the exercise list. Nil in the performing workout, there the exercise is already part of it.
+    var picked: Binding<[Exercise]>? = nil
 
-    @State var deletedExercise: Bool = false
-    
-    @State var showSheet: Bool = false
-    
+    @State private var deletedExercise: Bool = false
+    @State private var showSheet: Bool = false
+
+    @Query(sort: \Muscle.name) private var muscles: [Muscle]
+
     @Environment(\.dismiss) private var dismiss
-    
+    @Environment(UserSettings.self) private var userSettings
+
     var body: some View {
-        VStack{
-            // Same icon as in the exercise list
-            if exercise.verified{
-                Label("Verified Exercise", systemImage: "checkmark.circle")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.blue)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10)
-            }
+        let worked = [exercise].musclesWorked(in: muscles)
+        let pickedCount = picked?.wrappedValue.count { $0 == exercise } ?? 0
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                images
 
-            HStack (alignment: .top){
+                VStack(alignment: .leading, spacing: 4) {
+                    ExerciseNameText(name: exercise.name, verified: exercise.verified)
+                        .font(.title2.bold())
+                    Text([exercise.muscleGroup?.name, exercise.equipment?.name].compactMap { $0 }.joined(separator: " · "))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    if !exercise.aliases.isEmpty {
+                        aliases
+                            .padding(.top, 8)
+                    }
+                }
+                .padding(.horizontal, 4)
 
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .aspectRatio(1, contentMode: .fit)
-                    .overlay(alignment: .topLeading){
-                        ScrollView{
-                            if let description = exercise.exerciseDescription, !description.isEmpty{
-                                Text(description)
-                            } else{
-                                Text("No description was added :(")
+                card("Muscles") {
+                    HStack(alignment: .center, spacing: 16) {
+                        HighlightedBodyView(primaryMuscles: worked.primary, secondaryMuscles: worked.secondary)
+                            .frame(height: 190)
+                        VStack(alignment: .leading, spacing: 12) {
+                            MuscleLegend(color: MuscleLegend.primaryColor, title: "Main", muscles: worked.primary)
+                            if !worked.secondary.isEmpty {
+                                MuscleLegend(color: MuscleLegend.secondaryColor, title: "Also", muscles: worked.secondary)
                             }
                         }
-                        .padding(5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                                
-                Rectangle()
-                    .aspectRatio(1, contentMode: .fit)
-                    .overlay(
-                        ExerciseImagesView(images: imageItems) {
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundStyle(.white)
-                        }
-                    )
-                    .clipped()
-            }
-            .padding(.horizontal, 10)
+                }
 
-            HStack(alignment: .firstTextBaseline){
-                Text("Tracked per Set:")
-                    .font(.headline)
-                Text(exercise.trackedMetrics.map(\.name).joined(separator: ", "))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            
-            HStack{
-                HighlightedBodyView(primaryMuscles: exercise.primaryMuscles, secondaryMuscles: exercise.secondaryMuscles)
-                
-                VStack(alignment: .leading){
-                    Text("Primary Muscles")
-                        .font(.headline)
-                    ScrollView{
-                        VStack(alignment: .leading){
-                            ForEach(exercise.primaryMuscles) {muscle in
-                                Text(muscle.name)
-                            }
+                card("How to") {
+                    if let description = exercise.exerciseDescription, !description.isEmpty {
+                        Text(description)
+                            .font(.subheadline)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text("No description yet.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                card("Tracked per set") {
+                    FlowLayout(spacing: 8) {
+                        ForEach(exercise.trackedMetrics, id: \.self) { metric in
+                            Text(metric.name)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(userSettings.appColor)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(userSettings.appColor.opacity(0.15), in: Capsule())
                         }
                     }
-                    
-                    Text("Secondary Muscles")
-                        .font(.headline)
-                    ScrollView{
-                        VStack(alignment: .leading){
-                            ForEach(exercise.secondaryMuscles) {muscle in
-                                Text(muscle.name)
-                            }
-                        }
-                    }
-                    
-                    
-                    Text("Muscle Group")
-                        .font(.headline)
-                    Text(exercise.muscleGroup?.name ?? "")
-                        .padding(.bottom, 10)
-                    
-                    Text("Equipment")
-                        .font(.headline)
-                    Text(exercise.equipment?.name ?? "")
-                    .padding(.bottom, 20)
-                    
-                    
-                    
                 }
             }
-            .padding(.trailing, 10)
-            
-             
-            .navigationTitle(exercise.name)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) { toolbarButtons }
+            .padding(.horizontal)
+            .padding(.bottom)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle(exercise.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // verified exercises can't be changed
+            if exercise.canEdit {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Edit") { showSheet = true }
+                }
             }
-            .fullScreenCover(isPresented: $showSheet, content: {
-                CreateExerciseView(exercise: exercise, editMode: true, deletedExercise: $deletedExercise)
-            })
+        }
+        .bottomActionBar {
+            if let picked {
+                Button {
+                    picked.wrappedValue.append(exercise)
+                    dismiss()
+                } label: {
+                    Label(pickedCount == 0 ? "Add to workout" : "Add again (\(pickedCount + 1)×)", systemImage: "plus")
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            }
+        }
+        .fullScreenCover(isPresented: $showSheet) {
+            CreateExerciseView(exercise: exercise, editMode: true, deletedExercise: $deletedExercise)
         }
         .onChange(of: deletedExercise) {
             dismiss()
         }
-
     }
-    
-    
-    
-    
-    
+
+    /// The other names of the exercise, which the search finds it by as well
+    private var aliases: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Also known as")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            FlowLayout(spacing: 6) {
+                ForEach(exercise.aliases, id: \.self) { alias in
+                    Text(alias)
+                        .font(.subheadline)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color(.tertiarySystemFill), in: Capsule())
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Also known as \(exercise.aliases.joined(separator: ", "))")
+    }
+
+    private var images: some View {
+        ExerciseImagesView(images: imageItems) {
+            VStack(spacing: 8) {
+                Image(systemName: "photo")
+                    .font(.largeTitle)
+                Text("No images yet")
+                    .font(.subheadline)
+            }
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(.tertiarySystemFill))
+        }
+        .aspectRatio(imageItems.isEmpty ? 2 : 1, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            // the images of verified exercises are generated
+            if exercise.verified && !imageItems.isEmpty {
+                AIImageTag()
+                    .padding(10)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    private func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardBackground()
+    }
+
     // e.g. one per keyframe of the movement, the pending ones after the uploaded ones
     var imageItems: [ExerciseImageItem] {
         ExerciseImageItem.items(
@@ -139,39 +180,40 @@ struct ExerciseDetailView: View {
             pendingImages: exercise.pendingImages.enumerated().map { (id: "pending-\($0.offset)", data: $0.element) }
         )
     }
+}
 
-    var toolbarButtons: some View{
-        HStack {
-            
-            // verified exercises can't be changed
-            if exercise.canEdit {
-                Button(action: {
-                    showSheet.toggle()
-                }, label: {
-                    Image(systemName: "pencil")
-                        .foregroundStyle(Color("MyBlack"))
-                        .font(.title)
-                        .accessibilityLabel("Edit exercise")
-                })
+/// Marks the images of verified exercises as generated by an AI, with the full note in a popover when it's tapped
+private struct AIImageTag: View {
+
+    @State private var showsNote = false
+
+    private static let note = "The form isn't necessarily completely correct. It's only here to give you a general idea of the movement."
+
+    var body: some View {
+        Button {
+            showsNote = true
+        } label: {
+            Label("AI image", systemImage: "sparkles")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.black.opacity(0.55), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("AI-generated image. \(Self.note)")
+        .popover(isPresented: $showsNote, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("AI-generated image", systemImage: "sparkles")
+                    .font(.headline)
+                Text(Self.note)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            
-            if showAddButton {
-                Button(action: {
-                    exerciseList.append(exercise)
-                    showExercisesView.toggle()
-                    dismiss()
-                }, label: {
-                    Image(systemName: "plus.circle")
-                        .font(.title)
-                        .foregroundStyle(Color.green)
-                        .accessibilityLabel("Add to workout")
-                })
-                .padding(.trailing, 10)
-            }
+            .padding()
+            .frame(width: 280, alignment: .leading)
+            .presentationCompactAdaptation(.popover)
         }
     }
-    
-    
-    
-    
 }

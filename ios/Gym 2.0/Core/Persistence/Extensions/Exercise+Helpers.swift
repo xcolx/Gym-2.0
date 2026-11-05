@@ -78,3 +78,14 @@ extension Exercise {
         return ids.compactMap { id in muscles.first { $0.serverId == id } }
     }
 }
+
+extension Array where Element == Exercise {
+
+    /// The muscles these exercises train, as the main ones of at least one exercise and the ones that are only
+    /// secondary. Looked up in the given muscles, which are fetched once by the view.
+    func musclesWorked(in muscles: [Muscle]) -> (primary: [Muscle], secondary: [Muscle]) {
+        let primaryIds = Set(flatMap(\.primaryMuscleIds))
+        let secondaryIds = Set(flatMap(\.secondaryMuscleIds)).subtracting(primaryIds)
+        return (muscles.filter { primaryIds.contains($0.serverId) }, muscles.filter { secondaryIds.contains($0.serverId) })
+    }
+}
