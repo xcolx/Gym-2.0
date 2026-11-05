@@ -570,7 +570,7 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `units.ts` (Units): conversions, `formatWeight`, `formatDistance`, `formatVolume`, `formatNumber`, `unitOrMetric`.
 - `password-policy.ts`: `passwordProblem(password)`.
 - `interesting-facts.ts`: `interestingFacts({ workouts, equipment, muscleGroups, memberSince, weightUnit, distanceUnit, now?, weekStartsOn?, locale? })`, `formatCount`.
-- `format.ts` (DateFormatting.swift): `formatDate` (dd.MM.yy), `timeFromDate` (HH:mm), `startOfWeek`, `firstWeekday`, `roundHalfAwayFromZero`,
+- `format.ts` (DateFormatting.swift): `formatDate` (dd.MM.yy), `formatMonthYear`, `timeFromDate` (HH:mm), `startOfWeek`, `firstWeekday`, `roundHalfAwayFromZero`,
   `appLocale()` (English with the browser's region), `characterCount` (unicode scalars like the server's limits), `prefixCharacters` (grapheme clusters like Swift's `prefix`).
 - `relative-date.ts`: `formatRelativeNamed(date, now?)` (`.relative(presentation: .named)`).
 - `set-input.ts` (NumberInsertView): `parseSetInput`, `formatSetInput`, `displaySetInput`, `setInputChange`, `setInputHeader`, `setLabel`, `toggleSign`, `secondsFromText`.

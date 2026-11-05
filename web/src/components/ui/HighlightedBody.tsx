@@ -103,7 +103,7 @@ async function loadMask(muscle: Muscle): Promise<string | null> {
 }
 
 /** The colored part of the image of a muscle, invisible while it loads (MuscleHighlightView) */
-function MuscleHighlight({ muscle, color }: { muscle: Muscle; color: string }) {
+function MuscleHighlight({ muscle, color, className = "" }: { muscle: Muscle; color: string; className?: string }) {
   const key = cacheKey(muscle);
   const [loaded, setLoaded] = useState<{ key: string; mask: string | null } | null>(null);
 
@@ -125,7 +125,7 @@ function MuscleHighlight({ muscle, color }: { muscle: Muscle; color: string }) {
   const image = `url("${mask}")`;
   return (
     <div
-      className="pointer-events-none absolute inset-0"
+      className={`pointer-events-none absolute inset-0 ${className}`}
       style={{
         backgroundColor: color,
         maskImage: image,
@@ -144,21 +144,36 @@ function MuscleHighlight({ muscle, color }: { muscle: Muscle; color: string }) {
 export function HighlightedBody({
   primaryMuscles,
   secondaryMuscles,
+  focusedMuscle,
   className = "",
 }: {
   primaryMuscles: Muscle[];
   secondaryMuscles: Muscle[];
+  /** Shown alone instead of the other muscles, slowly pulsing in this color, e.g. to show where a muscle is */
+  focusedMuscle?: { muscle: Muscle; color: string } | null;
   className?: string;
 }) {
   const layer = "pointer-events-none absolute inset-0 h-full w-full object-contain";
   return (
     <div className={`relative aspect-[1051/1261] ${className}`}>
-      {secondaryMuscles.map((muscle) => (
-        <MuscleHighlight key={`s-${muscle.serverId}`} muscle={muscle} color="var(--secondary-muscle)" />
-      ))}
-      {primaryMuscles.map((muscle) => (
-        <MuscleHighlight key={`p-${muscle.serverId}`} muscle={muscle} color="#ff0000" />
-      ))}
+      {focusedMuscle ? (
+        <MuscleHighlight
+          // starts pulsing again from fully visible for another muscle
+          key={`f-${focusedMuscle.muscle.serverId}`}
+          muscle={focusedMuscle.muscle}
+          color={focusedMuscle.color}
+          className="animate-[muscle-pulse_1.1s_ease-in-out_infinite_alternate] motion-reduce:animate-none"
+        />
+      ) : (
+        <>
+          {secondaryMuscles.map((muscle) => (
+            <MuscleHighlight key={`s-${muscle.serverId}`} muscle={muscle} color="var(--secondary-muscle)" />
+          ))}
+          {primaryMuscles.map((muscle) => (
+            <MuscleHighlight key={`p-${muscle.serverId}`} muscle={muscle} color="#ff0000" />
+          ))}
+        </>
+      )}
       {/* eslint-disable @next/next/no-img-element */}
       <img
         src={`${BODY_SRC}/highlighted_body_black.png`}

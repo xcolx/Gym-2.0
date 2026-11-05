@@ -109,10 +109,22 @@
   --text-headline--line-height: 22px;
   --text-body: 17px;
   --text-body--line-height: 22px;
+  --text-subheadline: 15px;
+  --text-subheadline--line-height: 20px;
   --text-footnote: 13px;
   --text-footnote--line-height: 18px;
+  --text-caption1: 12px;
+  --text-caption1--line-height: 16px;
   --text-caption: 10px;
   --text-caption--line-height: 12px;
+  --font-rounded: ui-rounded, "SF Pro Rounded", var(--font-sans);
+}
+
+/* `.cardBackground()` (CardBackground.swift): the rounded card on the grouped background, e.g. of Home and the stats */
+@utility card {
+  border-radius: 20px;
+  background: var(--cell-bg);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
 }
 
 html {
@@ -196,6 +208,16 @@ input[type="range"].ios-slider::-moz-range-thumb {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.12), 0 6px 13px rgba(0, 0, 0, 0.12);
+}
+
+/* The focused muscle of HighlightedBody, slowly pulsing (the phaseAnimator of HighlightedBodyView.swift) */
+@keyframes muscle-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.25;
+  }
 }
 
 /* The landing page (components/landing): the cards floating around the start button and the pulse of the button */

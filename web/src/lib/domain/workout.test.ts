@@ -140,7 +140,7 @@ describe("home", () => {
   it("calculates the progress of the week", () => {
     expect(progressPercentage([[muscles[0], muscles[1]], [muscles[2]]], muscles)).toBe(58);
     expect(progressPercentage([[], []], [])).toBe(0);
-    expect(notTrainedMuscles([[muscles[0]], []], muscles).map((m) => m.name)).toEqual(["Triceps", "Front Deltoid", "Quads"]);
+    expect(notTrainedMuscles([[muscles[0]], []], muscles).muscles.map((m) => m.name)).toEqual(["Triceps", "Front Deltoid", "Quads"]);
   });
 });
 
