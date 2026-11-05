@@ -543,9 +543,10 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - Every modal overlay (Sheet, FullScreenCover, Alert, ActionSheet, PhotoViewer) puts `ref={modalRef}` on its root:
   while it is open the rest of the body is `inert` (not focusable or clickable, hidden from screen readers), the focus
   moves into it and returns when it closes.
-- `ui/overlay.tsx`: `Sheet({ open, onClose, label?, title?, leading?, trailing?, grouped? })` (`.sheet`: with a title or
-  toolbar items it has the inline navigation bar and the children scroll, without them the children bring their own
-  layout, e.g. ExercisesSheet), `SheetButton` (toolbar button, `bold` for the confirmation), `FullScreenCover`,
+- `ui/overlay.tsx`: `Sheet({ open, onClose, label?, title?, leading?, trailing?, grouped?, overCover? })` (`.sheet`: with
+  a title or toolbar items it has the inline navigation bar and the children scroll, without them the children bring
+  their own layout, e.g. ExercisesSheet; `overCover` for a sheet opened by a full screen cover, e.g. the muscle picker
+  of CreateExercise), `SheetButton` (toolbar button, `bold` for the confirmation), `FullScreenCover` (`grouped`),
   `useBackToClose(open, onClose)` (the back button of Android closes the topmost sheet: a history entry per open
   overlay), `afterOverlayClose(action)` (navigate only after a closing overlay removed its history entry), `useEscape`,
   `useBodyScrollLock`, `Portal`, `useIsClient`.
