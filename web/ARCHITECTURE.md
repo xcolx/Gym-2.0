@@ -53,7 +53,8 @@ web/
       chat/                 ChatsView, [chatId] (ChatView), [chatId]/info, friends, groups, ai (Gym-AI)
       workout/              WorkoutView entry, free, schemes/{add,[schemeId],[schemeId]/edit}, suggested, active/[workoutId]
       stats/                StatsView, distribution, exercises, facts, past-workouts/[workoutId]/edit
-      settings/             SettingsView, account/{username,email,password}, blocked-users, sync-problems
+      settings/             SettingsView, account (AccountView) and account/{username,email,password}, blocked-users,
+                            sync (SyncView) and sync/problems
     components/
       ui/                   the shared SwiftUI building blocks, see "Shared UI components", and the components every
                             tab uses: HighlightedBody, PhotoViewer, ServerImage, ProfileIcon, LegalPage
@@ -501,7 +502,7 @@ running, stopping, lock).
 - **State** (`state.ts`): `useSyncState()` → `{ state: "idle" | "syncing" | "failed", failureMessage, lastSyncDate,
   rejectedChanges, rejectedCreates, blockedWorkouts }`, `useSyncProblems()` (a failed sync on top, then the rejected
   creates and blocked workouts).
-- **For features** (`engine.ts`): `sync()` (also "Sync Again"), `resync()` ("Manual Resync": push, then load everything),
+- **For features** (`engine.ts`): `sync()` (also "Sync again"), `resync()` ("Resync everything": push, then load everything),
   `syncChats()`, `sendChatMessage(chatId)` (queues the input and sends it right away, resolves with the chat
   afterwards), `sendChatPhoto(chatId, upload, caption)` (throws, photos aren't kept offline), `markChatRead(chatId)`
   (one request per chat and message at a time, failures ignored), `storeChatAndMembers(dto)`.
@@ -563,7 +564,8 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `PhotoViewer` / `OpensPhotoViewer`, `ServerImage`, `ProfileIcon` / `ProfileCircle`.
 - Forms and lists: `ui/Form.tsx` (`FormPage`, `FormStack` for the sections in a `grouped` sheet, `FormSection`,
   `FormRow` (content `className`, row `rowClassName` and props such as `onContextMenu`), `PressableRow` (a row that is
-  a button with any content), `LinkRow`, `ButtonRow` (tinted or `destructive`, an icon may come first), `InputRow`),
+  a button with any content), `LinkRow`, `ButtonRow` (tinted or `destructive`, an icon may come first), `InputRow`,
+  `SettingsLabel` (SettingsLabel.swift: a title with its icon in the app color, e.g. the `label` of a `LinkRow`)),
   inset separators like iOS. Used by the settings, auth and chat screens. components/chat/chat-controls.tsx only keeps what
   the chat alone uses: `ContentUnavailable`, `Menu` and the button styles.
 
@@ -656,7 +658,7 @@ backend, also offline. What is still different from iOS or left to do:
 | Features/Chat/* | app/chat/**, components/chat/, lib/chat/actions.ts, lib/domain/chat-feature.ts, ai-chat.ts |
 | Features/Workout/* | app/workout/**, components/workout/ |
 | Features/Stats/* | app/stats/**, components/stats/, lib/domain/stats-screens.ts, workout-file.ts, legacy-workout-import.ts, lib/repo/stats-feature.ts |
-| Features/Settings/SyncProblemsView.swift, SettingsView (ResyncSection) | app/settings/sync-problems/page.tsx, components/settings/SettingsSections.tsx |
+| Features/Settings/SyncProblemsView.swift, SettingsView (SyncView) | app/settings/sync/problems/page.tsx, app/settings/sync/page.tsx |
 | DesignSystem/Components/* | components/ui/ (HighlightedBody, PhotoViewer, ServerImage, ProfileIcon, AppColorSegmentedPicker) |
 | @Query | lib/repo/hooks.ts |
 
@@ -676,7 +678,7 @@ muscles, equipment or exercises; add them in the admin (http://admin.localhost:5
 
 End-to-end checklist (production build, mobile viewport, own host like http://smoke.localhost:3106 for own cookies):
 login → home → create exercise → create scheme → start it → enter sets → end → stats and past workout → export and
-import → settings (units, appearance, app color, Manual Resync) → chat with a second user (send, receive the polled
+import → settings (units, appearance, app color, Resync everything) → chat with a second user (send, receive the polled
 reply, a rejected message shows "Not saved") → sync problems → logout and login (the server's data comes back) →
 offline: with the service worker installed stop the server and navigate and log a workout from the precache, or run
 the server with an unreachable `BACKEND_URL` (502, "Sync failed" in the sync problems), then start it with the real

@@ -3,7 +3,7 @@
 // SwiftUI `Form` / `List` in the inset grouped style
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, type LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 import { PageHeader } from "@/components/ui/Page";
@@ -55,8 +55,8 @@ export function FormSection({
 }) {
   return (
     <section>
-      {header && <h2 className="px-4 pb-1.5 text-footnote uppercase text-secondary-label">{header}</h2>}
-      <div className={plain ? "" : "overflow-hidden rounded-[10px] bg-cell"}>{children}</div>
+      {header && <h2 className="px-4 pb-1.5 text-footnote font-semibold text-secondary-label">{header}</h2>}
+      <div className={plain ? "" : "overflow-hidden rounded-[20px] bg-cell"}>{children}</div>
       {footer && <div className="px-4 pt-1.5 text-footnote text-secondary-label">{footer}</div>}
     </section>
   );
@@ -85,9 +85,23 @@ export function FormRow({
 /** A row that is a button with any content, e.g. a friend to select. `className` styles the content. */
 export function PressableRow({ children, className = "", ...props }: ComponentProps<"button">) {
   return (
-    <button type="button" {...props} className={`${rowOuter} active:bg-field/40 disabled:active:bg-transparent`}>
+    <button
+      type="button"
+      {...props}
+      className={`${rowOuter} enabled:hover:bg-field/15 active:bg-field/40 disabled:active:bg-transparent`}
+    >
       <div className={`${rowInner} ${props.disabled ? "opacity-40" : ""} ${className}`}>{children}</div>
     </button>
+  );
+}
+
+/** Port of SettingsLabel.swift: the title of a row with its icon in the app color */
+export function SettingsLabel({ icon: Icon, title }: { icon: LucideIcon; title: ReactNode }) {
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <Icon size={20} className="w-6 shrink-0 text-app" aria-hidden />
+      <span className="min-w-0 truncate">{title}</span>
+    </span>
   );
 }
 
@@ -108,7 +122,7 @@ export function LinkRow({ href, label, value, className = "" }: { href: string; 
       href={href}
       // The name of the row for screen readers, like the label and value VoiceOver reads
       aria-label={typeof label === "string" ? (typeof value === "string" && value !== "" ? `${label}, ${value}` : label) : undefined}
-      className={`${rowOuter} active:bg-field/40`}
+      className={`${rowOuter} hover:bg-field/15 active:bg-field/40`}
     >
       <div className={`${rowInner} ${className}`}>
         <span className="flex-1">{label}</span>
@@ -150,7 +164,7 @@ export function ButtonRow({
 /** `TextField` / `SecureField` in a form row */
 export function InputRow({ className = "", ...props }: ComponentProps<"input">) {
   return (
-    <FormRow className="py-0" rowClassName="focus-ring-within rounded-[10px]">
+    <FormRow className="py-0" rowClassName="focus-ring-within rounded-[20px]">
       <input
         {...props}
         className={`h-11 w-full min-w-0 bg-transparent outline-none placeholder:text-[var(--placeholder)] ${className}`}

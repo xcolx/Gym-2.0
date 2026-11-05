@@ -44,7 +44,7 @@ export function AddFriendSection({
 }) {
   return (
     <FormSection header="Add Friend" footer="Usernames are case-sensitive.">
-      <FormRow rowClassName="focus-ring-within rounded-[10px]">
+      <FormRow rowClassName="focus-ring-within rounded-[20px]">
         <form
           className="flex min-w-0 flex-1 items-center gap-3"
           autoComplete="off"

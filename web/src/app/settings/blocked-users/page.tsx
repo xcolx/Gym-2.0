@@ -41,7 +41,7 @@ export default function BlockedUsersPage() {
   };
 
   return (
-    <FormPage title="Blocked Users" inline back={SETTINGS_BACK}>
+    <FormPage title="Blocked users" inline back={SETTINGS_BACK}>
       {blockedUsers && blockedUsers.length > 0 && (
         <FormSection>
           {blockedUsers.map((user) => (
@@ -55,7 +55,7 @@ export default function BlockedUsersPage() {
                   <button
                     type="button"
                     onClick={() => void run(user.serverId, () => unblockUser(user.serverId))}
-                    className="rounded-full bg-app/15 px-3 py-1 text-[15px] text-app active:opacity-60"
+                    className="rounded-full bg-app/15 px-3 py-1 text-subheadline font-medium text-app hover:bg-app/25 active:opacity-60"
                   >
                     Unblock
                   </button>
@@ -77,7 +77,8 @@ export default function BlockedUsersPage() {
       {blockedUsers?.length === 0 && (
         <div className="flex flex-col items-center gap-3 pt-[22dvh] text-center">
           <UserRoundCheck size={56} strokeWidth={1.5} className="text-secondary-label" aria-hidden />
-          <p className="text-title2 font-bold">No Blocked Users</p>
+          <p className="text-title2 font-bold">No blocked users</p>
+          <p className="text-secondary-label">People you block show up here.</p>
         </div>
       )}
 

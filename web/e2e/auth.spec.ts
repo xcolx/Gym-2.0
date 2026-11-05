@@ -48,8 +48,8 @@ test("logs out", async ({ page, request }) => {
   await logIn(page, await createUser(request));
 
   await page.goto("/settings");
-  await page.getByRole("button", { name: "Log Out" }).click();
-  await page.getByRole("dialog", { name: "Log out?" }).getByRole("button", { name: "Log Out" }).click();
+  await page.getByRole("button", { name: "Log out" }).click();
+  await page.getByRole("dialog", { name: "Log out?" }).getByRole("button", { name: "Log out" }).click();
   await expect(page).not.toHaveURL(/\/settings$/);
 
   // The pages of the app lead to the login again

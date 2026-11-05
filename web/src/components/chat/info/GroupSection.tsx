@@ -15,7 +15,7 @@ export function GroupSection({ chat, isAdmin, onError }: { chat: ChatWithMembers
 
   return (
     <FormSection footer={groupFooter(chat.isPublic)}>
-      <FormRow className="gap-4" rowClassName="focus-ring-within rounded-[10px]">
+      <FormRow className="gap-4" rowClassName="focus-ring-within rounded-[20px]">
         <GroupImagePicker
           previewUrl={null}
           hash={chat.imageUrl}

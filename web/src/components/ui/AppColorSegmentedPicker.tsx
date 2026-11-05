@@ -2,14 +2,14 @@
 
 /**
  * Port of AppColorSegmentedPicker.swift: a segmented picker with the selected segment in the app color and the text
- * on it black or white, whichever reads better (`appColorForeground`, passed as `selectedForeground`).
+ * on it black or white, whichever reads better (`--app-color-foreground`, or `selectedForeground` for another color).
  */
-export function AppColorSegmentedPicker<Option extends string>({
+export function AppColorSegmentedPicker<Option extends string | number>({
   options,
   selection,
   onChange,
-  title = (option) => option,
-  selectedForeground,
+  title = (option) => String(option),
+  selectedForeground = "var(--app-color-foreground)",
   label,
   className = "",
 }: {
@@ -17,7 +17,8 @@ export function AppColorSegmentedPicker<Option extends string>({
   selection: Option;
   onChange: (option: Option) => void;
   title?: (option: Option) => string;
-  selectedForeground: string;
+  /** The app color's foreground by default */
+  selectedForeground?: string;
   /** For screen readers */
   label: string;
   className?: string;

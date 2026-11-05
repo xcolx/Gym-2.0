@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { FormPage, FormSection, InputRow } from "@/components/ui/Form";
-import { SaveButton, SETTINGS_BACK } from "@/components/settings/SaveButton";
+import { ACCOUNT_BACK, SaveButton } from "@/components/settings/SaveButton";
 import { Alert } from "@/components/ui/Alert";
 import { errorMessage, userApi } from "@/lib/api";
 import { newPasswordProblem } from "@/lib/auth/validation";
+import { goBack } from "@/lib/navigation";
 import { useCurrentUser } from "@/lib/repo/hooks";
 
 /** Port of ChangePasswordView (AccountSettingsView.swift) */
@@ -43,7 +44,7 @@ export default function ChangePasswordPage() {
 
   const message = problem ?? error;
   return (
-    <FormPage title="Password" inline back={SETTINGS_BACK}>
+    <FormPage title="Password" inline back={ACCOUNT_BACK}>
       <form onSubmit={save} className="contents">
         {/* For password managers: the account the password belongs to */}
         <input type="text" name="username" autoComplete="username" className="hidden" readOnly value={user?.email ?? ""} />
@@ -90,7 +91,7 @@ export default function ChangePasswordPage() {
         open={showsSuccess}
         title="Password changed"
         onClose={() => setShowsSuccess(false)}
-        buttons={[{ label: "OK", isDefault: true, onSelect: () => router.push(SETTINGS_BACK.href) }]}
+        buttons={[{ label: "OK", isDefault: true, onSelect: () => goBack(router, ACCOUNT_BACK.href) }]}
       />
     </FormPage>
   );
