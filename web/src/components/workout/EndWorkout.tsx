@@ -35,7 +35,7 @@ export function EndWorkout({ workoutId, onEnd }: { workoutId: LocalId; onEnd: ()
       <ExercisesSheet
         open={showsExercises}
         onClose={() => setShowsExercises(false)}
-        onAdd={(exercise) => void addExercisesToWorkout(workoutId, [exercise.id])}
+        onAdd={(exercises) => void addExercisesToWorkout(workoutId, exercises.map((exercise) => exercise.id))}
       />
     </div>
   );

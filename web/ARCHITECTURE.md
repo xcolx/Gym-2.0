@@ -51,7 +51,8 @@ web/
       auth/page.tsx         AuthView (components/auth)
       home/                 HomeView
       chat/                 ChatsView, [chatId] (ChatView), [chatId]/info, friends, groups, ai (Gym-AI)
-      workout/              WorkoutView entry, free, schemes/{add,[schemeId],[schemeId]/edit}, suggested, active/[workoutId]
+      workout/              WorkoutView entry, free, schemes/{add,[schemeId],[schemeId]/edit}, suggested/settings,
+                            suggested (?exercises=&minutes=&equipment=, see suggest-workout.ts), active/[workoutId]
       stats/                StatsView, distribution, exercises/[exerciseId], past-workouts/[workoutId]/edit
       settings/             SettingsView, account (AccountView) and account/{username,email,password}, blocked-users,
                             sync (SyncView) and sync/problems
@@ -573,7 +574,9 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `ui/Menu.tsx`: `Menu` (the "…" and sort menus of the toolbars, items with an icon, `destructive`, `disabled` or
   `checked`); `ui/ContentUnavailable.tsx` (ContentUnavailableView); `ui/ExerciseName.tsx` (ExerciseNameText.swift: the
   name with the verified badge in the app color); `BottomActionBar` of `ui/PrimaryButton.tsx` (`.bottomActionBar`);
-  `ui/SearchField.tsx` (`.searchable`, e.g. of the exercise stats, the chats and the public groups).
+  `ui/SearchField.tsx` (`.searchable`, e.g. of the exercise stats, the chats and the public groups);
+  `ui/MuscleLegend.tsx` (MuscleLegend.swift, the colors of the body); `ui/ReorderableList.tsx` (a List with `.onMove`
+  and `.onDelete`: drag the handle, swipe to the left), e.g. the exercises of EditWorkout.
   components/chat/chat-controls.tsx only keeps what the chat alone uses: the plain button style and the red text.
 - The message composer of the chats and the Gym-AI (MessageComposer.swift) is `MessageField` of
   components/chat/messages.tsx: the rounded field with the round `SendButton` inside. Enter sends with a keyboard.
@@ -603,6 +606,9 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `set-metric.ts` (SetMetric): names, input ranges, server ranges.
 - `chat.ts` (Chat+Helpers): `chatTitle`, `isChatHidden`, `sendingBlockedReason`, `otherMemberId`, `chatLastActivity`, `sortMessages`.
 - `home.ts` (HomeView helpers): `timeWorkedOutShort`, `progressPercentage`, `notTrainedMuscles`. `suggest.ts`: `suggestExercises`.
+- `workout-setup.ts` (the workout setup and the exercise picker): `musclesWorked` ([Exercise].musclesWorked),
+  `schemeDetails`, `exerciseDetailsText` ("Chest · Barbell"), `pickedPositions`, `withoutLastPick`, `moved`,
+  `formatWorkoutMinutes`, `isAlwaysAvailable`.
 
 ## Conventions for feature agents
 

@@ -10,10 +10,10 @@ interface ServerWorkouts {
 async function startBenchPress(page: Page, name: string) {
   await page.goto("/workout/free");
   await page.getByLabel("Name of the workout").fill(name);
-  await page.getByRole("button", { name: "Add exercise" }).click();
-  await page.getByRole("button", { name: "Bench Press, verified" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Add exercise" }).click();
-  await page.getByRole("button", { name: "Start Workout" }).click();
+  await page.getByRole("button", { name: "Add exercises" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add Bench Press, verified" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add 1 exercise" }).click();
+  await page.getByRole("button", { name: "Start workout" }).click();
   await expect(page).toHaveURL(/\/workout\/active\//);
 }
 

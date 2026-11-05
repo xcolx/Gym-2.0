@@ -51,19 +51,19 @@ export function PageHeader({
               }}
             >
               <ChevronLeft size={30} strokeWidth={2.25} className="-mr-0.5 shrink-0" aria-hidden />
-              <span className={`truncate ${inline ? "max-w-[90px]" : ""}`}>{back.label}</span>
+              <span className={`truncate ${inline ? "max-w-[72px]" : ""}`}>{back.label}</span>
             </Link>
           )}
           {leading && <div className={`flex items-center gap-4 ${back ? "" : "pl-1"}`}>{leading}</div>}
         </div>
         {inline && principal && (
-          <div className="absolute inset-x-[110px] flex justify-center">
+          <div className="absolute inset-x-[104px] flex justify-center">
             <h1 className="sr-only">{title}</h1>
             {principal}
           </div>
         )}
         {inline && !principal && (
-          <h1 className="pointer-events-none absolute inset-x-[110px] truncate text-center text-headline font-semibold">
+          <h1 className="pointer-events-none absolute inset-x-[104px] truncate text-center text-headline font-semibold">
             {title}
           </h1>
         )}

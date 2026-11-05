@@ -87,7 +87,7 @@ function EditExercises({ workout, edits }: { workout: WorkoutWithExercises; edit
         />
       </div>
 
-      <ExercisesSheet open={showExercises} onClose={() => setShowExercises(false)} onAdd={edits.add} />
+      <ExercisesSheet open={showExercises} onClose={() => setShowExercises(false)} onAdd={(exercises) => exercises.forEach(edits.add)} />
     </div>
   );
 }

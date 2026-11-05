@@ -42,6 +42,7 @@ function EditPerformingWorkoutContent({ workout, onClose }: { workout: WorkoutWi
             void renameWorkout(workout.id, name);
           }}
           onBlur={title.end}
+          className="h-auto rounded-[10px] bg-field px-2.5 py-2.5"
         />
         <button
           type="button"
@@ -66,7 +67,7 @@ function EditPerformingWorkoutContent({ workout, onClose }: { workout: WorkoutWi
       <ExercisesSheet
         open={showsExercises}
         onClose={() => setShowsExercises(false)}
-        onAdd={(exercise) => void addExercisesToWorkout(workout.id, [exercise.id])}
+        onAdd={(exercises) => void addExercisesToWorkout(workout.id, exercises.map((exercise) => exercise.id))}
       />
     </>
   );

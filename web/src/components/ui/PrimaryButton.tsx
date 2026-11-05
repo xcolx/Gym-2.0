@@ -45,11 +45,18 @@ export function SecondaryButton({ className = "", ...props }: ComponentProps<"bu
 
 /**
  * `.bottomActionBar` of PrimaryButtonStyle.swift: the main buttons of a screen, fixed at its bottom above the content
- * (and above the tab bar on phones)
+ * (and above the tab bar on phones). `inSheet`: the last part of a sheet whose content scrolls above it.
  */
-export function BottomActionBar({ children }: { children: ReactNode }) {
+export function BottomActionBar({ children, inSheet = false }: { children: ReactNode; inSheet?: boolean }) {
   return (
-    <div className="sticky bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-10 mt-auto border-t border-separator/60 bg-bar px-4 py-2 backdrop-blur-xl md:bottom-0">
+    <div
+      className={`z-10 mt-auto shrink-0 border-t border-separator/60 bg-bar px-4 pt-2 backdrop-blur-xl ${
+        // in a sheet: below its scrolling content, above the home indicator
+        inSheet
+          ? "pb-[calc(8px+env(safe-area-inset-bottom))]"
+          : "sticky bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] pb-2 md:bottom-0"
+      }`}
+    >
       <div className="flex gap-3">{children}</div>
     </div>
   );

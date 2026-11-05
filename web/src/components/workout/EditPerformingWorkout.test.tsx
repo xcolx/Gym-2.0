@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -86,11 +86,10 @@ describe("EditPerformingWorkout", () => {
 
     await user.click(await screen.findByRole("button", { name: "Add exercise" }));
     await user.type(screen.getByPlaceholderText("Search"), "squ");
-    expect(screen.queryByRole("button", { name: "Bench Press" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Squat" }));
-    // The plus in the header of the exercise, next to the back button
-    const header = (await screen.findByRole("button", { name: "Exercises" })).closest("header")!;
-    await user.click(within(header).getByRole("button", { name: "Add exercise" }));
+    expect(screen.queryByRole("button", { name: "Add Bench Press" })).toBeNull();
+    // picked in the list, added with the button at the bottom
+    await user.click(screen.getByRole("button", { name: "Add Squat" }));
+    await user.click(screen.getByRole("button", { name: "Add 1 exercise" }));
 
     await waitFor(async () => expect(await exerciseNames(workout.id)).toEqual(["Bench Press", "Squat"]));
   });
