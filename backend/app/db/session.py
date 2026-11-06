@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, make_url
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm import Session, sessionmaker
@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import settings
 from app.core.errors import DatabaseError, DatabaseTimeoutError
 
+# SQLAlchemy 2.1 uses psycopg 3 for postgresql:// URLs, which returns other types (e.g. INET as ipaddress objects)
 engine = create_engine(
-    settings.DATABASE_URL,
+    make_url(settings.DATABASE_URL).set(drivername="postgresql+psycopg2"),
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

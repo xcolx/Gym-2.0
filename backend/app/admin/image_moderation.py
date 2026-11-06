@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
 from math import ceil
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 from anyio import to_thread
 from sqladmin import BaseView, expose
@@ -57,8 +57,9 @@ def _message_page(session: Session, offset: int, limit: int) -> list[Tile]:
         .order_by(Message.created_at.desc(), Message.id.desc())
         .offset(offset).limit(limit)
     )
+    # The query skips rows without an image, which mypy can't see
     return [
-        Tile(image_hash, created_at, "message", pk, f"Message {pk} by {user_name or 'deleted user'}", deleted_at is not None)
+        Tile(cast(str, image_hash), created_at, "message", pk, f"Message {pk} by {user_name or 'deleted user'}", deleted_at is not None)
         for pk, image_hash, created_at, deleted_at, user_name in rows
     ]
 
@@ -72,8 +73,9 @@ def _chat_page(session: Session, offset: int, limit: int) -> list[Tile]:
         .order_by(date.desc(), Chat.id.desc())
         .offset(offset).limit(limit)
     )
+    # The query skips rows without an image, which mypy can't see
     return [
-        Tile(image_hash, image_date, "chat", pk, f"{name or 'Chat'} ({pk})", deleted_at is not None)
+        Tile(cast(str, image_hash), image_date, "chat", pk, f"{name or 'Chat'} ({pk})", deleted_at is not None)
         for pk, image_hash, image_date, deleted_at, name in rows
     ]
 
