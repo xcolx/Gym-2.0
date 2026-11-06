@@ -108,7 +108,13 @@ function checkSmtp() {
     return smtpCheck;
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// The domain labels exclude the dot, so the regex can match only one way and runs in linear time. 254 characters is
+// the longest address SMTP allows.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
+function isValidEmail(email) {
+    return email.length <= 254 && EMAIL_REGEX.test(email);
+}
 
 function escapeHtml(value) {
     const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -221,7 +227,7 @@ function validateEmailRequest({ email, user_id, token, expires_in_minutes }) {
         || !Number.isInteger(user_id) || !Number.isInteger(expires_in_minutes) || expires_in_minutes < 1) {
         return 'email, user_id, token and expires_in_minutes (a positive integer) are required';
     }
-    if (!EMAIL_REGEX.test(email)) {
+    if (!isValidEmail(email)) {
         return 'Invalid email address';
     }
     return null;
@@ -294,7 +300,7 @@ app.post('/api/send-already-registered', async (req, res) => {
     if (typeof email !== 'string' || !Number.isInteger(user_id)) {
         return rejectRequest(req, res, 'email and user_id are required');
     }
-    if (!EMAIL_REGEX.test(email)) {
+    if (!isValidEmail(email)) {
         return rejectRequest(req, res, 'Invalid email address');
     }
 
