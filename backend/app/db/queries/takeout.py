@@ -29,12 +29,12 @@ def get_sessions(db: Session, user_id: int) -> list[UserSession]:
 
 def get_friends(db: Session, user_id: int) -> list[tuple[Friend, User]]:
     other_id = (Friend.user_id_1 + Friend.user_id_2) - user_id
-    return [tuple(row) for row in db.execute(
+    return list(db.execute(
         select(Friend, User)
         .join(User, User.id == other_id)
         .where(or_(Friend.user_id_1 == user_id, Friend.user_id_2 == user_id))
         .order_by(Friend.since)
-    ).all()]
+    ).all())
 
 
 def get_friend_requests(db: Session, user_id: int) -> list[FriendRequest]:
@@ -85,17 +85,17 @@ def get_workout_schemes(db: Session, user_id: int) -> list[WorkoutScheme]:
 
 
 def get_chat_memberships(db: Session, user_id: int) -> list[tuple[ChatUser, Chat]]:
-    return [tuple(row) for row in db.execute(
+    return list(db.execute(
         select(ChatUser, Chat).join(Chat, Chat.id == ChatUser.chat_id).where(ChatUser.user_id == user_id).order_by(Chat.id)
-    ).all()]
+    ).all())
 
 
 def get_chat_members(db: Session, chat_ids: list[int]) -> list[tuple[ChatUser, User]]:
     if not chat_ids:
         return []
-    return [tuple(row) for row in db.execute(
+    return list(db.execute(
         select(ChatUser, User).join(User, User.id == ChatUser.user_id).where(ChatUser.chat_id.in_(chat_ids))
-    ).all()]
+    ).all())
 
 
 def get_sent_messages(db: Session, user_id: int) -> list[Message]:
