@@ -17,7 +17,6 @@
 
 /*
  * Design tokens mirroring the iOS app (Assets.xcassets + UIKit system colors).
- * "my-black" / "my-white" invert in dark mode exactly like the MyBlack / MyWhite color sets.
  */
 :root {
   color-scheme: light dark;
@@ -25,15 +24,11 @@
   --app-color-foreground: #ffffff; /* black or white on the app color, set with it (lib/app-color.ts) */
   --background: #ffffff;
   --foreground: #000000;
-  --my-black: #000000;
-  --my-white: #ffffff;
-  --my-gray: #666666;
   --secondary-label: rgba(60, 60, 67, 0.6);
   --field: rgba(128, 128, 128, 0.3);
   --separator: rgba(60, 60, 67, 0.29);
   --bar-bg: rgba(249, 249, 249, 0.94);
   --tab-inactive: #999999;
-  --banner: #34c759;
   --secondary-muscle: #ff9500;
   /* systemGroupedBackground behind the sections of a Form, secondarySystemGroupedBackground of its cells */
   --grouped-bg: #f2f2f7;
@@ -51,14 +46,10 @@
   :root:not([data-theme="light"]) {
     --background: #000000;
     --foreground: #ffffff;
-    --my-black: #ffffff;
-    --my-white: #000000;
-    --my-gray: #999999;
     --secondary-label: rgba(235, 235, 245, 0.6);
     --separator: rgba(84, 84, 88, 0.6);
     --bar-bg: rgba(22, 22, 22, 0.94);
     --tab-inactive: #8e8e93;
-    --banner: #30d158;
     --secondary-muscle: #ff9f0a;
     --grouped-bg: #000000;
     --cell-bg: #1c1c1e;
@@ -68,14 +59,10 @@
   color-scheme: dark;
   --background: #000000;
   --foreground: #ffffff;
-  --my-black: #ffffff;
-  --my-white: #000000;
-  --my-gray: #999999;
   --secondary-label: rgba(235, 235, 245, 0.6);
   --separator: rgba(84, 84, 88, 0.6);
   --bar-bg: rgba(22, 22, 22, 0.94);
   --tab-inactive: #8e8e93;
-  --banner: #30d158;
   --secondary-muscle: #ff9f0a;
   --grouped-bg: #000000;
   --cell-bg: #1c1c1e;
@@ -86,15 +73,11 @@
   --color-foreground: var(--foreground);
   --color-app: var(--app-color);
   --color-app-foreground: var(--app-color-foreground);
-  --color-my-black: var(--my-black);
-  --color-my-white: var(--my-white);
-  --color-my-gray: var(--my-gray);
   --color-secondary-label: var(--secondary-label);
   --color-field: var(--field);
   --color-separator: var(--separator);
   --color-bar: var(--bar-bg);
   --color-tab-inactive: var(--tab-inactive);
-  --color-banner: var(--banner);
   --color-grouped: var(--grouped-bg);
   --color-cell: var(--cell-bg);
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue",

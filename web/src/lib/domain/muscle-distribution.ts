@@ -32,24 +32,6 @@ export function distributionRows(
     .sort((a, b) => b.value - a.value || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
-/**
- * The bar of every muscle (sorted by name) or muscle group in percent of the highest value, in the order of
- * `muscles` / `muscleGroups`. All 0 if nothing was trained.
- */
-export function distributionPercentages(
-  workouts: readonly WorkoutWithExercises[],
-  muscles: readonly Muscle[],
-  muscleGroups: readonly MuscleGroup[],
-  value: ValueCriteria,
-  category: CategoryCriteria,
-): number[] {
-  const values =
-    category === "Muscle" ? muscleValues(workouts, muscles, value) : muscleGroupValues(workouts, muscleGroups, value);
-  const highest = Math.max(0, ...values);
-  if (!(highest > 0)) return values;
-  return values.map((count) => count / (highest / 100));
-}
-
 function muscleValues(
   workouts: readonly WorkoutWithExercises[],
   muscles: readonly Muscle[],

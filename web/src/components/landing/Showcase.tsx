@@ -1,10 +1,20 @@
 import type { ReactNode } from "react";
-import { Activity, ChartColumn, Dumbbell, ListChecks, MessageCircle, Smartphone, Users, type LucideIcon } from "lucide-react";
+import { Activity, ChartLine, Dumbbell, House, ListChecks, MessagesSquare, Settings, Smartphone, type LucideIcon } from "lucide-react";
 
 import { SectionTitle } from "./SectionTitle";
 
 const BODY_SRC = "/images/Highlighted%20Body";
 const SHOWN_MUSCLES = ["Chest", "Front Deltoid", "Triceps", "Abs", "Quads"];
+const NOT_TRAINED = ["Biceps", "Calves", "Glutes", "Lats"];
+const TABS: { icon: LucideIcon; label: string }[] = [
+  { icon: House, label: "Home" },
+  { icon: MessagesSquare, label: "Chat" },
+  { icon: Dumbbell, label: "Workout" },
+  { icon: ChartLine, label: "Stats" },
+  { icon: Settings, label: "Settings" },
+];
+/** The share of the muscles trained, the arc of the gauge around the body */
+const COVERED = 0.62;
 
 export function Showcase() {
   return (
@@ -19,10 +29,10 @@ export function Showcase() {
           title="See what you trained. And what you didn't."
         />
         <ul className="mt-8 flex flex-col gap-5">
-          <Point icon={Activity} title="The last four days at a glance">
-            The trained muscles light up on the body, the ones you missed are listed next to it.
+          <Point icon={Activity} title="The last three days at a glance">
+            The trained muscles light up on the body, the ones you missed are listed below it.
           </Point>
-          <Point icon={ListChecks} title="Your routines as schemes">
+          <Point icon={ListChecks} title="Your routines, one tap away">
             Save your push, pull and leg days and start them with one tap. A past workout can be repeated too.
           </Point>
           <Point icon={Smartphone} title="iPhone and browser">
@@ -45,54 +55,81 @@ function PhoneMockup() {
         aria-label="The home screen of Gym 2.0 with the trained muscles highlighted on a body"
       >
         <div className="absolute left-1/2 top-2 h-6 w-24 -translate-x-1/2 rounded-full bg-[#111]" aria-hidden />
-        <div className="flex h-full flex-col overflow-hidden rounded-[38px]" aria-hidden>
-          <div className="flex items-center gap-3 bg-[#ff0000]/50 px-4 pt-12 pb-4">
-            <span className="h-12 w-12 rounded-full border-[3px] border-[#ff0000] bg-black" />
-            <span>
-              <span className="block text-[22px] leading-6">alex.lifts</span>
-              <span className="block text-[10px] text-[#666]">Tracking with Gym 2.0 since: 03.01.26</span>
-            </span>
+        <div className="flex h-full flex-col overflow-hidden rounded-[38px] bg-[#f2f2f7]" aria-hidden>
+          {/* the profile banner in the app color */}
+          <div className="flex flex-col items-center bg-linear-to-b from-[#ff0000]/45 to-[#ff0000]/15 px-4 pt-9 pb-8">
+            <span className="h-[60px] w-[60px] rounded-full border-[3px] border-[#ff0000] bg-[#8e8e93]" />
+            <span className="mt-1.5 text-[17px] leading-5 font-bold">alex.lifts</span>
+            <span className="text-[11px] text-[#3c3c43]/60">Training since January 2026</span>
           </div>
-          <div className="flex justify-evenly px-2 py-3">
+          <div className="relative mx-3 -mt-6 flex divide-x divide-[#3c3c43]/20 rounded-[16px] bg-white py-2 shadow-[0_4px_10px_rgba(0,0,0,0.06)]">
             {[
               ["42", "Workouts"],
-              ["31 h", "trained"],
+              ["31 h", "Trained"],
               ["517", "Sets"],
             ].map(([value, label]) => (
-              <span key={label} className="flex h-[58px] w-[78px] flex-col items-center justify-center rounded-[10px] bg-black text-white">
-                <span className="text-[20px] leading-6">{value}</span>
-                <span className="text-[11px] font-semibold">{label}</span>
+              <span key={label} className="flex flex-1 flex-col items-center">
+                <span className="font-rounded text-[16px] leading-5 font-bold">{value}</span>
+                <span className="text-[10px] text-[#3c3c43]/60">{label}</span>
               </span>
             ))}
           </div>
-          <p className="px-3 text-[11px]">Muscles worked out the last 3 days:</p>
-          <div className="relative mx-auto aspect-[1051/1261] w-[250px]">
-            {/* The muscle images contain the outline as well, multiplied they keep only the red parts on top of it */}
-            {/* eslint-disable @next/next/no-img-element */}
-            <img src={`${BODY_SRC}/highlighted_body_black.png`} alt="" className="absolute inset-0 h-full w-full" />
-            {SHOWN_MUSCLES.map((muscle) => (
-              <img
-                key={muscle}
-                src={`${BODY_SRC}/Muscles/${encodeURIComponent(muscle)}.png`}
-                alt=""
-                loading="lazy"
-                className="absolute inset-0 h-full w-full mix-blend-multiply"
-              />
-            ))}
-            {/* eslint-enable @next/next/no-img-element */}
-          </div>
-          <div className="mt-auto flex items-center gap-2 px-3 pb-3">
-            <span className="relative h-2 flex-1 rounded-full bg-[#ddd]">
-              <span className="absolute inset-y-0 left-0 w-[62%] rounded-full bg-[#ff0000]" />
+
+          <div className="mx-3 mt-3 flex flex-col rounded-[16px] bg-white px-3 pt-2.5 pb-3 shadow-[0_4px_10px_rgba(0,0,0,0.06)]">
+            <span className="text-[12px] font-bold">Muscles · last 3 days</span>
+            <div className="relative mx-auto mt-1 h-[200px] w-[214px]">
+              {/* the coverage gauge: an open ring around the body, filled by the trained share */}
+              <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full -rotate-[225deg]">
+                <circle cx="50" cy="50" r="46" fill="none" stroke="#e5e5ea" strokeWidth="3" strokeLinecap="round" pathLength="100" strokeDasharray="75 100" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="46"
+                  fill="none"
+                  stroke="#ff0000"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  pathLength="100"
+                  strokeDasharray={`${75 * COVERED} 100`}
+                />
+              </svg>
+              <div className="absolute left-1/2 top-[14px] aspect-[1051/1261] w-[124px] -translate-x-1/2">
+                {/* The muscle images contain the outline as well, multiplied they keep only the red parts on top of it */}
+                {/* eslint-disable @next/next/no-img-element */}
+                <img src={`${BODY_SRC}/highlighted_body_black.png`} alt="" className="absolute inset-0 h-full w-full" />
+                {SHOWN_MUSCLES.map((muscle) => (
+                  <img
+                    key={muscle}
+                    src={`${BODY_SRC}/Muscles/${encodeURIComponent(muscle)}.png`}
+                    alt=""
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full mix-blend-multiply"
+                  />
+                ))}
+                {/* eslint-enable @next/next/no-img-element */}
+              </div>
+              <span className="absolute inset-x-0 bottom-0 flex flex-col items-center">
+                <span className="font-rounded text-[22px] leading-6 font-bold">{Math.round(COVERED * 100)}%</span>
+                <span className="text-[9px] text-[#3c3c43]/60">covered</span>
+              </span>
+            </div>
+            <span className="mt-1.5 text-[10px] text-[#3c3c43]/60">Not trained yet</span>
+            <span className="mt-1 flex flex-wrap gap-1">
+              {NOT_TRAINED.map((muscle) => (
+                <span key={muscle} className="rounded-full bg-[#ff0000]/12 px-2 py-0.5 text-[9px] text-[#d70015]">
+                  {muscle}
+                </span>
+              ))}
             </span>
-            <span className="text-[11px] font-semibold">62%</span>
           </div>
-          <div className="flex justify-around border-t border-[#ddd] bg-[#f9f9f9] px-2 pt-2 pb-5 text-[#999]">
-            <Dumbbell size={20} className="text-[#ff0000]" />
-            <MessageCircle size={20} />
-            <ListChecks size={20} />
-            <ChartColumn size={20} />
-            <Users size={20} />
+
+          <div className="mt-auto flex justify-around border-t border-[#3c3c43]/20 bg-[#f9f9f9]/95 px-2 pt-1.5 pb-5 text-[#999]">
+            {TABS.map(({ icon: Icon, label }, index) => (
+              <span key={label} className={`flex flex-col items-center gap-0.5 ${index === 0 ? "text-[#ff0000]" : ""}`}>
+                <Icon size={18} />
+                <span className="text-[8px]">{label}</span>
+              </span>
+            ))}
           </div>
         </div>
       </div>

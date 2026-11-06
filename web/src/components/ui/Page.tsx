@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { goBack } from "@/lib/navigation";
 
@@ -72,16 +72,4 @@ export function PageHeader({
       {!inline && <h1 className="px-4 pb-2 pt-0.5 text-large-title font-bold tracking-tight">{title}</h1>}
     </header>
   );
-}
-
-const pillClass =
-  "inline-block w-fit rounded-[25px] bg-my-black p-[15px] text-title text-my-white transition-opacity active:opacity-60 hover:opacity-85";
-
-/** The black rounded "NavigationLink" buttons used all over the app. */
-export function PillLink({ className = "", ...props }: ComponentProps<typeof Link>) {
-  return <Link {...props} className={`${pillClass} ${className}`} />;
-}
-
-export function PillButton({ className = "", ...props }: ComponentProps<"button">) {
-  return <button type="button" {...props} className={`${pillClass} disabled:opacity-40 ${className}`} />;
 }

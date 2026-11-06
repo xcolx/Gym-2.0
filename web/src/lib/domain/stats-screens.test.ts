@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { makeExercise, makeWorkoutExercise, makeWorkoutWithExercises, muscleGroups, muscles } from "@/test/fixtures";
 import { UnitSystem } from "@/types/models";
-import { distributionPercentages } from "./muscle-distribution";
+import { distributionRows, type CategoryCriteria, type ValueCriteria } from "./muscle-distribution";
 import { makeMuscleMask, maskAlpha, maskSize } from "./muscle-mask";
 import {
   exerciseStatsLines,
@@ -31,7 +31,7 @@ const rowing = makeExercise({
   tracksDistance: true,
 });
 
-describe("distributionPercentages (DistributionByMuscleView.getPercentages)", () => {
+describe("distributionRows (DistributionByMuscleView.rows)", () => {
   const workouts = [
     makeWorkoutWithExercises({}, [[bench, { reps: [10, 8, 6], weights: [50, 50, 50] }]]),
     makeWorkoutWithExercises({}, [
@@ -40,44 +40,39 @@ describe("distributionPercentages (DistributionByMuscleView.getPercentages)", ()
     ]),
   ];
   // Muscles: Chest, Triceps, Front Deltoid, Quads. Groups: Chest, Legs.
+  const values = (value: ValueCriteria, category: CategoryCriteria) =>
+    Object.fromEntries(distributionRows(workouts, muscles, muscleGroups, value, category).map((row) => [row.name, row.value]));
 
   it("counts the sets of primary muscles fully and of secondary muscles a third", () => {
     // Chest 3 + 2 = 5, Triceps and Front Deltoid 0.33 * 5, Quads 2 (unilateral sets)
-    const percentages = distributionPercentages(workouts, muscles, muscleGroups, "Sets", "Muscle");
-    expect(percentages.map((value) => Number(value.toFixed(6)))).toEqual([100, 33, 33, 40]);
+    const sets = values("Sets", "Muscle");
+    expect(sets.Chest).toBe(5);
+    expect(sets.Triceps).toBeCloseTo(1.65);
+    expect(sets["Front Deltoid"]).toBeCloseTo(1.65);
+    expect(sets.Quads).toBe(2);
   });
 
   it("counts the reps", () => {
-    // Chest 34, Triceps 0.33 * 34, Quads 36
-    const [chest, triceps, frontDeltoid, quads] = distributionPercentages(
-      workouts,
-      muscles,
-      muscleGroups,
-      "Reps",
-      "Muscle",
-    );
-    expect(chest).toBeCloseTo((34 / 36) * 100);
-    expect(triceps).toBeCloseTo(((0.33 * 34) / 36) * 100);
-    expect(frontDeltoid).toBeCloseTo(triceps);
-    expect(quads).toBe(100);
+    const reps = values("Reps", "Muscle");
+    expect(reps.Chest).toBe(34);
+    expect(reps.Triceps).toBeCloseTo(0.33 * 34);
+    expect(reps["Front Deltoid"]).toBeCloseTo(reps.Triceps);
+    expect(reps.Quads).toBe(36);
   });
 
   it("counts the workouts of the primary muscles only", () => {
-    expect(distributionPercentages(workouts, muscles, muscleGroups, "Workouts", "Muscle")).toEqual([100, 0, 0, 50]);
+    expect(values("Workouts", "Muscle")).toEqual({ Chest: 2, Triceps: 0, "Front Deltoid": 0, Quads: 1 });
   });
 
   it("counts a unilateral set once for a muscle group, like for a muscle", () => {
     // Chest 3 + 2, Legs 2 unilateral sets (4 entries)
-    expect(distributionPercentages(workouts, muscles, muscleGroups, "Sets", "Muscle Group")).toEqual([100, 40]);
-    expect(distributionPercentages(workouts, muscles, muscleGroups, "Workouts", "Muscle Group")).toEqual([100, 50]);
-    expect(distributionPercentages(workouts, muscles, muscleGroups, "Reps", "Muscle Group")).toEqual([
-      (34 / 36) * 100,
-      100,
-    ]);
+    expect(values("Sets", "Muscle Group")).toEqual({ Chest: 5, Legs: 2 });
+    expect(values("Workouts", "Muscle Group")).toEqual({ Chest: 2, Legs: 1 });
+    expect(values("Reps", "Muscle Group")).toEqual({ Chest: 34, Legs: 36 });
   });
 
   it("is 0 for everything without workouts", () => {
-    expect(distributionPercentages([], muscles, muscleGroups, "Sets", "Muscle")).toEqual([0, 0, 0, 0]);
+    expect(distributionRows([], muscles, muscleGroups, "Sets", "Muscle").map((row) => row.value)).toEqual([0, 0, 0, 0]);
   });
 });
 

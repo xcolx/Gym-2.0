@@ -335,7 +335,7 @@ an inline script before the first paint and by the AppShell. `globals.css` switc
 `dark:` variant with it, so use `dark:` (not `@media (prefers-color-scheme)`) for dark styles. Tokens: `bg-background`,
 `text-foreground`, `text-app` / `bg-app` (the app color), `bg-grouped` and `bg-cell` (the background of a Form and its
 cells; a sheet makes both lighter in the dark appearance like iOS), `text-secondary-label`, `bg-field`,
-`border-separator`, `my-black` / `my-white`.
+`border-separator`, `bg-bar` and `text-tab-inactive`; the `card` utility for cards.
 
 Dates and numbers are formatted with `appLocale()` of `lib/domain/format.ts`: English with the region of the browser
 (`en-CH` for `de-CH`), like `Locale.current` of the iOS app, which is only localized in English.
@@ -556,11 +556,11 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   `PromptAlert` (with a text field, e.g. rename and the ReportDialog of components/chat).
 - `ui/ActionSheet.tsx`: `ActionSheet({ open, title, message?, buttons, onClose })` (`.actionSheet` /
   `.confirmationDialog`, scrolls long lists, closed by Cancel, outside, Escape and back).
-- `ui/controls.tsx`: `Switch` (Toggle in the app color), `SegmentedPicker` (Picker(.segmented)), `Spinner`
+- `ui/controls.tsx`: `Switch` (Toggle in the app color), `Spinner`
   (ProgressView); `ui/AppColorSegmentedPicker.tsx` (AppColorSegmentedPicker.swift); `ui/Page.tsx`: `Page`,
   `PageHeader` (the navigation bar of every screen, large or `inline` title, `back`, `leading`/`trailing` toolbar
   items; back pops with `goBack(router, parentHref)` of `lib/navigation.ts`: history back if the previous entry is the
-  parent, otherwise the parent replaces the screen, so back never leaves the app), `PillLink`, `PillButton`;
+  parent, otherwise the parent replaces the screen, so back never leaves the app);
   `ui/PrimaryButton.tsx`: `PrimaryButton` (PrimaryButtonStyle.swift: the filled main button of a screen in the app
   color, `isLoading` shows a spinner), `SecondaryButton` (the one below it), `primaryButtonClass` (e.g. for a link).
 - The `card` utility of globals.css is `.cardBackground()` (CardBackground.swift): the rounded card on `bg-grouped`.
