@@ -97,7 +97,8 @@ struct ExerciseDetailView: View {
                 }
             }
         }
-        .bottomActionBar {
+        // no bar in the performing workout, there's nothing to add the exercise to
+        .bottomActionBar(isPresented: picked != nil) {
             if let picked {
                 Button {
                     picked.wrappedValue.append(exercise)
