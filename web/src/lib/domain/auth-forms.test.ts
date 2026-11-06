@@ -34,19 +34,23 @@ describe("signUpFormState", () => {
   };
 
   it("can be sent when everything is filled in and accepted", () => {
-    expect(signUpFormState(valid)).toEqual({ usernameIssue: null, passwordIssue: null, canSubmit: true });
+    expect(signUpFormState(valid)).toEqual({
+      usernameIssue: null,
+      passwordRules: { hasValidLength: true, hasEnoughKinds: true, passwordsMatch: true },
+      canSubmit: true,
+    });
   });
 
-  it("shows the problems of the username and the password", () => {
+  it("shows the problem of the username and the rules the password breaks", () => {
     const state = signUpFormState({ ...valid, username: "al", password: "short", passwordConfirmation: "" });
     expect(state.usernameIssue).toBe("Between 3 and 20 characters.");
-    expect(state.passwordIssue).toBe("At least 8 characters.");
+    expect(state.passwordRules).toEqual({ hasValidLength: false, hasEnoughKinds: false, passwordsMatch: false });
     expect(state.canSubmit).toBe(false);
   });
 
   it("needs the same password twice", () => {
     const state = signUpFormState({ ...valid, passwordConfirmation: "Secret124" });
-    expect(state.passwordIssue).toBe("The passwords don't match.");
+    expect(state.passwordRules.passwordsMatch).toBe(false);
     expect(state.canSubmit).toBe(false);
   });
 
@@ -59,6 +63,8 @@ describe("signUpFormState", () => {
 
   it("has no problems while the fields are empty", () => {
     const state = signUpFormState({ ...valid, username: "", password: "", passwordConfirmation: "" });
-    expect(state).toEqual({ usernameIssue: null, passwordIssue: null, canSubmit: false });
+    expect(state.usernameIssue).toBeNull();
+    expect(state.passwordRules).toEqual({ hasValidLength: false, hasEnoughKinds: false, passwordsMatch: false });
+    expect(state.canSubmit).toBe(false);
   });
 });

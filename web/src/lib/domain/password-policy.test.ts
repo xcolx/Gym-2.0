@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { passwordProblem } from "./password-policy";
+import { hasEnoughKinds, hasValidLength, passwordProblem } from "./password-policy";
 
 describe("passwordProblem", () => {
   it("needs 8 to 50 characters", () => {
@@ -20,5 +20,15 @@ describe("passwordProblem", () => {
     expect(passwordProblem("abcdefg1")).toBeNull();
     expect(passwordProblem("abcdefg!")).toBeNull();
     expect(passwordProblem("ABCDEFGh")).toBeNull();
+  });
+});
+
+describe("the rules ticked off while typing", () => {
+  it("checks the length and the kinds of characters on their own", () => {
+    expect(hasValidLength("abcdefgh")).toBe(true);
+    expect(hasValidLength("😀😀😀😀")).toBe(false);
+    expect(hasValidLength("a".repeat(51))).toBe(false);
+    expect(hasEnoughKinds("ab")).toBe(false);
+    expect(hasEnoughKinds("a1")).toBe(true);
   });
 });

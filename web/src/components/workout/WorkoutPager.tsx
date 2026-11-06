@@ -3,14 +3,35 @@
 // The `TabView` with `PageTabViewStyle` of WhilstWorkoutView.swift. The shown page is kept in the session storage, so
 // a reload or a visit of another tab comes back to it.
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { Flag } from "lucide-react";
 
-const MAX_DOTS = 20;
+export interface WorkoutPagerHandle {
+  show(index: number): void;
+}
 
-export function WorkoutPager({ pages, storageKey }: { pages: { key: string; label: string; content: ReactNode }[]; storageKey: string }) {
+/**
+ * The exercises as pages that are swiped, the last page finishes the workout. Above them one bar per exercise: the
+ * shown one in the app color, the ones with sets faded, the empty ones gray, and a flag for the finish page.
+ */
+export function WorkoutPager({
+  pages,
+  finish,
+  storageKey,
+  onPageChange,
+  ref,
+}: {
+  pages: { key: string; label: string; content: ReactNode; hasSets: boolean }[];
+  finish: ReactNode;
+  storageKey: string;
+  /** The index of the shown page, the number of exercises for the finish page */
+  onPageChange?: (page: number) => void;
+  ref?: Ref<WorkoutPagerHandle>;
+}) {
   const scroller = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(0);
-  const shownPage = Math.min(page, pages.length - 1);
+  const pageCount = pages.length + 1;
+  const shownPage = Math.min(page, pageCount - 1);
 
   // back to the page shown before
   useLayoutEffect(() => {
@@ -31,6 +52,7 @@ export function WorkoutPager({ pages, storageKey }: { pages: { key: string; labe
     const current = Math.round(element.scrollLeft / element.clientWidth);
     if (current === page) return;
     setPage(current);
+    onPageChange?.(current);
     try {
       window.sessionStorage.setItem(storageKey, String(current));
     } catch {
@@ -38,19 +60,54 @@ export function WorkoutPager({ pages, storageKey }: { pages: { key: string; labe
     }
   };
 
-  const show = (index: number) => {
+  const show = (index: number, smooth = true) => {
     const element = scroller.current;
-    element?.scrollTo({ left: index * element.clientWidth, behavior: "smooth" });
+    element?.scrollTo({ left: index * element.clientWidth, behavior: smooth ? "smooth" : "instant" });
   };
+  useImperativeHandle(ref, () => ({ show: (index) => show(index, false) }));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        className="flex h-7 shrink-0 items-center gap-1 px-4 pb-1"
+        role="tablist"
+        aria-label={shownPage < pages.length ? `Exercise ${shownPage + 1} of ${pages.length}` : "Finish"}
+      >
+        {pages.map((p, index) => (
+          <button
+            key={p.key}
+            type="button"
+            role="tab"
+            aria-selected={index === shownPage}
+            aria-label={p.label}
+            onClick={() => show(index)}
+            className="flex h-full min-w-0 flex-1 items-center"
+          >
+            <span
+              className={`h-1 w-full rounded-full transition-colors duration-200 ${
+                index === shownPage ? "bg-app" : p.hasSets ? "bg-app/35" : "bg-field/60"
+              }`}
+            />
+          </button>
+        ))}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={shownPage === pages.length}
+          aria-label="Finish"
+          onClick={() => show(pages.length)}
+          className={`flex size-7 shrink-0 items-center justify-center ${shownPage === pages.length ? "text-app" : "text-secondary-label"}`}
+        >
+          <Flag size={14} strokeWidth={2.5} aria-hidden />
+        </button>
+      </div>
+
       <div
         ref={scroller}
         onScroll={onScroll}
         className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {pages.map((p, index) => (
+        {[...pages, { key: "finish", label: "Finish", content: finish }].map((p, index) => (
           <section
             key={p.key}
             aria-label={p.label}
@@ -60,27 +117,6 @@ export function WorkoutPager({ pages, storageKey }: { pages: { key: string; labe
             {p.content}
           </section>
         ))}
-      </div>
-      <div className="flex h-7 shrink-0 items-center justify-center gap-0.5" role="tablist" aria-label="Pages">
-        {pages.length > MAX_DOTS ? (
-          <span className="text-footnote text-secondary-label">
-            {shownPage + 1} / {pages.length}
-          </span>
-        ) : (
-          pages.map((p, index) => (
-            <button
-              key={p.key}
-              type="button"
-              role="tab"
-              aria-selected={index === shownPage}
-              aria-label={p.label}
-              onClick={() => show(index)}
-              className="flex h-7 w-4 items-center justify-center"
-            >
-              <span className={`h-[7px] w-[7px] rounded-full ${index === shownPage ? "bg-my-black" : "bg-my-black/25"}`} />
-            </button>
-          ))
-        )}
       </div>
     </div>
   );

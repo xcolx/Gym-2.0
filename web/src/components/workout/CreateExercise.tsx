@@ -2,10 +2,11 @@
 
 // Port of ios/Gym 2.0/Features/Workout/Exercises/CreateExerciseView.swift
 
-import { useRef, useState } from "react";
-import { CirclePlus, Download, ImagePlus, Pencil, Trash2, X } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
+import { BicepsFlexed, Check, ChevronRight, CircleAlert, CirclePlus, Dumbbell, Image as ImageIcon, ImagePlus, Trash2, X, type LucideIcon } from "lucide-react";
 
 import { HighlightedBody } from "@/components/ui/HighlightedBody";
+import { MuscleLegend, PRIMARY_MUSCLE_COLOR, SECONDARY_MUSCLE_COLOR } from "@/components/ui/MuscleLegend";
 import { EXERCISE_LIMITS, exerciseCanChangeTrackedMetrics, musclesWithIds } from "@/lib/domain/exercise";
 import {
   addAlias,
@@ -18,14 +19,16 @@ import {
   sortedMetrics,
   trackingFlags,
 } from "@/lib/domain/exercise-form";
+import { characterCount } from "@/lib/domain/format";
 import { exerciseTrackedMetrics, SET_METRIC_NAMES } from "@/lib/domain/set-metric";
 import { createExercise, deleteExercise, updateExercise } from "@/lib/repo";
 import { useEquipment, useExerciseInScheme, useExerciseInUse, useExercises, useMuscleGroups, useMuscles, useReferenceData } from "@/lib/repo/hooks";
-import { SET_METRICS, type Exercise, type SetMetric } from "@/types/models";
+import { SET_METRICS, type Exercise, type Muscle, type SetMetric } from "@/types/models";
 import { ActionSheet, type ActionSheetButton } from "@/components/ui/ActionSheet";
 import { Alert } from "@/components/ui/Alert";
+import { ButtonRow, FormRow, FormSection, FormStack, PressableRow } from "@/components/ui/Form";
 import { ExerciseImages, exerciseImageItems, prepareExerciseImage } from "./exercise-image";
-import { FullScreenCover } from "@/components/ui/overlay";
+import { FullScreenCover, Sheet, SheetButton } from "@/components/ui/overlay";
 
 export function CreateExercise({
   open,
@@ -41,15 +44,16 @@ export function CreateExercise({
   onDeleted?: () => void;
 }) {
   return (
-    <FullScreenCover open={open} onClose={onClose} label={exercise ? `Edit ${exercise.name}` : "Create Exercise"}>
+    <FullScreenCover open={open} onClose={onClose} label={exercise ? "Edit exercise" : "New exercise"} grouped>
       <ExerciseForm exercise={exercise} onClose={onClose} onDeleted={onDeleted} />
     </FullScreenCover>
   );
 }
 
-type Picker = "primary" | "secondary" | "equipment" | "muscleGroup" | "photo";
+type Picker = "equipment" | "muscleGroup" | "photo";
+type MuscleRole = "primary" | "secondary";
 
-const chip = "min-h-9 rounded-full px-3 py-1.5 text-[15px] leading-5";
+const RED = "text-[#ff3b30] dark:text-[#ff453a]";
 
 function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | null; onClose: () => void; onDeleted?: () => void }) {
   const exercises = useExercises();
@@ -80,21 +84,21 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
   const [nameTakenWarning, setNameTakenWarning] = useState(false);
   const [missingSelectionWarning, setMissingSelectionWarning] = useState(false);
   const [picker, setPicker] = useState<Picker | null>(null);
+  const [musclePicker, setMusclePicker] = useState<MuscleRole | null>(null);
   const [alert, setAlert] = useState<"delete" | "nonDeletable" | "inScheme" | null>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
   const filesInput = useRef<HTMLInputElement>(null);
 
   const trimmedName = name.trim();
+  const trimmedNewAlias = newAlias.trim();
   const trimmedDescription = description.trim();
   const nameProblem = exerciseNameProblem(trimmedName, { missingSelectionWarning, nameTakenWarning });
-  const aliasProblem = aliasProblemOf(newAlias.trim());
+  const aliasProblem = aliasProblemOf(trimmedNewAlias);
   const descriptionProblem = descriptionProblemOf(trimmedDescription);
-  const problem = nameProblem ?? aliasProblem ?? descriptionProblem;
 
   // The set data of performed workouts depends on the tracked metrics, so they are fixed once the exercise was performed
   const canChangeTrackedMetrics = exercise ? inUse !== undefined && exerciseCanChangeTrackedMetrics(exercise, inUse) : true;
 
-  const muscleName = (id: number) => reference?.muscles.get(id)?.name ?? "";
   const primaryMuscles = reference ? musclesWithIds(primaryIds, reference) : [];
   const secondaryMuscles = reference ? musclesWithIds(secondaryIds, reference) : [];
 
@@ -116,7 +120,7 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
     }
     // a name that was typed but not added yet
     const added = submitAlias();
-    const typedAliasProblem = added ? null : aliasProblemOf(newAlias.trim());
+    const typedAliasProblem = added ? null : aliasProblemOf(trimmedNewAlias);
     if (exerciseNameProblem(trimmedName, { missingSelectionWarning, nameTakenWarning: taken }) || typedAliasProblem || descriptionProblem) {
       return;
     }
@@ -166,39 +170,19 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
     setTrackedMetrics((metrics) => (metrics.includes(metric) ? metrics.filter((m) => m !== metric) : sortedMetrics([...metrics, metric])));
   };
 
-  const muscleButtons = (selected: number[], select: (id: number) => void, deselect: (id: number) => void): ActionSheetButton[] =>
-    (allMuscles ?? []).map((muscle) =>
-      selected.includes(muscle.serverId)
-        ? { label: muscle.name, destructive: true, onSelect: () => deselect(muscle.serverId) }
-        : { label: muscle.name, onSelect: () => select(muscle.serverId) },
-    );
+  // a muscle is either primary or secondary, the server refuses it in both lists
+  const toggleMuscle = (role: MuscleRole, id: number) => {
+    const [selected, setSelected, setOther] =
+      role === "primary" ? [primaryIds, setPrimaryIds, setSecondaryIds] : [secondaryIds, setSecondaryIds, setPrimaryIds];
+    if (selected.includes(id)) {
+      setSelected((ids) => ids.filter((other) => other !== id));
+    } else {
+      setSelected((ids) => [...ids, id]);
+      setOther((ids) => ids.filter((other) => other !== id));
+    }
+  };
 
   const pickers: Record<Picker, { title: string; message: string; buttons: ActionSheetButton[] }> = {
-    primary: {
-      title: "Primary Muscles",
-      message: "Select muscles to add/remove them from the list",
-      buttons: muscleButtons(
-        primaryIds,
-        (id) => {
-          setPrimaryIds((ids) => [...ids, id]);
-          // a muscle is either primary or secondary, the server refuses it in both lists
-          setSecondaryIds((ids) => ids.filter((other) => other !== id));
-        },
-        (id) => setPrimaryIds((ids) => ids.filter((other) => other !== id)),
-      ),
-    },
-    secondary: {
-      title: "Secondary Muscles",
-      message: "Select muscles to add/remove them from the list",
-      buttons: muscleButtons(
-        secondaryIds,
-        (id) => {
-          setSecondaryIds((ids) => [...ids, id]);
-          setPrimaryIds((ids) => ids.filter((other) => other !== id));
-        },
-        (id) => setSecondaryIds((ids) => ids.filter((other) => other !== id)),
-      ),
-    },
     equipment: {
       title: "Equipment",
       message: "Select the equipment needed for this exercise",
@@ -212,86 +196,41 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
       })),
     },
     muscleGroup: {
-      title: "Muscle Group",
+      title: "Muscle group",
       message: "Select the most important muscle group for this exercise",
       buttons: (allMuscleGroups ?? []).map((group) => ({ label: group.name, onSelect: () => setMuscleGroupId(group.serverId) })),
     },
     photo: {
-      title: "Image",
-      message: "Take a photo of the exercise or choose some, e.g. one per keyframe of the movement",
+      title: "Add images",
+      message: "Take a photo of the exercise or choose some, e.g. one per step of the movement",
       buttons: [
-        { label: "Take Photo", onSelect: () => cameraInput.current?.click() },
-        { label: "Choose Photos", onSelect: () => filesInput.current?.click() },
+        { label: "Take photo", onSelect: () => cameraInput.current?.click() },
+        { label: "Choose photos", onSelect: () => filesInput.current?.click() },
       ],
     },
   };
 
-  const missing = (isMissing: boolean) => (missingSelectionWarning && isMissing ? "text-[#ff3b30]" : "");
-  const editButton = (label: string, onClick: () => void, plus = false) => (
-    <button type="button" aria-label={label} onClick={onClick} className="-my-2 flex h-11 w-11 items-center justify-center text-[#34c759] active:opacity-50">
-      {plus ? <CirclePlus size={20} /> : <Pencil size={18} />}
-    </button>
-  );
+  const muscleCount = (ids: number[]) => (ids.length === 0 ? "None" : `${ids.length}`);
+  const metricsMissing = missingSelectionWarning && trackedMetrics.length === 0;
 
   return (
-    <div className="flex flex-col pb-6">
-      {/* cancel, name and delete */}
-      <div className="flex items-center gap-1 py-2.5 pr-2.5">
-        <button type="button" aria-label="Cancel" onClick={onClose} className="flex h-11 w-12 shrink-0 items-center justify-center text-[#ff3b30] active:opacity-50">
-          <X size={30} />
-        </button>
-        <input
-          value={name}
-          onChange={(event) => {
-            setName(event.target.value);
-            setNameTakenWarning(false);
-          }}
-          placeholder="Name of the Exercise"
-          aria-label="Name of the Exercise"
-          autoCorrect="off"
-          autoComplete="off"
-          enterKeyHint="done"
-          className={`h-12 min-w-0 flex-1 rounded-[6px] border border-separator bg-background px-2 text-title2 outline-none placeholder:text-secondary-label focus:border-app ${
-            nameProblem ? "text-[#ff3b30]" : "text-my-black"
-          }`}
-        />
-        {exercise && (
-          <button
-            type="button"
-            aria-label="Delete exercise"
-            // like the server, it can't be deleted while a workout or a workout scheme contains it
-            onClick={() => setAlert(inUse ? "nonDeletable" : inScheme ? "inScheme" : "delete")}
-            disabled={inUse === undefined || inScheme === undefined}
-            className="flex h-11 w-11 shrink-0 items-center justify-center text-[#ff3b30] active:opacity-50"
-          >
-            <Trash2 size={26} />
-          </button>
-        )}
-      </div>
+    <div className="flex flex-col [--placeholder:rgba(60,60,67,0.3)] dark:[--placeholder:rgba(235,235,245,0.3)]">
+      <header className="sticky top-0 z-10 flex h-11 shrink-0 items-center justify-between bg-grouped/90 px-4 backdrop-blur-xl">
+        <SheetButton onClick={onClose} className="z-10">
+          Cancel
+        </SheetButton>
+        <h1 className="absolute inset-x-24 truncate text-center text-headline font-semibold">{exercise ? "Edit exercise" : "New exercise"}</h1>
+        <SheetButton bold onClick={() => void save()} className="z-10">
+          Save
+        </SheetButton>
+      </header>
 
-      {problem && <p className="px-2.5 text-footnote text-[#ff3b30]">{problem}</p>}
-
-      {/* description and images */}
-      <div className="grid grid-cols-2 gap-2.5 px-2.5 pt-1">
-        <label className="flex flex-col">
-          <span className="font-semibold">Description:</span>
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            className="focus-ring aspect-square w-full resize-none border border-my-black bg-field/40 p-1 outline-none"
-          />
-        </label>
-        <div className="flex flex-col">
-          <span className="font-semibold">
-            Images:{" "}
-            <span className="font-normal text-secondary-label">
-              {imageCount}/{EXERCISE_LIMITS.images}
-            </span>
-          </span>
-          <div className="aspect-square w-full overflow-hidden bg-black">
+      <FormStack>
+        <FormSection header={`Images · ${imageCount}/${EXERCISE_LIMITS.images}`} plain>
+          <div className={`relative w-full overflow-hidden rounded-[20px] bg-field/30 ${imageCount === 0 ? "aspect-[2/1]" : "aspect-square"}`}>
             <ExerciseImages
               images={exerciseImageItems(imageUrls, photos)}
-              placeholder={<ImagePlus size={40} className="text-white" />}
+              placeholder={<ImageIcon size={34} className="text-secondary-label" aria-hidden />}
               onRemove={removeImage}
               trailing={
                 imageCount < EXERCISE_LIMITS.images
@@ -302,10 +241,11 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
                           type="button"
                           aria-label="Add images"
                           onClick={() => setPicker("photo")}
-                          className="flex h-full w-full flex-col items-center justify-center gap-1 text-white active:opacity-70"
+                          className="flex h-full w-full flex-col items-center justify-center gap-2 text-app active:opacity-60"
                         >
-                          <ImagePlus size={40} />
-                          {imageCount > 0 && <span className="text-footnote">Add more</span>}
+                          <ImagePlus size={34} aria-hidden />
+                          <span className="text-subheadline font-medium">{imageCount > 0 ? "Add more images" : "Add images"}</span>
+                          {imageCount === 0 && <span className="text-caption1 text-secondary-label">e.g. one per step of the movement</span>}
                         </button>
                       ),
                     }
@@ -315,125 +255,188 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
           </div>
           <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={(event) => void pickPhotos(event.currentTarget)} />
           <input ref={filesInput} type="file" accept="image/*" multiple hidden onChange={(event) => void pickPhotos(event.currentTarget)} />
-        </div>
-      </div>
+        </FormSection>
 
-      {/* Other names like "Military Press" for "Barbell Shoulder Press", so that the exercise is found by them */}
-      <div className="px-2.5 pt-[5px]">
-        <p className="font-semibold">Other Names:</p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          {aliases.map((alias) => (
-            <button
-              key={alias}
-              type="button"
-              onClick={() => setAliases((list) => list.filter((other) => other !== alias))}
-              className={`${chip} flex items-center gap-1 bg-app text-white active:opacity-60`}
-              aria-label={`Remove ${alias}`}
-            >
-              {alias}
-              <X size={12} strokeWidth={3} />
-            </button>
-          ))}
-          {aliases.length < EXERCISE_LIMITS.aliasCount && (
+        <FormSection header="Name" footer={nameProblem && <ProblemText>{nameProblem}</ProblemText>}>
+          <FormRow className="py-0" rowClassName="focus-ring-within rounded-[20px]">
             <input
-              value={newAlias}
-              onChange={(event) => setNewAlias(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  submitAlias();
-                }
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                setNameTakenWarning(false);
               }}
-              placeholder="Add a name"
-              aria-label="Add another name"
+              placeholder="e.g. Bench press"
+              aria-label="Name"
               autoCorrect="off"
               autoComplete="off"
               enterKeyHint="done"
-              className={`${chip} focus-ring w-[150px] bg-field/40 outline-none placeholder:text-secondary-label ${aliasProblem ? "text-[#ff3b30]" : "text-my-black"}`}
+              className={`h-12 w-full min-w-0 bg-transparent text-title3 font-semibold outline-none placeholder:font-normal placeholder:text-[var(--placeholder)] ${
+                nameProblem ? RED : ""
+              }`}
             />
+          </FormRow>
+        </FormSection>
+
+        {/* Other names like "Military press" for "Barbell shoulder press", so that the exercise is found by them */}
+        <FormSection
+          header="Also known as"
+          footer={aliasProblem ? <ProblemText>{aliasProblem}</ProblemText> : "Only used to find the exercise when searching."}
+        >
+          {aliases.length > 0 && (
+            <FormRow>
+              <div className="flex flex-wrap gap-1.5">
+                {aliases.map((alias) => (
+                  <button
+                    key={alias}
+                    type="button"
+                    onClick={() => setAliases((list) => list.filter((other) => other !== alias))}
+                    className="flex items-center gap-1 rounded-full bg-field/40 px-2.5 py-[5px] text-subheadline active:opacity-60"
+                    aria-label={`Remove ${alias}`}
+                  >
+                    {alias}
+                    <X size={12} strokeWidth={3} className="text-secondary-label" aria-hidden />
+                  </button>
+                ))}
+              </div>
+            </FormRow>
           )}
-        </div>
-        <p className="mt-1 text-footnote text-secondary-label">Only used to find the exercise when searching.</p>
-      </div>
-
-      {/* tracked metrics */}
-      <div className="px-2.5 py-[5px]">
-        <p className={`font-semibold ${missing(trackedMetrics.length === 0)}`}>Tracked per Set:</p>
-        <div className="mt-1 flex flex-wrap gap-2">
-          {SET_METRICS.map((metric) => {
-            const selected = trackedMetrics.includes(metric);
-            return (
+          {aliases.length < EXERCISE_LIMITS.aliasCount && (
+            <FormRow className="py-0" rowClassName={`focus-ring-within ${aliases.length > 0 ? "rounded-b-[20px]" : "rounded-[20px]"}`}>
+              <input
+                value={newAlias}
+                onChange={(event) => setNewAlias(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    submitAlias();
+                  }
+                }}
+                placeholder="Add another name"
+                aria-label="Add another name"
+                autoCorrect="off"
+                autoComplete="off"
+                enterKeyHint="done"
+                className={`h-11 min-w-0 flex-1 bg-transparent outline-none placeholder:text-[var(--placeholder)] ${aliasProblem ? RED : ""}`}
+              />
               <button
-                key={metric}
                 type="button"
-                aria-pressed={selected}
-                disabled={!canChangeTrackedMetrics}
-                onClick={() => toggleMetric(metric)}
-                className={`${chip} disabled:opacity-60 ${selected ? "bg-app text-white" : "bg-field/40 text-my-black"}`}
+                aria-label="Add name"
+                onClick={submitAlias}
+                disabled={trimmedNewAlias === "" || aliasProblem !== null}
+                className="-mr-1 flex h-11 w-9 items-center justify-center text-app active:opacity-50 disabled:text-tab-inactive"
               >
-                {SET_METRIC_NAMES[metric]}
+                <CirclePlus size={24} aria-hidden />
               </button>
-            );
-          })}
-        </div>
-        {!canChangeTrackedMetrics && (
-          <p className="mt-1 text-footnote text-secondary-label">
-            You have already done a workout with this exercise, so the tracked values can&apos;t be changed.
-          </p>
-        )}
-      </div>
+            </FormRow>
+          )}
+        </FormSection>
 
-      {/* highlighted body, muscles, equipment, save button */}
-      <div className="flex gap-2.5 pr-2.5 pt-1">
-        <div className="flex w-1/2 shrink-0 flex-col">
-          <HighlightedBody className="w-full" primaryMuscles={primaryMuscles} secondaryMuscles={secondaryMuscles} />
-          <div className="pb-2.5 pl-2.5 pt-2">
-            <p className="flex items-center font-semibold">
-              Muscle Group:
-              {editButton("Select the muscle group", () => setPicker("muscleGroup"))}
-            </p>
-            <p className={missing(muscleGroupId === null)}>
-              {muscleGroupId === null ? "Select a muscle group" : (reference?.muscleGroups.get(muscleGroupId)?.name ?? "")}
-            </p>
-          </div>
-          <div className="pl-2.5">
-            <p className="flex items-center font-semibold">
-              Equipment needed:
-              {editButton("Select the equipment", () => setPicker("equipment"))}
-            </p>
-            <p className={missing(equipmentId === null)}>
-              {equipmentId === null ? "Select the equipment" : (reference?.equipment.get(equipmentId)?.name ?? "")}
-            </p>
-          </div>
-        </div>
+        <FormSection
+          header="Description"
+          footer={
+            <div className="flex items-start gap-2">
+              {descriptionProblem && <ProblemText>{descriptionProblem}</ProblemText>}
+              <span className="ml-auto tabular-nums">
+                {characterCount(trimmedDescription)}/{EXERCISE_LIMITS.description}
+              </span>
+            </div>
+          }
+        >
+          <FormRow rowClassName="focus-ring-within rounded-[20px]">
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="How is it done? What should you look out for?"
+              aria-label="Description"
+              rows={4}
+              // grows with the text like `.lineLimit(4...12)`
+              className="max-h-[12lh] min-h-[4lh] w-full resize-none bg-transparent outline-none [field-sizing:content] placeholder:text-[var(--placeholder)]"
+            />
+          </FormRow>
+        </FormSection>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <p className="flex items-center font-semibold">
-            Primary Muscles:
-            {editButton("Add primary muscles", () => setPicker("primary"), true)}
-          </p>
-          {primaryIds.map((id) => (
-            <p key={id}>{muscleName(id)}</p>
-          ))}
-          <p className="mt-2 flex items-center font-semibold">
-            Secondary Muscles:
-            {editButton("Add secondary muscles", () => setPicker("secondary"), true)}
-          </p>
-          {secondaryIds.map((id) => (
-            <p key={id}>{muscleName(id)}</p>
-          ))}
-          <div className="flex flex-1 items-end justify-end pt-4">
-            <button
-              type="button"
-              onClick={() => void save()}
-              className="flex items-center gap-2 rounded-[25px] bg-[#34c759] p-[15px] text-title text-white active:opacity-60"
+        <FormSection header="Muscles">
+          <FormRow className="gap-4 py-3">
+            <HighlightedBody className="h-[170px] shrink-0" primaryMuscles={primaryMuscles} secondaryMuscles={secondaryMuscles} />
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              <MuscleLegend color={PRIMARY_MUSCLE_COLOR} title="Main" muscles={primaryMuscles} />
+              <MuscleLegend color={SECONDARY_MUSCLE_COLOR} title="Also" muscles={secondaryMuscles} />
+            </div>
+          </FormRow>
+          <ValueRow title="Main muscles" dotColor={PRIMARY_MUSCLE_COLOR} value={muscleCount(primaryIds)} onClick={() => setMusclePicker("primary")} />
+          <ValueRow
+            title="Secondary muscles"
+            dotColor={SECONDARY_MUSCLE_COLOR}
+            value={muscleCount(secondaryIds)}
+            onClick={() => setMusclePicker("secondary")}
+          />
+        </FormSection>
+
+        <FormSection header="Details">
+          <ValueRow
+            title="Muscle group"
+            icon={BicepsFlexed}
+            value={muscleGroupId === null ? "Select" : (reference?.muscleGroups.get(muscleGroupId)?.name ?? "")}
+            isMissing={missingSelectionWarning && muscleGroupId === null}
+            onClick={() => setPicker("muscleGroup")}
+          />
+          <ValueRow
+            title="Equipment"
+            icon={Dumbbell}
+            value={equipmentId === null ? "Select" : (reference?.equipment.get(equipmentId)?.name ?? "")}
+            isMissing={missingSelectionWarning && equipmentId === null}
+            onClick={() => setPicker("equipment")}
+          />
+        </FormSection>
+
+        <FormSection
+          header={<span className={metricsMissing ? RED : ""}>Tracked per set</span>}
+          footer={
+            !canChangeTrackedMetrics ? (
+              "You have already done a workout with this exercise, so the tracked values can't be changed."
+            ) : metricsMissing ? (
+              <ProblemText>Select at least one value.</ProblemText>
+            ) : undefined
+          }
+        >
+          <FormRow>
+            <div className="flex flex-wrap gap-2">
+              {SET_METRICS.map((metric) => {
+                const selected = trackedMetrics.includes(metric);
+                return (
+                  <button
+                    key={metric}
+                    type="button"
+                    aria-pressed={selected}
+                    disabled={!canChangeTrackedMetrics}
+                    onClick={() => toggleMetric(metric)}
+                    className={`flex items-center gap-1 rounded-full px-3 py-[7px] text-subheadline font-medium active:opacity-60 disabled:opacity-50 disabled:active:opacity-50 ${
+                      selected ? "bg-app text-white" : "bg-field/40"
+                    }`}
+                  >
+                    {selected && <Check size={14} strokeWidth={3} aria-hidden />}
+                    {SET_METRIC_NAMES[metric]}
+                  </button>
+                );
+              })}
+            </div>
+          </FormRow>
+        </FormSection>
+
+        {exercise && (
+          <FormSection>
+            <ButtonRow
+              destructive
+              // like the server, it can't be deleted while a workout or a workout scheme contains it
+              onClick={() => setAlert(inUse ? "nonDeletable" : inScheme ? "inScheme" : "delete")}
+              disabled={inUse === undefined || inScheme === undefined}
             >
-              Save
-              <Download size={26} />
-            </button>
-          </div>
-        </div>
-      </div>
+              <Trash2 size={20} aria-hidden />
+              Delete exercise
+            </ButtonRow>
+          </FormSection>
+        )}
+      </FormStack>
 
       {picker && (
         <ActionSheet
@@ -445,24 +448,29 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
         />
       )}
 
-      <Alert
-        open={alert === "nonDeletable"}
-        title="You can't delete this exercise!"
-        message="You have already done a workout with this exercise. Therefore it can't be deleted."
-        buttons={[{ label: "Got it", role: "cancel" }]}
-        onClose={() => setAlert(null)}
+      <MusclePicker
+        role={musclePicker}
+        allMuscles={allMuscles ?? []}
+        selected={musclePicker === "secondary" ? secondaryIds : primaryIds}
+        onToggle={(id) => musclePicker && toggleMuscle(musclePicker, id)}
+        onClose={() => setMusclePicker(null)}
       />
+
       <Alert
-        open={alert === "inScheme"}
-        title="You can't delete this exercise!"
-        message="This exercise is part of a workout scheme. Remove it from the scheme first to delete it."
+        open={alert === "nonDeletable" || alert === "inScheme"}
+        title="You can't delete this exercise"
+        message={
+          alert === "inScheme"
+            ? "This exercise is part of a workout scheme. Remove it from the scheme first to delete it."
+            : "You have already done a workout with this exercise. Therefore it can't be deleted."
+        }
         buttons={[{ label: "Got it", role: "cancel" }]}
         onClose={() => setAlert(null)}
       />
       <Alert
         open={alert === "delete"}
-        title="Delete"
-        message="Are you sure you want to delete this exercise?"
+        title="Delete this exercise?"
+        message="It can't be recovered."
         buttons={[
           {
             label: "Delete",
@@ -475,10 +483,96 @@ function ExerciseForm({ exercise, onClose, onDeleted }: { exercise: Exercise | n
               });
             },
           },
-          { label: "Go back", role: "cancel" },
+          { label: "Cancel", role: "cancel" },
         ]}
         onClose={() => setAlert(null)}
       />
     </div>
+  );
+}
+
+/** A row that opens a choice, with the chosen value on the right, red while it's missing (FormValueRow) */
+function ValueRow({
+  title,
+  icon: Icon,
+  dotColor,
+  value,
+  isMissing = false,
+  onClick,
+}: {
+  title: string;
+  icon?: LucideIcon;
+  /** the dot of the muscle legend instead of an icon */
+  dotColor?: string;
+  value: string;
+  isMissing?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <PressableRow onClick={onClick} aria-label={`${title}, ${value}`}>
+      <span className="flex w-6 shrink-0 justify-center" aria-hidden>
+        {Icon ? <Icon size={20} className="text-app" /> : <span className="size-2.5 rounded-full" style={{ backgroundColor: dotColor }} />}
+      </span>
+      <span className={`flex-1 ${isMissing ? RED : ""}`}>{title}</span>
+      <span className={`min-w-0 truncate ${isMissing ? RED : "text-secondary-label"}`}>{value}</span>
+      <ChevronRight size={18} strokeWidth={2.5} className="-mr-1 shrink-0 text-tab-inactive/70" aria-hidden />
+    </PressableRow>
+  );
+}
+
+/** A problem of the input below its field */
+function ProblemText({ children }: { children: ReactNode }) {
+  return (
+    <span className={`flex items-start gap-1 ${RED}`}>
+      <CircleAlert size={14} strokeWidth={2.5} className="mt-px shrink-0" aria-hidden />
+      {children}
+    </span>
+  );
+}
+
+/**
+ * All muscles with a checkmark at the selected ones, tapping one adds or removes it. A muscle added here is removed
+ * from the muscles of the other role.
+ */
+function MusclePicker({
+  role,
+  allMuscles,
+  selected,
+  onToggle,
+  onClose,
+}: {
+  role: MuscleRole | null;
+  allMuscles: readonly Muscle[];
+  selected: readonly number[];
+  onToggle: (id: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Sheet
+      open={role !== null}
+      onClose={onClose}
+      title={role === "secondary" ? "Secondary muscles" : "Main muscles"}
+      trailing={
+        <SheetButton bold onClick={onClose}>
+          Done
+        </SheetButton>
+      }
+      grouped
+      overCover
+    >
+      <FormStack>
+        <FormSection>
+          {allMuscles.map((muscle) => {
+            const isSelected = selected.includes(muscle.serverId);
+            return (
+              <PressableRow key={muscle.serverId} aria-pressed={isSelected} onClick={() => onToggle(muscle.serverId)}>
+                <span className="flex-1">{muscle.name}</span>
+                {isSelected && <Check size={20} strokeWidth={2.5} className="text-app" aria-hidden />}
+              </PressableRow>
+            );
+          })}
+        </FormSection>
+      </FormStack>
+    </Sheet>
   );
 }

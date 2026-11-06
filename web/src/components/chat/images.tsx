@@ -7,13 +7,21 @@ import { OpensPhotoViewer } from "@/components/ui/PhotoViewer";
 import { ProfileIcon } from "@/components/ui/ProfileIcon";
 import { ServerImage } from "@/components/ui/ServerImage";
 import { otherMemberId } from "@/lib/domain/chat";
+import { groupInitials } from "@/lib/domain/chat-feature";
 import type { ChatWithMembers, User } from "@/types/models";
 
-/** The gray circle with `person.3.fill` of a group without image */
-function GroupPlaceholder({ size }: { size: number }) {
+/** A group without image: the initials of its name in the app color, or `person.3.fill` without any */
+function GroupPlaceholder({ name, size }: { name: string | null; size: number }) {
+  const initials = groupInitials(name);
   return (
-    <span className="flex h-full w-full items-center justify-center rounded-full bg-[#8e8e93]">
-      <UsersRound size={size * 0.56} fill="white" strokeWidth={1.5} className="text-white" aria-hidden />
+    <span className="flex h-full w-full items-center justify-center rounded-full bg-app/18 text-app" aria-hidden>
+      {initials ? (
+        <span className="font-rounded font-semibold leading-none" style={{ fontSize: size * 0.38 }}>
+          {initials}
+        </span>
+      ) : (
+        <UsersRound size={size * 0.56} fill="currentColor" strokeWidth={1.5} />
+      )}
     </span>
   );
 }
@@ -33,7 +41,9 @@ export function ChatImage({
   /** Whether a tap opens the image in the photo viewer */
   opensPhotoViewer?: boolean;
 }) {
-  if (chat.groupChat) return <GroupImage hash={chat.imageUrl} size={size} opensPhotoViewer={opensPhotoViewer} />;
+  if (chat.groupChat) {
+    return <GroupImage hash={chat.imageUrl} name={chat.name} size={size} opensPhotoViewer={opensPhotoViewer} />;
+  }
   const otherId = otherMemberId(chat, currentUserId);
   const other = otherId === null ? undefined : users.get(otherId);
   return (
@@ -46,11 +56,21 @@ export function ChatImage({
   );
 }
 
-/** The round image of a group, or `person.3.fill` without one. A tap opens the image in the photo viewer. */
-export function GroupImage({ hash, size, opensPhotoViewer = true }: { hash: string | null; size: number; opensPhotoViewer?: boolean }) {
+/** The round image of a group, or the initials of its name without one. A tap opens the image in the photo viewer. */
+export function GroupImage({
+  hash,
+  name,
+  size,
+  opensPhotoViewer = true,
+}: {
+  hash: string | null;
+  name: string | null;
+  size: number;
+  opensPhotoViewer?: boolean;
+}) {
   const image = (
     <span className="block shrink-0" style={{ width: size, height: size }}>
-      <ServerImage hash={hash} fit="cover" className="h-full w-full rounded-full" placeholder={<GroupPlaceholder size={size} />} />
+      <ServerImage hash={hash} fit="cover" className="h-full w-full rounded-full" placeholder={<GroupPlaceholder name={name} size={size} />} />
     </span>
   );
   if (!opensPhotoViewer) return image;

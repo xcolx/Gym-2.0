@@ -7,13 +7,14 @@ import { forgotPassword, login, resendVerificationEmail, signUp } from "@/lib/au
 import { trimmed } from "@/lib/auth/validation";
 import { canSubmitForgotPassword, canSubmitLogin, signUpFormState } from "@/lib/domain/auth-forms";
 
-/** The login of AuthView.swift, with resending the verification email when the email isn't verified yet */
-export function useLogin(email: string) {
+/**
+ * The login of AuthView.swift (LoginViewModel). An email that isn't verified yet shows the hint to verify it, which
+ * offers to send the email again.
+ */
+export function useLogin(email: string, showCheckEmail: (email: string, message: string) => void) {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [emailNotVerified, setEmailNotVerified] = useState(false);
-  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   const canSubmit = canSubmitLogin(email, password, isLoading);
 
@@ -22,30 +23,20 @@ export function useLogin(email: string) {
     if (!canSubmit) return;
     setIsLoading(true);
     setError(null);
-    setEmailNotVerified(false);
-    setResendMessage(null);
     try {
       await login(trimmed(email), password);
     } catch (caught) {
-      setError(errorMessage(caught));
-      if (isApiError(caught) && caught.kind === "server" && caught.code === "EmailVerificationError") setEmailNotVerified(true);
+      if (isApiError(caught) && caught.kind === "server" && caught.code === "EmailVerificationError") {
+        showCheckEmail(trimmed(email), errorMessage(caught));
+      } else {
+        setError(errorMessage(caught));
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const resend = async () => {
-    setIsLoading(true);
-    try {
-      setResendMessage(await resendVerificationEmail(trimmed(email)));
-    } catch (caught) {
-      setResendMessage(errorMessage(caught));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return { password, setPassword, isLoading, error, emailNotVerified, resendMessage, canSubmit, submit, resend };
+  return { password, setPassword, isLoading, error, canSubmit, submit };
 }
 
 /** Creating an account (SignUpView of AuthView.swift) */
@@ -62,7 +53,7 @@ export function useSignUp(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { usernameIssue, passwordIssue, canSubmit } = signUpFormState({
+  const { usernameIssue, passwordRules, canSubmit } = signUpFormState({
     email,
     username,
     password,
@@ -103,7 +94,7 @@ export function useSignUp(
     isLoading,
     error,
     usernameIssue,
-    passwordIssue,
+    passwordRules,
     canSubmit,
     submit,
   };

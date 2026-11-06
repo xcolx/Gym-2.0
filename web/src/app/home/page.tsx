@@ -1,11 +1,12 @@
 "use client";
 
-import { HighlightedBody } from "@/components/ui/HighlightedBody";
+import { useState } from "react";
+
+import { ProfileBanner, RecentMuscles, Totals } from "@/components/home/HomeSections";
 import { useNow } from "@/lib/use-now";
-import { ListOfNotTrainedMuscles, ProfileBanner, ProgressBar, StatCard } from "@/components/home/HomeSections";
-import { notTrainedMuscles, progressPercentage, timeWorkedOutShort } from "@/lib/domain/home";
+import { timeWorkedOutShort } from "@/lib/domain/home";
 import { summaryOfWorkouts } from "@/lib/domain/stats";
-import { isRecent, musclesTrained, RECENT_DAYS } from "@/lib/domain/workout";
+import { isRecent, musclesTrained } from "@/lib/domain/workout";
 import {
   useCurrentUser,
   useFinishedWorkouts,
@@ -13,6 +14,7 @@ import {
   useReferenceData,
   useUserSettings,
 } from "@/lib/repo/hooks";
+import type { Muscle } from "@/types/models";
 
 /** Port of HomeView.swift */
 export default function HomePage() {
@@ -21,6 +23,8 @@ export default function HomePage() {
   const workouts = useFinishedWorkouts();
   const muscles = useMuscles();
   const reference = useReferenceData();
+  // The muscle that is shown alone on the body, until something else is tapped or Home is left
+  const [selectedMuscle, setSelectedMuscle] = useState<Muscle | null>(null);
 
   // Checked every minute, so the days move on while the page stays open
   const now = useNow(60_000);
@@ -28,36 +32,26 @@ export default function HomePage() {
   if (user === undefined || !settings || !workouts || !muscles || !reference) return null;
 
   const recentWorkouts = workouts.filter((workout) => isRecent(workout, new Date(now)));
-  const trained = musclesTrained(recentWorkouts, reference);
-  const percentage = progressPercentage(trained, muscles);
 
   return (
-    <main className="screen mx-auto flex w-full max-w-3xl flex-col md:px-6 md:pt-6">
-      <ProfileBanner user={user} schemeColor={settings.schemeColor} />
-
-      <div className="flex justify-evenly py-5">
-        <StatCard value={String(workouts.length)} label="Workouts" />
-        <StatCard value={timeWorkedOutShort(workouts)} label="trained" />
-        <StatCard value={String(summaryOfWorkouts(workouts).sets)} label="Sets" />
+    <main className="screen bg-grouped" onClick={() => setSelectedMuscle(null)}>
+      <div className="mx-auto w-full max-w-3xl md:px-6 md:pt-6">
+        <ProfileBanner user={user} schemeColor={settings.schemeColor} />
+        <Totals
+          totals={[
+            { value: String(workouts.length), label: "Workouts" },
+            { value: timeWorkedOutShort(workouts), label: "Trained" },
+            { value: String(summaryOfWorkouts(workouts).sets), label: "Sets" },
+          ]}
+        />
+        <RecentMuscles
+          trained={musclesTrained(recentWorkouts, reference)}
+          muscles={muscles}
+          appColor={settings.schemeColor}
+          selectedMuscle={selectedMuscle}
+          onSelectMuscle={setSelectedMuscle}
+        />
       </div>
-
-      <div className="flex-1" />
-
-      <div className="flex items-stretch">
-        <section className="min-w-0 flex-1">
-          <p className="pl-2.5">Muscles worked out the last {RECENT_DAYS} days:</p>
-          <HighlightedBody
-            primaryMuscles={trained[0]}
-            secondaryMuscles={trained[1]}
-            className="mx-auto max-h-[52dvh] max-w-full md:max-h-[480px]"
-          />
-        </section>
-        {percentage < 100 && <ListOfNotTrainedMuscles muscles={notTrainedMuscles(trained, muscles)} />}
-      </div>
-
-      <ProgressBar percentage={percentage} />
-
-      <div className="flex-1" />
     </main>
   );
 }

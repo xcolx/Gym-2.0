@@ -3,8 +3,14 @@
 import { Spinner } from "@/components/ui/controls";
 import { FormSection } from "@/components/ui/Form";
 
-/** The way back from the account screens to the settings */
+/** The way back from the account, the sync and the blocked users to the settings */
 export const SETTINGS_BACK = { href: "/settings", label: "Settings" } as const;
+
+/** The way back from the username, email and password to the account */
+export const ACCOUNT_BACK = { href: "/settings/account", label: "Account" } as const;
+
+/** The way back from the sync problems to the sync */
+export const SYNC_BACK = { href: "/settings/sync", label: "Sync" } as const;
 
 /** SaveButton of AccountSettingsView.swift: a section with "Save" and a spinner while saving. Submits its form. */
 export function SaveButton({ isSaving, disabled, onClick }: { isSaving: boolean; disabled: boolean; onClick?: () => void }) {

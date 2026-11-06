@@ -1,16 +1,14 @@
 "use client";
 
-import { AccountSection } from "@/components/settings/AccountSection";
+import { LogoutSection } from "@/components/settings/AccountSection";
 import { FormPage } from "@/components/ui/Form";
 import {
-  AboutDeveloperSection,
-  AppColorSection,
+  AboutSection,
+  AccountCard,
   AppearanceSection,
-  BlockedUsersSection,
-  BodyweightSection,
   InstallSection,
-  ResyncSection,
-  UnitsSection,
+  PrivacySection,
+  TrainingSection,
 } from "@/components/settings/SettingsSections";
 import { useBlockedUsers, useCurrentUser, useUserSettings } from "@/lib/repo/hooks";
 
@@ -24,19 +22,16 @@ export default function SettingsPage() {
 
   return (
     <FormPage title="Settings">
+      {user && <AccountCard user={user} />}
       {/* Can only be changed once the first sync loaded the current user */}
       <fieldset disabled={!settings.isAvailable} className={`contents ${settings.isAvailable ? "" : "[&_section]:opacity-60"}`}>
-        <BodyweightSection settings={settings} />
-        <UnitsSection settings={settings} />
-        <AppColorSection settings={settings} />
-        <BlockedUsersSection count={blockedUsers.length} disabled={!settings.isAvailable} />
+        <TrainingSection settings={settings} />
       </fieldset>
-      {/* Only stored on this device, so it can always be changed */}
-      <AppearanceSection />
-      {user && <AccountSection user={user} />}
-      <ResyncSection />
+      <AppearanceSection settings={settings} />
+      <PrivacySection blockedUsersCount={blockedUsers.length} disabled={!settings.isAvailable} />
       <InstallSection />
-      <AboutDeveloperSection />
+      <AboutSection />
+      {user && <LogoutSection />}
     </FormPage>
   );
 }

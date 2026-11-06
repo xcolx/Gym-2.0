@@ -17,22 +17,18 @@
 
 /*
  * Design tokens mirroring the iOS app (Assets.xcassets + UIKit system colors).
- * "my-black" / "my-white" invert in dark mode exactly like the MyBlack / MyWhite color sets.
  */
 :root {
   color-scheme: light dark;
   --app-color: #ff0000; /* overridden at runtime from Settings → App Color */
+  --app-color-foreground: #ffffff; /* black or white on the app color, set with it (lib/app-color.ts) */
   --background: #ffffff;
   --foreground: #000000;
-  --my-black: #000000;
-  --my-white: #ffffff;
-  --my-gray: #666666;
   --secondary-label: rgba(60, 60, 67, 0.6);
   --field: rgba(128, 128, 128, 0.3);
   --separator: rgba(60, 60, 67, 0.29);
   --bar-bg: rgba(249, 249, 249, 0.94);
   --tab-inactive: #999999;
-  --banner: #34c759;
   --secondary-muscle: #ff9500;
   /* systemGroupedBackground behind the sections of a Form, secondarySystemGroupedBackground of its cells */
   --grouped-bg: #f2f2f7;
@@ -50,14 +46,10 @@
   :root:not([data-theme="light"]) {
     --background: #000000;
     --foreground: #ffffff;
-    --my-black: #ffffff;
-    --my-white: #000000;
-    --my-gray: #999999;
     --secondary-label: rgba(235, 235, 245, 0.6);
     --separator: rgba(84, 84, 88, 0.6);
     --bar-bg: rgba(22, 22, 22, 0.94);
     --tab-inactive: #8e8e93;
-    --banner: #30d158;
     --secondary-muscle: #ff9f0a;
     --grouped-bg: #000000;
     --cell-bg: #1c1c1e;
@@ -67,14 +59,10 @@
   color-scheme: dark;
   --background: #000000;
   --foreground: #ffffff;
-  --my-black: #ffffff;
-  --my-white: #000000;
-  --my-gray: #999999;
   --secondary-label: rgba(235, 235, 245, 0.6);
   --separator: rgba(84, 84, 88, 0.6);
   --bar-bg: rgba(22, 22, 22, 0.94);
   --tab-inactive: #8e8e93;
-  --banner: #30d158;
   --secondary-muscle: #ff9f0a;
   --grouped-bg: #000000;
   --cell-bg: #1c1c1e;
@@ -84,15 +72,12 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-app: var(--app-color);
-  --color-my-black: var(--my-black);
-  --color-my-white: var(--my-white);
-  --color-my-gray: var(--my-gray);
+  --color-app-foreground: var(--app-color-foreground);
   --color-secondary-label: var(--secondary-label);
   --color-field: var(--field);
   --color-separator: var(--separator);
   --color-bar: var(--bar-bg);
   --color-tab-inactive: var(--tab-inactive);
-  --color-banner: var(--banner);
   --color-grouped: var(--grouped-bg);
   --color-cell: var(--cell-bg);
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Helvetica Neue",
@@ -105,14 +90,28 @@
   --text-title--line-height: 34px;
   --text-title2: 22px;
   --text-title2--line-height: 28px;
+  --text-title3: 20px;
+  --text-title3--line-height: 25px;
   --text-headline: 17px;
   --text-headline--line-height: 22px;
   --text-body: 17px;
   --text-body--line-height: 22px;
+  --text-subheadline: 15px;
+  --text-subheadline--line-height: 20px;
   --text-footnote: 13px;
   --text-footnote--line-height: 18px;
+  --text-caption1: 12px;
+  --text-caption1--line-height: 16px;
   --text-caption: 10px;
   --text-caption--line-height: 12px;
+  --font-rounded: ui-rounded, "SF Pro Rounded", var(--font-sans);
+}
+
+/* `.cardBackground()` (CardBackground.swift): the rounded card on the grouped background, e.g. of Home and the stats */
+@utility card {
+  border-radius: 20px;
+  background: var(--cell-bg);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
 }
 
 html {
@@ -196,6 +195,34 @@ input[type="range"].ios-slider::-moz-range-thumb {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.12), 0 6px 13px rgba(0, 0, 0, 0.12);
+}
+
+/* The focused muscle of HighlightedBody, slowly pulsing (the phaseAnimator of HighlightedBodyView.swift) */
+@keyframes muscle-pulse {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.25;
+  }
+}
+
+/* A dot of the typing indicator of the Gym-AI, fading in and out one after the other (AITypingIndicatorView) */
+@keyframes typing-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Something that appears, e.g. the note below the typing indicator */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* The landing page (components/landing): the cards floating around the start button and the pulse of the button */

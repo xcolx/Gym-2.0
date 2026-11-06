@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartLine, Dumbbell, House, MessageCircle, Settings, type LucideIcon } from "lucide-react";
+import { ChartLine, Dumbbell, House, MessagesSquare, Settings, type LucideIcon } from "lucide-react";
 
 type Tab = { name: string; href: string; icon: LucideIcon; filled?: boolean };
 
 // Same order and labels as the TabView in MainView.swift
 const TABS: Tab[] = [
   { name: "Home", href: "/home", icon: House, filled: true },
-  { name: "Chat", href: "/chat", icon: MessageCircle },
+  // outlined like on iOS, which fills the other symbols
+  { name: "Chat", href: "/chat", icon: MessagesSquare },
   { name: "Workout", href: "/workout", icon: Dumbbell },
   { name: "Stats", href: "/stats", icon: ChartLine },
   { name: "Settings", href: "/settings", icon: Settings },

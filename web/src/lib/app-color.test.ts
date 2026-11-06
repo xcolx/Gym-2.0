@@ -27,8 +27,20 @@ describe("applyAppColor", () => {
     vi.stubGlobal("localStorage", { setItem: (key: string, value: string) => stored.set(key, value) });
     applyAppColor("#00FF00");
     expect(setProperty).toHaveBeenCalledWith("--app-color", "#00FF00");
+    expect(setProperty).toHaveBeenCalledWith("--app-color-foreground", "#FFFFFF");
     expect(stored.get("appColor")).toBe("#00FF00");
     expect(APP_COLOR_SCRIPT).toContain('localStorage.getItem("appColor")');
+  });
+
+  it("sets the same foreground before the first paint as appColorForeground", () => {
+    for (const [color, foreground] of [["#FFFF00", "#000000"], ["#FF0000", "#FFFFFF"]]) {
+      const setProperty = vi.fn();
+      vi.stubGlobal("document", { documentElement: { style: { setProperty } } });
+      vi.stubGlobal("localStorage", { getItem: () => color });
+      new Function(APP_COLOR_SCRIPT)();
+      expect(setProperty).toHaveBeenCalledWith("--app-color", color);
+      expect(setProperty).toHaveBeenCalledWith("--app-color-foreground", foreground);
+    }
   });
 
   it("works without storage", () => {

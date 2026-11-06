@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Plus, Sparkles, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Page, PageHeader, PillLink } from "@/components/ui/Page";
+import { Page, PageHeader } from "@/components/ui/Page";
 import { WorkoutSchemes } from "@/components/workout/WorkoutSchemes";
 import { InProgressWorkoutChooser } from "@/components/workout/InProgressWorkoutChooser";
 import { activeWorkoutRoute } from "@/components/workout/start-workout";
@@ -13,7 +15,7 @@ import {
   setShownWorkout,
   wasOpenedSinceTabEntered,
 } from "@/components/workout/workout-navigation";
-import { useSchemes, useWorkoutsInProgress } from "@/lib/repo/hooks";
+import { useMuscles, useSchemes, useWorkoutsInProgress } from "@/lib/repo/hooks";
 import type { Workout } from "@/types/models";
 
 /**
@@ -23,6 +25,7 @@ import type { Workout } from "@/types/models";
 export default function WorkoutPage() {
   const router = useRouter();
   const schemes = useSchemes();
+  const muscles = useMuscles();
   const inProgress = useWorkoutsInProgress();
   const [showsChooser, setShowsChooser] = useState(false);
   const evaluated = useRef(false);
@@ -64,14 +67,14 @@ export default function WorkoutPage() {
   if (opensWorkout) return null;
 
   return (
-    <Page>
+    <Page className="bg-grouped">
       <PageHeader title="Workout" />
-      <div className="flex flex-1 flex-col gap-2 p-2.5 pb-6">
-        <PillLink href="/workout/free">Free Workout</PillLink>
-        <PillLink href="/workout/suggested/settings">Suggested Workout</PillLink>
-        <div className="mt-2.5 flex flex-1 flex-col">
-          <WorkoutSchemes schemes={schemes ?? []} />
+      <div className="flex flex-1 flex-col gap-6 px-4 pb-6">
+        <div className="grid grid-cols-2 gap-3">
+          <StartCard href="/workout/free" title="Free workout" subtitle="Pick your exercises" icon={Plus} />
+          <StartCard href="/workout/suggested/settings" title="Suggested" subtitle="Based on your week" icon={Sparkles} />
         </div>
+        <WorkoutSchemes schemes={schemes ?? []} muscles={muscles ?? []} />
       </div>
       <InProgressWorkoutChooser
         open={showsChooser}
@@ -81,5 +84,20 @@ export default function WorkoutPage() {
         onClose={() => setShowsChooser(false)}
       />
     </Page>
+  );
+}
+
+/** StartCard of WorkoutView.swift: one of the two ways to start a workout without a saved one */
+function StartCard({ href, title, subtitle, icon: Icon }: { href: string; title: string; subtitle: string; icon: LucideIcon }) {
+  return (
+    <Link href={href} className="card flex flex-col gap-3 p-4 transition-[scale,opacity] hover:opacity-90 active:scale-[0.98] active:opacity-80">
+      <span className="flex size-11 items-center justify-center rounded-full bg-app text-app-foreground" aria-hidden>
+        <Icon size={22} strokeWidth={2.5} />
+      </span>
+      <span className="flex flex-col gap-0.5">
+        <span className="truncate text-headline font-semibold">{title}</span>
+        <span className="line-clamp-2 text-footnote text-secondary-label">{subtitle}</span>
+      </span>
+    </Link>
   );
 }

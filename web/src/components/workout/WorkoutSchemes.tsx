@@ -3,109 +3,170 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { CirclePlus, Pencil } from "lucide-react";
+import { ListChecks, Play, Plus } from "lucide-react";
 
 import { ActionSheet } from "@/components/ui/ActionSheet";
+import { HighlightedBody } from "@/components/ui/HighlightedBody";
+import { InProgressWorkoutChooser } from "@/components/workout/InProgressWorkoutChooser";
+import { useStartWorkout } from "@/components/workout/start-workout";
 import { useNow } from "@/lib/use-now";
-import { formatRelativeNamed } from "@/lib/domain/relative-date";
-import type { WorkoutScheme } from "@/types/models";
+import { musclesWorked, schemeDetails } from "@/lib/domain/workout-setup";
+import { startWorkoutFromScheme } from "@/lib/repo";
+import type { Muscle, WorkoutSchemeWithExercises } from "@/types/models";
 
 const LONG_PRESS_MS = 500;
 
-/** Port of WorkoutSchemesView.swift */
-export function WorkoutSchemes({ schemes }: { schemes: WorkoutScheme[] }) {
+/**
+ * Port of WorkoutSchemesView.swift: the user's own workouts on the workout start screen, each opened to change it before
+ * it's started, or started right away with its play button. A long press (or right click) opens its menu.
+ */
+export function WorkoutSchemes({ schemes, muscles }: { schemes: WorkoutSchemeWithExercises[]; muscles: Muscle[] }) {
   const router = useRouter();
-  const [showSheet, setShowSheet] = useState(false);
-  // the context menu of a tile (long press or right click)
-  const [menuScheme, setMenuScheme] = useState<WorkoutScheme | null>(null);
+  const [showsEditSheet, setShowsEditSheet] = useState(false);
+  // the context menu of a card (long press or right click)
+  const [menuScheme, setMenuScheme] = useState<WorkoutSchemeWithExercises | null>(null);
   const now = useNow(60_000);
+  const { start, chooser } = useStartWorkout();
+
+  const startScheme = (scheme: WorkoutSchemeWithExercises) =>
+    void start(() => startWorkoutFromScheme(scheme.id, scheme.name, scheme.exercises.map((exercise) => exercise.id)));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center">
-        <h2 className="flex-1 text-title">Your Own Workouts:</h2>
-        <button
-          type="button"
-          onClick={() => setShowSheet(true)}
-          aria-label="Edit a workout"
-          className="flex h-11 w-11 items-center justify-center text-my-black active:opacity-50"
-        >
-          <Pencil size={20} strokeWidth={2.25} />
-        </button>
-        <Link
-          href="/workout/schemes/add"
-          aria-label="Add workout"
-          className="mr-[15px] flex h-11 w-11 items-center justify-center text-my-black active:opacity-50"
-        >
-          <CirclePlus size={22} strokeWidth={2.25} />
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-baseline gap-3 px-1">
+        <h2 className="flex-1 text-title3 font-bold">Your workouts</h2>
+        {schemes.length > 0 && (
+          <button type="button" onClick={() => setShowsEditSheet(true)} className="text-subheadline font-medium text-app active:opacity-50">
+            Edit
+          </button>
+        )}
+        <Link href="/workout/schemes/add" aria-label="New workout" className="self-center text-app active:opacity-50">
+          <span className="flex size-[22px] items-center justify-center rounded-full bg-app text-app-foreground">
+            <Plus size={16} strokeWidth={3} aria-hidden />
+          </span>
         </Link>
       </div>
 
-      <div className="mt-2 min-h-[240px] flex-1 overflow-y-auto rounded-[20px] bg-my-gray p-2">
-        <div className="grid grid-cols-2 gap-2">
-          {schemes.map((s) => (
-            <div key={s.id} className="flex justify-center">
-              <SchemeTile scheme={s} now={now} onContextMenu={() => setMenuScheme(s)} />
-            </div>
-          ))}
+      {schemes.length === 0 ? (
+        <div className="card flex flex-col items-center gap-2.5 p-6 text-center">
+          <ListChecks size={34} className="text-app" aria-hidden />
+          <h3 className="text-headline font-semibold">No saved workouts yet</h3>
+          <p className="text-subheadline text-secondary-label">Save the workouts you do often to start them in one tap.</p>
+          <Link href="/workout/schemes/add" className="pt-1 text-subheadline font-semibold text-app active:opacity-50">
+            Create a workout
+          </Link>
         </div>
-      </div>
+      ) : (
+        <ul className="flex flex-col gap-2.5">
+          {schemes.map((scheme) => (
+            <li key={scheme.id}>
+              <SchemeCard
+                scheme={scheme}
+                muscles={muscles}
+                now={now}
+                onStart={() => startScheme(scheme)}
+                onContextMenu={() => setMenuScheme(scheme)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
 
       <ActionSheet
-        open={showSheet}
-        title="Edit Workout"
+        open={showsEditSheet}
+        title="Edit workout"
         message="Choose the workout you would like to edit"
-        buttons={schemes.map((s) => ({ label: s.name, onSelect: () => router.push(`/workout/schemes/${s.id}/edit`) }))}
-        onClose={() => setShowSheet(false)}
+        buttons={schemes.map((scheme) => ({ label: scheme.name, onSelect: () => router.push(`/workout/schemes/${scheme.id}/edit`) }))}
+        onClose={() => setShowsEditSheet(false)}
       />
       <ActionSheet
         open={menuScheme !== null}
         title={menuScheme?.name ?? ""}
-        buttons={menuScheme ? [{ label: "Edit", onSelect: () => router.push(`/workout/schemes/${menuScheme.id}/edit`) }] : []}
+        buttons={
+          menuScheme
+            ? [
+                ...(menuScheme.exercises.length > 0 ? [{ label: "Start", onSelect: () => startScheme(menuScheme) }] : []),
+                { label: "Edit", onSelect: () => router.push(`/workout/schemes/${menuScheme.id}/edit`) },
+              ]
+            : []
+        }
         onClose={() => setMenuScheme(null)}
       />
-    </div>
+      <InProgressWorkoutChooser {...chooser} />
+    </section>
   );
 }
 
-/** A scheme with the time since it was last performed. A long press opens its context menu instead. */
-function SchemeTile({ scheme, now, onContextMenu }: { scheme: WorkoutScheme; now: number; onContextMenu: () => void }) {
+/** schemeCard of WorkoutSchemesView: the body with its muscles, the name, details and the play button */
+function SchemeCard({
+  scheme,
+  muscles,
+  now,
+  onStart,
+  onContextMenu,
+}: {
+  scheme: WorkoutSchemeWithExercises;
+  muscles: Muscle[];
+  now: number;
+  onStart: () => void;
+  onContextMenu: () => void;
+}) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressed = useRef(false);
   const cancel = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
   };
+  const worked = musclesWorked(scheme.exercises, muscles);
+  const count = scheme.exercises.length;
 
   return (
-    <Link
-      href={`/workout/schemes/${scheme.id}`}
-      className="flex max-w-full select-none flex-col items-center rounded-[20px] bg-app p-2.5 text-my-black [-webkit-touch-callout:none] active:opacity-60"
-      onPointerDown={() => {
-        longPressed.current = false;
-        cancel();
-        timer.current = setTimeout(() => {
+    <div className="card flex items-center gap-3 py-3 pl-4 pr-3">
+      <Link
+        href={`/workout/schemes/${scheme.id}`}
+        className="flex min-w-0 flex-1 select-none items-center gap-3 [-webkit-touch-callout:none] active:opacity-60"
+        onPointerDown={() => {
+          longPressed.current = false;
+          cancel();
+          timer.current = setTimeout(() => {
+            longPressed.current = true;
+            onContextMenu();
+          }, LONG_PRESS_MS);
+        }}
+        onPointerUp={cancel}
+        onPointerLeave={cancel}
+        onPointerCancel={cancel}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          if (!longPressed.current) onContextMenu();
           longPressed.current = true;
-          onContextMenu();
-        }, LONG_PRESS_MS);
-      }}
-      onPointerUp={cancel}
-      onPointerLeave={cancel}
-      onPointerCancel={cancel}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        if (!longPressed.current) onContextMenu();
-        longPressed.current = true;
-        cancel();
-      }}
-      onClick={(event) => {
-        if (longPressed.current) event.preventDefault();
-      }}
-    >
-      <span className="max-w-full truncate text-title">{scheme.name}</span>
-      {scheme.lastPerformed && now > 0 && (
-        <span className="text-[12px] leading-4">{formatRelativeNamed(scheme.lastPerformed, new Date(now))}</span>
-      )}
-    </Link>
+          cancel();
+        }}
+        onClick={(event) => {
+          if (longPressed.current) event.preventDefault();
+        }}
+      >
+        <HighlightedBody className="h-16 w-[54px] shrink-0" primaryMuscles={worked.primary} secondaryMuscles={worked.secondary} />
+        <span className="flex min-w-0 flex-1 flex-col gap-[3px]">
+          <span className="line-clamp-2 break-words text-headline font-semibold">{scheme.name}</span>
+          <span className="truncate text-subheadline text-secondary-label">
+            {schemeDetails(count, now > 0 ? scheme.lastPerformed : null, new Date(now))}
+          </span>
+          {worked.primary.length > 0 && (
+            <span className="truncate text-caption1 text-tab-inactive">{worked.primary.map((muscle) => muscle.name).join(", ")}</span>
+          )}
+        </span>
+      </Link>
+      <button
+        type="button"
+        aria-label={`Start ${scheme.name}`}
+        disabled={count === 0}
+        onClick={onStart}
+        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-app text-app-foreground transition-[scale,opacity] active:scale-90 disabled:opacity-40"
+      >
+        <Play size={16} className="ml-0.5 fill-current" aria-hidden />
+      </button>
+    </div>
   );
 }
+

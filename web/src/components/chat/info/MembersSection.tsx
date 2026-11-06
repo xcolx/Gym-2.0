@@ -1,15 +1,15 @@
 "use client";
 
-import { CircleEllipsis, UserPlus } from "lucide-react";
+import { Ellipsis, UserPlus } from "lucide-react";
 
-import { ButtonRow, FormRow, FormSection } from "@/components/ui/Form";
+import { FormRow, FormSection, PressableRow } from "@/components/ui/Form";
 import { Menu, type MenuItem } from "@/components/chat/chat-controls";
 import { Spinner } from "@/components/ui/controls";
 import { ProfileIcon } from "@/components/ui/ProfileIcon";
-import { memberStatus } from "@/lib/domain/chat-feature";
+import { isMemberAdmin, memberCountText, memberDetails } from "@/lib/domain/chat-feature";
 import type { ChatMember, ChatWithMembers, User } from "@/types/models";
 
-/** The members of a chat with the menu of the actions for each, and "Add Members" for the admins of a private group */
+/** The members of a group with the menu of the actions for each, and "Add members" for the admins of a private group */
 export function MembersSection({
   chat,
   members,
@@ -32,32 +32,43 @@ export function MembersSection({
   memberActions: (member: ChatMember, user: User | undefined, username: string) => MenuItem[];
 }) {
   return (
-    <FormSection header={chat.groupChat ? `${chat.members.length} Members` : "Member"} footer={footer}>
+    <FormSection header={memberCountText(chat.members.length)} footer={footer}>
       {canAddMembers && (
-        <ButtonRow onClick={onAddMembers}>
-          <UserPlus size={20} aria-hidden />
-          Add Members
-        </ButtonRow>
+        <PressableRow onClick={onAddMembers} className="text-app">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-app/15" aria-hidden>
+            <UserPlus size={19} strokeWidth={2.25} />
+          </span>
+          Add members
+        </PressableRow>
       )}
       {members.map((member) => {
         const { userId } = member;
         const user = users.get(userId);
         const username = user?.username ?? "Unknown user";
-        const status = memberStatus(chat, member, user);
+        const details = memberDetails(userId, user, currentUserId);
         const actions = memberActions(member, user, username);
         return (
           <FormRow key={userId}>
             <ProfileIcon hash={user?.profileIconUrl} size={40} color={user?.schemeColor} imageHash={user?.profileImageUrl} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate">{userId === currentUserId ? `${username} (You)` : username}</p>
-              {status && <p className="text-[12px] text-secondary-label">{status}</p>}
+            <div className="flex min-w-0 flex-1 flex-col gap-px">
+              <p className="truncate">{username}</p>
+              {details && <p className="text-caption1 text-secondary-label">{details}</p>}
             </div>
+            {isMemberAdmin(chat, member) && (
+              <span className="shrink-0 rounded-full bg-app/15 px-2 py-[3px] text-[11px] font-semibold leading-[13px] text-app">
+                Admin
+              </span>
+            )}
             {busyIds.has(userId) ? (
-              <Spinner />
+              <span className="flex w-7 justify-center">
+                <Spinner />
+              </span>
             ) : (
               actions.length > 0 && (
                 <Menu label={`Actions for ${username}`} items={actions}>
-                  <CircleEllipsis size={24} aria-hidden />
+                  <span className="flex size-7 items-center justify-center rounded-full bg-app/15 text-app">
+                    <Ellipsis size={18} strokeWidth={2.5} aria-hidden />
+                  </span>
                 </Menu>
               )
             )}

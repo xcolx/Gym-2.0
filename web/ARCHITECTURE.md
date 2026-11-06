@@ -51,9 +51,11 @@ web/
       auth/page.tsx         AuthView (components/auth)
       home/                 HomeView
       chat/                 ChatsView, [chatId] (ChatView), [chatId]/info, friends, groups, ai (Gym-AI)
-      workout/              WorkoutView entry, free, schemes/{add,[schemeId],[schemeId]/edit}, suggested, active/[workoutId]
-      stats/                StatsView, distribution, exercises, facts, past-workouts/[workoutId]/edit
-      settings/             SettingsView, account/{username,email,password}, blocked-users, sync-problems
+      workout/              WorkoutView entry, free, schemes/{add,[schemeId],[schemeId]/edit}, suggested/settings,
+                            suggested (?exercises=&minutes=&equipment=, see suggest-workout.ts), active/[workoutId]
+      stats/                StatsView, distribution, exercises/[exerciseId], past-workouts/[workoutId]/edit
+      settings/             SettingsView, account (AccountView) and account/{username,email,password}, blocked-users,
+                            sync (SyncView) and sync/problems
     components/
       ui/                   the shared SwiftUI building blocks, see "Shared UI components", and the components every
                             tab uses: HighlightedBody, PhotoViewer, ServerImage, ProfileIcon, LegalPage
@@ -62,8 +64,9 @@ web/
                             Features, Showcase, PrivacySection, FinalCallToAction, LandingFooter, SectionTitle, brand.ts
       legal/                PrivacyPolicy.tsx, TermsOfUse.tsx: the texts of /privacy and /tos (built with ui/LegalPage),
                             ThirdPartyLicenses.tsx + third-party-licenses.json (generated): /licenses
-      auth/                 AuthScreen.tsx (switches the views), LoginView, SignUpView, ForgotPasswordView,
-                            CheckEmailView, AuthParts.tsx (AuthHeader, AuthButton), use-auth-forms.ts (their hooks)
+      auth/                 AuthScreen.tsx (switches the views, back through the history), WelcomeView, LoginView,
+                            SignUpView, ForgotPasswordView, CheckEmailView, AuthParts.tsx (AuthPage, AuthTextField,
+                            PasswordRule, AuthCheckbox, AuthMessage, ...), use-auth-forms.ts (their hooks)
       workout/              the workout tab, also SetTable.tsx, EditWorkoutExercise.tsx (NumberInsertView,
                             EditWorkoutExerciseView: performing and past workouts), EditWorkout.tsx, ExercisesSheet.tsx
                             and the parts of the performing workout (PerformingExercise.tsx, WorkoutPager.tsx, ...)
@@ -72,11 +75,14 @@ web/
       chat/                 the chat tab: the shared parts (ChatScreen, messages, images, chat-controls, ReportDialog,
                             NewGroupSheet, AIChat, ...) and one folder per screen
         list/               ChatsScreen.tsx, ChatRow.tsx, AIConversationsBanner.tsx, use-friend-request-count.ts
-        conversation/       ChatConversationScreen.tsx (ChatView), ChatComposer, PendingMessage, PhotoCompose,
+        conversation/       ChatConversationScreen.tsx (ChatView: runs of bubbles, DaySeparator), ChatComposer,
+                            PendingMessage, PhotoCompose,
                             use-chat-conversation.ts (draft, sending, polling, the menu of a message)
-        info/               ChatInfoScreen.tsx, MembersSection, GroupSection, AddMembersSheet, use-chat-info.ts
+        info/               ChatInfoScreen.tsx, ChatInfoHeader, DirectChatActions (the tiles of a direct chat),
+                            MembersSection, GroupSection, AddMembersSheet, use-chat-info.ts
                             (useChatInfo, useAddMembers), use-group-section.ts
-        friends/            FriendsScreen.tsx, AddFriendSection, FriendRequestsSection, FriendsListSection,
+        friends/            FriendsScreen.tsx, AddFriendSection, FriendRequestsSection (+ SentRequestsSection),
+                            FriendsListSection, PersonRow,
                             use-friends-screen.ts, use-context-menu.tsx (long press / right click → ActionSheet)
         groups/             PublicGroupsScreen.tsx, PublicGroupRow.tsx, use-public-groups.ts
       stats/                the stats tab
@@ -86,7 +92,7 @@ web/
     lib/
       store.ts              createStore/useStore: tiny observable value (the web @Observable)
       uuid.ts               newUUID(), also outside secure contexts
-      app-color.ts          --app-color CSS variable from the user's schemeColor
+      app-color.ts          --app-color CSS variable from the user's schemeColor, --app-color-foreground on it
       site.ts               SITE_URL (https://gym2.app), the App Store ID and URL, INDEXED_ROUTES
       use-online.ts         useOnline(): navigator.onLine as hook
       use-now.ts            useNow(interval): the current time for durations, one shared clock per interval
@@ -329,7 +335,7 @@ an inline script before the first paint and by the AppShell. `globals.css` switc
 `dark:` variant with it, so use `dark:` (not `@media (prefers-color-scheme)`) for dark styles. Tokens: `bg-background`,
 `text-foreground`, `text-app` / `bg-app` (the app color), `bg-grouped` and `bg-cell` (the background of a Form and its
 cells; a sheet makes both lighter in the dark appearance like iOS), `text-secondary-label`, `bg-field`,
-`border-separator`, `my-black` / `my-white`.
+`border-separator`, `bg-bar` and `text-tab-inactive`; the `card` utility for cards.
 
 Dates and numbers are formatted with `appLocale()` of `lib/domain/format.ts`: English with the region of the browser
 (`en-CH` for `de-CH`), like `Locale.current` of the iOS app, which is only localized in English.
@@ -500,7 +506,7 @@ running, stopping, lock).
 - **State** (`state.ts`): `useSyncState()` → `{ state: "idle" | "syncing" | "failed", failureMessage, lastSyncDate,
   rejectedChanges, rejectedCreates, blockedWorkouts }`, `useSyncProblems()` (a failed sync on top, then the rejected
   creates and blocked workouts).
-- **For features** (`engine.ts`): `sync()` (also "Sync Again"), `resync()` ("Manual Resync": push, then load everything),
+- **For features** (`engine.ts`): `sync()` (also "Sync again"), `resync()` ("Resync everything": push, then load everything),
   `syncChats()`, `sendChatMessage(chatId)` (queues the input and sends it right away, resolves with the chat
   afterwards), `sendChatPhoto(chatId, upload, caption)` (throws, photos aren't kept offline), `markChatRead(chatId)`
   (one request per chat and message at a time, failures ignored), `storeChatAndMembers(dto)`.
@@ -537,9 +543,10 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - Every modal overlay (Sheet, FullScreenCover, Alert, ActionSheet, PhotoViewer) puts `ref={modalRef}` on its root:
   while it is open the rest of the body is `inert` (not focusable or clickable, hidden from screen readers), the focus
   moves into it and returns when it closes.
-- `ui/overlay.tsx`: `Sheet({ open, onClose, label?, title?, leading?, trailing?, grouped? })` (`.sheet`: with a title or
-  toolbar items it has the inline navigation bar and the children scroll, without them the children bring their own
-  layout, e.g. ExercisesSheet), `SheetButton` (toolbar button, `bold` for the confirmation), `FullScreenCover`,
+- `ui/overlay.tsx`: `Sheet({ open, onClose, label?, title?, leading?, trailing?, grouped?, overCover? })` (`.sheet`: with
+  a title or toolbar items it has the inline navigation bar and the children scroll, without them the children bring
+  their own layout, e.g. ExercisesSheet; `overCover` for a sheet opened by a full screen cover, e.g. the muscle picker
+  of CreateExercise), `SheetButton` (toolbar button, `bold` for the confirmation), `FullScreenCover` (`grouped`),
   `useBackToClose(open, onClose)` (the back button of Android closes the topmost sheet: a history entry per open
   overlay), `afterOverlayClose(action)` (navigate only after a closing overlay removed its history entry), `useEscape`,
   `useBodyScrollLock`, `Portal`, `useIsClient`.
@@ -549,19 +556,38 @@ One implementation each, used by every tab. Overlays render into the body (`Port
   `PromptAlert` (with a text field, e.g. rename and the ReportDialog of components/chat).
 - `ui/ActionSheet.tsx`: `ActionSheet({ open, title, message?, buttons, onClose })` (`.actionSheet` /
   `.confirmationDialog`, scrolls long lists, closed by Cancel, outside, Escape and back).
-- `ui/controls.tsx`: `Switch` (Toggle in the app color), `SegmentedPicker` (Picker(.segmented)), `Spinner`
+- `ui/controls.tsx`: `Switch` (Toggle in the app color), `Spinner`
   (ProgressView); `ui/AppColorSegmentedPicker.tsx` (AppColorSegmentedPicker.swift); `ui/Page.tsx`: `Page`,
   `PageHeader` (the navigation bar of every screen, large or `inline` title, `back`, `leading`/`trailing` toolbar
   items; back pops with `goBack(router, parentHref)` of `lib/navigation.ts`: history back if the previous entry is the
-  parent, otherwise the parent replaces the screen, so back never leaves the app), `PillLink`, `PillButton`.
-- `SetTable` (`{ workoutExercise, stopwatchWorkoutId? }`, the stopwatch only in the performing workout) and
-  `EditWorkoutExercise` read the units and reference data themselves; the set fields are `lib/domain/set-input.ts`.
+  parent, otherwise the parent replaces the screen, so back never leaves the app);
+  `ui/PrimaryButton.tsx`: `PrimaryButton` (PrimaryButtonStyle.swift: the filled main button of a screen in the app
+  color, `isLoading` shows a spinner), `SecondaryButton` (the one below it), `primaryButtonClass` (e.g. for a link).
+- The `card` utility of globals.css is `.cardBackground()` (CardBackground.swift): the rounded card on `bg-grouped`.
+- `SetTable` (`{ workoutExercise, stopwatchWorkoutId?, limitsRows? }`, the stopwatch only in the performing workout,
+  at most four rows that scroll there, all of them in a past workout) and `EditWorkoutExercise` read the units and
+  reference data themselves; the set fields are `lib/domain/set-input.ts`.
+- The workout in progress: `WorkoutPager` (the pages with a bar per exercise and the finish page, `ref` to show a
+  page), `EditPerformingWorkout` (the overview sheet, its `WorkoutExercisesSection` is also the sheet of a past workout,
+  `EditWorkoutExercisesSheet`), `EndWorkout` (the finish page) and `DeleteWorkoutConfirmation`
+  (asks twice before the workout is deleted); `useDoneSetCounts` of `active/use-active-workout.ts`.
 - `PhotoViewer` / `OpensPhotoViewer`, `ServerImage`, `ProfileIcon` / `ProfileCircle`.
 - Forms and lists: `ui/Form.tsx` (`FormPage`, `FormStack` for the sections in a `grouped` sheet, `FormSection`,
   `FormRow` (content `className`, row `rowClassName` and props such as `onContextMenu`), `PressableRow` (a row that is
-  a button with any content), `LinkRow`, `ButtonRow` (tinted or `destructive`, an icon may come first), `InputRow`),
-  inset separators like iOS. Used by the settings, auth and chat screens. components/chat/chat-controls.tsx only keeps what
-  the chat alone uses: `ContentUnavailable`, `Menu` and the button styles.
+  a button with any content), `LinkRow`, `ButtonRow` (tinted or `destructive`, an icon may come first), `InputRow`,
+  `SettingsLabel` (SettingsLabel.swift: a title with its icon in the app color, e.g. the `label` of a `LinkRow`)),
+  inset separators like iOS. Used by the settings, auth and chat screens.
+- `ui/Menu.tsx`: `Menu` (the "…" and sort menus of the toolbars, items with an icon, `destructive`, `disabled` or
+  `checked`); `ui/ContentUnavailable.tsx` (ContentUnavailableView); `ui/ExerciseName.tsx` (ExerciseNameText.swift: the
+  name with the verified badge in the app color); `BottomActionBar` of `ui/PrimaryButton.tsx` (`.bottomActionBar`,
+  `inSheet` and `inPane` for the bottom of a sheet or of a page of the workout);
+  `ui/SearchField.tsx` (`.searchable`, e.g. of the exercise stats, the chats and the public groups);
+  `ui/MuscleLegend.tsx` (MuscleLegend.swift, the colors of the body); `ui/ReorderableList.tsx` (a List with `.onMove`
+  and `.onDelete`: drag the handle, swipe to the left, or the arrow and delete keys on the handle), e.g. the exercises
+  of EditWorkout.
+  components/chat/chat-controls.tsx only keeps what the chat alone uses: the plain button style and the red text.
+- The message composer of the chats and the Gym-AI (MessageComposer.swift) is `MessageField` of
+  components/chat/messages.tsx: the rounded field with the round `SendButton` inside. Enter sends with a keyboard.
 
 ## Domain logic (`lib/domain`, pure, unit tested)
 
@@ -569,8 +595,12 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `fuzzy-search.ts` (FuzzySearch): `fuzzyScore`, `fuzzyFilter(items, query, names)`; use `exerciseSearchNames` to include aliases.
 - `units.ts` (Units): conversions, `formatWeight`, `formatDistance`, `formatVolume`, `formatNumber`, `unitOrMetric`.
 - `password-policy.ts`: `passwordProblem(password)`.
+- `stats-overview.ts` (StatsOverview.swift and the helpers of the stats screens): `statsOverview` (minutes per day,
+  sets per muscle, exercise count), `topMuscles`, the activity board (`activityWeeks`, `activityLevel`,
+  `monthStartIndices`), `workoutsByMonth`, `exerciseStatsRows` / `shownExerciseStatsRows`, the progress chart
+  (`chartMetrics`, `chartValue`, `chartRangeStart`) and `personalRecordSet`.
 - `interesting-facts.ts`: `interestingFacts({ workouts, equipment, muscleGroups, memberSince, weightUnit, distanceUnit, now?, weekStartsOn?, locale? })`, `formatCount`.
-- `format.ts` (DateFormatting.swift): `formatDate` (dd.MM.yy), `timeFromDate` (HH:mm), `startOfWeek`, `firstWeekday`, `roundHalfAwayFromZero`,
+- `format.ts` (DateFormatting.swift): `formatDate` (dd.MM.yy), `formatMonthYear`, `timeFromDate` (HH:mm), `startOfWeek`, `firstWeekday`, `roundHalfAwayFromZero`,
   `appLocale()` (English with the browser's region), `characterCount` (unicode scalars like the server's limits), `prefixCharacters` (grapheme clusters like Swift's `prefix`).
 - `relative-date.ts`: `formatRelativeNamed(date, now?)` (`.relative(presentation: .named)`).
 - `set-input.ts` (NumberInsertView): `parseSetInput`, `formatSetInput`, `displaySetInput`, `setInputChange`, `setInputHeader`, `setLabel`, `toggleSign`, `secondsFromText`.
@@ -584,13 +614,17 @@ One implementation each, used by every tab. Overlays render into the body (`Port
 - `set-metric.ts` (SetMetric): names, input ranges, server ranges.
 - `chat.ts` (Chat+Helpers): `chatTitle`, `isChatHidden`, `sendingBlockedReason`, `otherMemberId`, `chatLastActivity`, `sortMessages`.
 - `home.ts` (HomeView helpers): `timeWorkedOutShort`, `progressPercentage`, `notTrainedMuscles`. `suggest.ts`: `suggestExercises`.
+- `workout-setup.ts` (the workout setup and the exercise picker): `musclesWorked` ([Exercise].musclesWorked),
+  `schemeDetails`, `exerciseDetailsText` ("Chest · Barbell"), `pickedPositions`, `withoutLastPick`, `moved`,
+  `formatWorkoutMinutes`, `isAlwaysAvailable`. `active-workout.ts` (the workout in progress): `doneSetCount`,
+  `doneSetsText`, `exercisesWithSetsText`, `canRemoveSet`.
 
 ## Conventions for feature agents
 
 - Routes go in `src/app/<tab>/...` (tabs: home, chat, workout, stats, settings; auth UI in `src/app/auth/...`).
   Data pages are client components. Use the shared components of `components/ui` (Sheet, Alert, ActionSheet, Switch,
   ...) instead of building another overlay or control.
-- Route folders only hold `page.tsx` and `layout.tsx` (and data of that one page, e.g. `app/stats/sections.ts`).
+- Route folders only hold `page.tsx` and `layout.tsx` (and data of that one page).
   Components go in `src/components/<tab>/` (e.g. `components/workout/WorkoutPager.tsx`), or in `components/ui/` when
   several tabs use them. Logic without UI goes into `lib/domain` with a `*.test.ts` next to it.
 - Read with hooks, write with repo functions. Don't call `db.*` from components; add a hook/repo function instead:
@@ -651,8 +685,8 @@ backend, also offline. What is still different from iOS or left to do:
 | Features/Settings/* | app/settings/**, components/settings/, lib/repo/settings-feature.ts, lib/domain/profile-image-crop.ts |
 | Features/Chat/* | app/chat/**, components/chat/, lib/chat/actions.ts, lib/domain/chat-feature.ts, ai-chat.ts |
 | Features/Workout/* | app/workout/**, components/workout/ |
-| Features/Stats/* | app/stats/**, components/stats/, lib/domain/stats-screens.ts, workout-file.ts, legacy-workout-import.ts, lib/repo/stats-feature.ts |
-| Features/Settings/SyncProblemsView.swift, SettingsView (ResyncSection) | app/settings/sync-problems/page.tsx, components/settings/SettingsSections.tsx |
+| Features/Stats/* | app/stats/**, components/stats/, lib/domain/stats-screens.ts, stats-overview.ts, workout-file.ts, legacy-workout-import.ts, lib/repo/stats-feature.ts |
+| Features/Settings/SyncProblemsView.swift, SettingsView (SyncView) | app/settings/sync/problems/page.tsx, app/settings/sync/page.tsx |
 | DesignSystem/Components/* | components/ui/ (HighlightedBody, PhotoViewer, ServerImage, ProfileIcon, AppColorSegmentedPicker) |
 | @Query | lib/repo/hooks.ts |
 
@@ -672,7 +706,7 @@ muscles, equipment or exercises; add them in the admin (http://admin.localhost:5
 
 End-to-end checklist (production build, mobile viewport, own host like http://smoke.localhost:3106 for own cookies):
 login → home → create exercise → create scheme → start it → enter sets → end → stats and past workout → export and
-import → settings (units, appearance, app color, Manual Resync) → chat with a second user (send, receive the polled
+import → settings (units, appearance, app color, Resync everything) → chat with a second user (send, receive the polled
 reply, a rejected message shows "Not saved") → sync problems → logout and login (the server's data comes back) →
 offline: with the service worker installed stop the server and navigate and log a workout from the precache, or run
 the server with an unreachable `BACKEND_URL` (502, "Sync failed" in the sync problems), then start it with the real

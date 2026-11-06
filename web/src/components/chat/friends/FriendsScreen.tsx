@@ -6,19 +6,22 @@ import { MessageAlert } from "@/components/ui/Alert";
 import { ReportDialog } from "@/components/chat/ReportDialog";
 
 import { AddFriendSection } from "./AddFriendSection";
-import { FriendRequestsSection } from "./FriendRequestsSection";
+import { FriendRequestsSection, SentRequestsSection } from "./FriendRequestsSection";
 import { FriendsListSection } from "./FriendsListSection";
 import { useContextMenu } from "./use-context-menu";
 import { useFriendsScreen } from "./use-friends-screen";
 
-/** Port of FriendsView.swift */
+/**
+ * Port of FriendsView.swift: finding users by their username, the received and sent friend requests and the friends,
+ * from which a direct chat is started
+ */
 export function FriendsScreen() {
   const screen = useFriendsScreen();
   const contextMenu = useContextMenu();
   const { busyIds, confirmationDialog, askToConfirm, report } = screen;
 
   return (
-    <FormPage title="Friends" inline back={{ href: "/chat", label: "Chats" }}>
+    <FormPage title="Friends" back={{ href: "/chat", label: "Chats" }}>
       <AddFriendSection
         searchText={screen.searchText}
         onChangeSearchText={screen.changeSearchText}
@@ -27,8 +30,6 @@ export function FriendsScreen() {
         foundUser={screen.foundUser}
         foundUserStatus={screen.statusOf}
         searchMessage={screen.searchMessage}
-        sentRequests={screen.sentRequests}
-        busyIds={busyIds}
         onAdd={(userId) => void screen.sendRequest(userId)}
         onCancelRequest={(userId) => void screen.cancelRequest(userId)}
         onReport={(user) => report({ kind: "user", id: user.id, username: user.username })}
@@ -43,6 +44,12 @@ export function FriendsScreen() {
         onReport={({ sender }) => report({ kind: "user", id: sender.id, username: sender.username })}
         onBlock={({ sender }) => askToConfirm({ kind: "block", id: sender.id, username: sender.username, profile: sender })}
         openContextMenu={contextMenu.open}
+      />
+
+      <SentRequestsSection
+        sentRequests={screen.sentRequests}
+        busyIds={busyIds}
+        onCancel={(userId) => void screen.cancelRequest(userId)}
       />
 
       <FriendsListSection

@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { EditWorkout } from "@/components/workout/EditWorkout";
-import { PillButton } from "@/components/ui/Page";
+import { EditWorkout, SaveLabel } from "@/components/workout/EditWorkout";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { createScheme } from "@/lib/repo";
 import type { Exercise } from "@/types/models";
 
@@ -23,16 +23,16 @@ export default function AddSchemePage() {
 
   return (
     <EditWorkout
-      navTitle="Add Workout Scheme"
+      navTitle="New workout"
       back={{ href: "/workout", label: "Workout" }}
       workoutTitle={title}
       onWorkoutTitleChange={setTitle}
       exerciseList={list}
       onExerciseListChange={setList}
     >
-      <PillButton onClick={() => void save()} disabled={name === ""}>
-        Save Workout
-      </PillButton>
+      <PrimaryButton onClick={() => void save()} disabled={name === "" || list.length === 0}>
+        <SaveLabel />
+      </PrimaryButton>
     </EditWorkout>
   );
 }

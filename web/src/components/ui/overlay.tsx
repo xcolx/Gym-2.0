@@ -223,7 +223,8 @@ export function SheetButton({ bold = false, className = "", ...props }: Componen
  *
  * With a `title`, `leading` or `trailing` it has the inline navigation bar of its NavigationStack (e.g. "Cancel", the
  * title and "Save") and the children scroll below it. Without, the children fill the sheet with their own layout
- * (e.g. a NavigationStack with several screens). `grouped`: the gray background of a Form.
+ * (e.g. a NavigationStack with several screens). `grouped`: the gray background of a Form. `overCover`: shown by a
+ * full screen cover, above it.
  */
 export function Sheet({
   open,
@@ -233,10 +234,12 @@ export function Sheet({
   leading,
   trailing,
   grouped = false,
+  overCover = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
+  overCover?: boolean;
   /** For screen readers, the title if not given */
   label?: string;
   title?: string;
@@ -254,7 +257,7 @@ export function Sheet({
     <Portal>
       <div
         ref={modalRef}
-        className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 md:items-center md:p-6"
+        className={`fixed inset-0 flex items-end justify-center bg-black/40 md:items-center md:p-6 ${overCover ? "z-[120]" : "z-[100]"}`}
         onClick={onClose}
         role="dialog"
         aria-modal="true"
@@ -288,16 +291,21 @@ export function Sheet({
   );
 }
 
-/** A SwiftUI `.fullScreenCover`: covers the whole screen including the tab bar. Closed with the back button too. */
+/**
+ * A SwiftUI `.fullScreenCover`: covers the whole screen including the tab bar. Closed with the back button too.
+ * `grouped`: the gray background of a Form.
+ */
 export function FullScreenCover({
   open,
   onClose,
   label,
+  grouped = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   label: string;
+  grouped?: boolean;
   children: ReactNode;
 }) {
   useBodyScrollLock(open);
@@ -307,7 +315,9 @@ export function FullScreenCover({
     <Portal>
       <div
         ref={modalRef}
-        className="fixed inset-0 z-[110] flex flex-col overflow-y-auto overscroll-contain bg-background pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-foreground"
+        className={`fixed inset-0 z-[110] flex flex-col overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-foreground ${
+          grouped ? "bg-grouped" : "bg-background"
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label={label}

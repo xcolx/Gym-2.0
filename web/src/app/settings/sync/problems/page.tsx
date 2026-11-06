@@ -4,11 +4,10 @@ import { CloudCheck, RotateCw, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
 import { FormPage, FormSection } from "@/components/ui/Form";
-import { SETTINGS_BACK } from "@/components/settings/SaveButton";
+import { SYNC_BACK } from "@/components/settings/SaveButton";
 import { Spinner } from "@/components/ui/controls";
 import { appLocale } from "@/lib/domain/format";
 import { sync, useSyncProblems } from "@/lib/sync";
-
 
 /** Port of SyncProblemsView.swift */
 export default function SyncProblemsPage() {
@@ -23,14 +22,14 @@ export default function SyncProblemsPage() {
 
   return (
     <FormPage
-      title="Sync Problems"
+      title="Sync problems"
       inline
-      back={SETTINGS_BACK}
+      back={SYNC_BACK}
       trailing={
         isSyncing ? (
           <Spinner size={22} />
         ) : (
-          <button type="button" onClick={() => void syncAgain()} aria-label="Sync Again" title="Sync Again" className="active:opacity-50">
+          <button type="button" onClick={() => void syncAgain()} aria-label="Sync again" title="Sync again" className="active:opacity-50">
             <RotateCw size={22} />
           </button>
         )
@@ -40,7 +39,7 @@ export default function SyncProblemsPage() {
         // ContentUnavailableView
         <div className="flex flex-col items-center gap-2 pt-[22dvh] text-center">
           <CloudCheck size={48} className="mb-2 text-secondary-label" aria-hidden />
-          <h2 className="text-title2 font-bold">No Sync Problems</h2>
+          <h2 className="text-title2 font-bold">Everything is synced</h2>
           <p className="text-secondary-label">Everything is in sync with the server.</p>
         </div>
       ) : (

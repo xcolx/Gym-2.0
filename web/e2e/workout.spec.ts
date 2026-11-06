@@ -10,10 +10,10 @@ interface ServerWorkouts {
 async function startBenchPress(page: Page, name: string) {
   await page.goto("/workout/free");
   await page.getByLabel("Name of the workout").fill(name);
-  await page.getByRole("button", { name: "Add exercise" }).click();
-  await page.getByRole("button", { name: "Bench Press, verified" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Add exercise" }).click();
-  await page.getByRole("button", { name: "Start Workout" }).click();
+  await page.getByRole("button", { name: "Add exercises" }).first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add Bench Press, verified" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Add 1 exercise" }).click();
+  await page.getByRole("button", { name: "Start workout" }).click();
   await expect(page).toHaveURL(/\/workout\/active\//);
 }
 
@@ -23,8 +23,8 @@ async function enterSet(page: Page, set: number, reps: string, kilograms: string
 }
 
 async function endWorkout(page: Page) {
-  await page.getByRole("tab", { name: "End Workout" }).click();
-  await page.getByRole("button", { name: "End Workout" }).click();
+  await page.getByRole("tab", { name: "Finish" }).click();
+  await page.getByRole("button", { name: "Finish workout" }).click();
   await expect(page).toHaveURL(/\/workout$/);
 }
 
@@ -37,7 +37,7 @@ test("logs a workout that reaches the server and the user's other devices", asyn
 
   await startBenchPress(page, "Push Day");
   await enterSet(page, 1, "10", "60");
-  await page.getByRole("button", { name: "add set" }).click();
+  await page.getByRole("button", { name: "Add set" }).click();
   await enterSet(page, 2, "8", "62.5");
   await endWorkout(page);
 
@@ -49,9 +49,9 @@ test("logs a workout that reaches the server and the user's other devices", asyn
   // The other device loads it with its first sync
   const phone = await deviceOf(browser, user);
   await phone.goto("/stats");
-  const stat = (term: string) => phone.getByRole("term").filter({ hasText: term }).locator("+ dd");
-  await expect(stat("Number of Workouts")).toHaveText("1");
-  await expect(stat("Total Reps")).toHaveText("18");
+  const total = (label: string) => phone.getByRole("group", { name: label, exact: true });
+  await expect(total("Workouts")).toContainText("1");
+  await expect(total("Reps")).toContainText("18");
 });
 
 test("keeps the sets entered offline and uploads them once online", async ({ page, context, request }) => {

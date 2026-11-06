@@ -50,9 +50,10 @@ export async function createUser(request: APIRequestContext, prefix?: string): P
 
 export async function logIn(page: Page, user: TestUser): Promise<void> {
   await page.goto("/auth");
+  await page.getByRole("button", { name: "Log in" }).click();
   await page.getByPlaceholder("Email").fill(user.email);
   await page.getByPlaceholder("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Log In" }).click();
+  await page.getByRole("button", { name: "Log in" }).click();
   await expect(page).toHaveURL(/\/home$/);
 }
 

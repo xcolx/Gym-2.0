@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { goBack } from "@/lib/navigation";
 
@@ -16,18 +16,22 @@ export function Page({ children, className = "" }: { children: ReactNode; classN
  * NavigationStack bar + `.navigationTitle`, large or inline. The back link pops the screen when the parent is the
  * previous history entry and opens the parent in its place otherwise (`goBack`). `leading` and `trailing` are the
  * toolbar items. With an inline title a long back label (e.g. the name of a chat) is shortened, so it never covers it.
+ * `principal` takes the place of an inline title (`ToolbarItem(placement: .principal)`), e.g. a button with the image
+ * and name of a chat.
  */
 export function PageHeader({
   title,
   back,
   leading,
   trailing,
+  principal,
   inline = false,
 }: {
   title: string;
   back?: { href: string; label: string };
   leading?: ReactNode;
   trailing?: ReactNode;
+  principal?: ReactNode;
   /** `.navigationBarTitleDisplayMode(.inline)` */
   inline?: boolean;
 }) {
@@ -47,13 +51,19 @@ export function PageHeader({
               }}
             >
               <ChevronLeft size={30} strokeWidth={2.25} className="-mr-0.5 shrink-0" aria-hidden />
-              <span className={`truncate ${inline ? "max-w-[90px]" : ""}`}>{back.label}</span>
+              <span className={`truncate ${inline ? "max-w-[72px]" : ""}`}>{back.label}</span>
             </Link>
           )}
           {leading && <div className={`flex items-center gap-4 ${back ? "" : "pl-1"}`}>{leading}</div>}
         </div>
-        {inline && (
-          <h1 className="pointer-events-none absolute inset-x-[110px] truncate text-center text-headline font-semibold">
+        {inline && principal && (
+          <div className="absolute inset-x-[104px] flex justify-center">
+            <h1 className="sr-only">{title}</h1>
+            {principal}
+          </div>
+        )}
+        {inline && !principal && (
+          <h1 className="pointer-events-none absolute inset-x-[104px] truncate text-center text-headline font-semibold">
             {title}
           </h1>
         )}
@@ -62,16 +72,4 @@ export function PageHeader({
       {!inline && <h1 className="px-4 pb-2 pt-0.5 text-large-title font-bold tracking-tight">{title}</h1>}
     </header>
   );
-}
-
-const pillClass =
-  "inline-block w-fit rounded-[25px] bg-my-black p-[15px] text-title text-my-white transition-opacity active:opacity-60 hover:opacity-85";
-
-/** The black rounded "NavigationLink" buttons used all over the app. */
-export function PillLink({ className = "", ...props }: ComponentProps<typeof Link>) {
-  return <Link {...props} className={`${pillClass} ${className}`} />;
-}
-
-export function PillButton({ className = "", ...props }: ComponentProps<"button">) {
-  return <button type="button" {...props} className={`${pillClass} disabled:opacity-40 ${className}`} />;
 }

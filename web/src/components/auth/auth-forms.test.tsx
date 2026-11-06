@@ -28,10 +28,20 @@ function WithEmail({ view }: { view: (email: string, setEmail: (email: string) =
 }
 
 describe("LoginView", () => {
+  const showCheckEmail = vi.fn();
   const renderLogin = () =>
     render(
       <WithEmail
-        view={(email, setEmail) => <LoginView email={email} setEmail={setEmail} showSignUp={() => {}} showForgotPassword={() => {}} />}
+        view={(email, setEmail) => (
+          <LoginView
+            email={email}
+            setEmail={setEmail}
+            onBack={() => {}}
+            showSignUp={() => {}}
+            showForgotPassword={() => {}}
+            showCheckEmail={showCheckEmail}
+          />
+        )}
       />,
     );
 
@@ -39,7 +49,7 @@ describe("LoginView", () => {
     auth.login.mockResolvedValue(undefined);
     renderLogin();
     const user = userEvent.setup();
-    const submit = screen.getByRole("button", { name: "Log In" }) as HTMLButtonElement;
+    const submit = screen.getByRole("button", { name: "Log in" }) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
 
     await user.type(screen.getByPlaceholderText("Email"), " alice@example.com ");
@@ -50,24 +60,21 @@ describe("LoginView", () => {
     expect(auth.login).toHaveBeenCalledWith("alice@example.com", PASSWORD);
   });
 
-  it("shows the error and offers to resend the email if it isn't verified", async () => {
+  it("shows the hint to verify the email if it isn't verified yet", async () => {
     auth.login.mockRejectedValue(
       new ApiError("server", { status: 403, code: "EmailVerificationError", message: "Verify your email first." }),
     );
-    auth.resendVerificationEmail.mockResolvedValue("We sent you a new link.");
     renderLogin();
     const user = userEvent.setup();
 
-    await user.type(screen.getByPlaceholderText("Email"), "alice@example.com");
+    await user.type(screen.getByPlaceholderText("Email"), "alice@example.com ");
     await user.type(screen.getByPlaceholderText("Password"), `${PASSWORD}{Enter}`);
-    expect(await screen.findByText("Verify your email first.")).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "Resend verification email" }));
-    expect(auth.resendVerificationEmail).toHaveBeenCalledWith("alice@example.com");
-    expect(await screen.findByText("We sent you a new link.")).toBeTruthy();
+    expect(showCheckEmail).toHaveBeenCalledWith("alice@example.com", "Verify your email first.");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("doesn't offer to resend the email for other errors", async () => {
+  it("shows the other errors below the fields", async () => {
     auth.login.mockRejectedValue(new ApiError("server", { status: 401, code: "InvalidCredentialsError", message: "Wrong password." }));
     renderLogin();
     const user = userEvent.setup();
@@ -75,8 +82,8 @@ describe("LoginView", () => {
     await user.type(screen.getByPlaceholderText("Email"), "alice@example.com");
     await user.type(screen.getByPlaceholderText("Password"), `wrong{Enter}`);
 
-    expect(await screen.findByText("Wrong password.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Resend verification email" })).toBeNull();
+    expect((await screen.findByRole("alert")).textContent).toBe("Wrong password.");
+    expect(showCheckEmail).not.toHaveBeenCalled();
   });
 });
 
@@ -85,7 +92,7 @@ describe("SignUpView", () => {
   const renderSignUp = () =>
     render(
       <WithEmail
-        view={(email, setEmail) => <SignUpView email={email} setEmail={setEmail} showLogin={() => {}} didSignUp={didSignUp} />}
+        view={(email, setEmail) => <SignUpView email={email} setEmail={setEmail} onBack={() => {}} showLogin={() => {}} didSignUp={didSignUp} />}
       />,
     );
 
@@ -100,27 +107,32 @@ describe("SignUpView", () => {
     auth.signUp.mockResolvedValue("Check your inbox.");
     renderSignUp();
     const user = userEvent.setup();
-    const submit = screen.getByRole("button", { name: "Create Account" }) as HTMLButtonElement;
+    const submit = screen.getByRole("button", { name: "Create account" }) as HTMLButtonElement;
 
     await fillIn(user);
     expect(submit.disabled).toBe(true);
-    await user.click(screen.getByRole("switch", { name: "I'm at least 16 years old and accept the Terms of Use" }));
+    await user.click(screen.getByRole("checkbox", { name: "I'm at least 16 years old and accept the Terms of Use" }));
     expect(submit.disabled).toBe(true);
-    await user.click(screen.getByRole("switch", { name: "I accept the Privacy Policy" }));
+    await user.click(screen.getByRole("checkbox", { name: "I accept the Privacy Policy" }));
     await user.click(submit);
 
     expect(auth.signUp).toHaveBeenCalledWith("alice@example.com", PASSWORD, "alice");
     expect(didSignUp).toHaveBeenCalledWith("alice@example.com", "Check your inbox.");
   });
 
-  it("explains what is wrong with the username and the password", async () => {
+  it("explains what is wrong with the username and ticks off the rules the password meets", async () => {
     renderSignUp();
     const user = userEvent.setup();
 
     await fillIn(user, { username: "al", repeat: "Other-Passw0rd" });
 
     expect(screen.getByText("Between 3 and 20 characters.")).toBeTruthy();
-    expect(screen.getByText("The passwords don't match.")).toBeTruthy();
+    const rules = screen.getAllByRole("listitem").map((rule) => rule.textContent);
+    expect(rules).toEqual([
+      "8 to 50 characters, met",
+      "Two of: lowercase, uppercase, digits, symbols, met",
+      "Passwords match, not met",
+    ]);
   });
 
   it("shows the error of the server", async () => {
@@ -129,9 +141,9 @@ describe("SignUpView", () => {
     const user = userEvent.setup();
 
     await fillIn(user);
-    await user.click(screen.getByRole("switch", { name: "I'm at least 16 years old and accept the Terms of Use" }));
-    await user.click(screen.getByRole("switch", { name: "I accept the Privacy Policy" }));
-    await user.click(screen.getByRole("button", { name: "Create Account" }));
+    await user.click(screen.getByRole("checkbox", { name: "I'm at least 16 years old and accept the Terms of Use" }));
+    await user.click(screen.getByRole("checkbox", { name: "I accept the Privacy Policy" }));
+    await user.click(screen.getByRole("button", { name: "Create account" }));
 
     expect(await screen.findByText("This username is taken.")).toBeTruthy();
     expect(didSignUp).not.toHaveBeenCalled();

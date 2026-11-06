@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle, MessageSquareWarning } from "lucide-react";
+import { MessageSquareWarning, MessagesSquare } from "lucide-react";
 import { Fragment } from "react";
 
 import { PhotoViewer } from "@/components/ui/PhotoViewer";
@@ -12,11 +12,11 @@ import { ActionSheet } from "@/components/ui/ActionSheet";
 import { MessageAlert } from "@/components/ui/Alert";
 import { ReportDialog } from "@/components/chat/ReportDialog";
 import { ChatImage } from "@/components/chat/images";
-import { MessageBubble } from "@/components/chat/messages";
+import { DaySeparator, MessageBubble } from "@/components/chat/messages";
 import { chatTitle, sendingBlockedReason } from "@/lib/domain/chat";
-import { formatDaySeparator, messageRows } from "@/lib/domain/chat-feature";
+import { memberCountText, messageRows } from "@/lib/domain/chat-feature";
 import { useChat } from "@/lib/repo";
-import type { ChatWithMembers } from "@/types/models";
+import type { ChatWithMembers, User } from "@/types/models";
 
 import { ChatComposer } from "./ChatComposer";
 import { PendingMessage } from "./PendingMessage";
@@ -35,7 +35,7 @@ export function ChatConversationScreen({ chatId }: { chatId: number }) {
         <PageHeader inline title="" back={{ href: "/chat", label: "Chats" }} />
         <ContentUnavailable
           icon={MessageSquareWarning}
-          title="Chat Not Available"
+          title="Chat not available"
           description="You're no longer a member of this chat."
           className="flex-1"
         />
@@ -46,44 +46,41 @@ export function ChatConversationScreen({ chatId }: { chatId: number }) {
 }
 
 function ChatConversation({ chat }: { chat: ChatWithMembers }) {
-  const chatId = chat.serverId;
   const conversation = useChatConversation(chat);
   const { messages, users, currentUserId, isPending, isSending, photoToSend, viewedPhoto, menuMessage } = conversation;
 
   if (messages === undefined || users === undefined) return <ChatScreen>{null}</ChatScreen>;
 
-  const rows = messageRows(messages, chat, users, currentUserId);
+  const rows = messageRows(messages, chat, users, currentUserId, isPending);
   const blockedReason = sendingBlockedReason(chat, users, currentUserId);
   const title = chatTitle(chat, users, currentUserId);
 
   return (
     <ChatScreen>
-      <PageHeader inline
+      <PageHeader
+        inline
         title={title}
         back={{ href: "/chat", label: "Chats" }}
-        trailing={
-          // A tap opens the chat info, not the photo
-          <Link href={`/chat/${chatId}/info`} aria-label="Chat info" className="active:opacity-60">
-            <ChatImage chat={chat} users={users} currentUserId={currentUserId} size={32} opensPhotoViewer={false} />
-          </Link>
-        }
+        principal={<TitleButton chat={chat} users={users} currentUserId={currentUserId} title={title} />}
       />
 
-      <div className="relative flex min-h-0 flex-1 flex-col border-t border-separator">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <BottomAnchoredScroll scrollRef={conversation.scrollRef}>
-          <div className="flex flex-col gap-1.5 p-4">
-            {rows.map(({ message, daySeparator, isOwn, senderName }) => (
+          <div className="flex flex-col px-4 py-2">
+            {rows.map(({ message, daySeparator, isOwn, senderName, startsRun, endsRun }) => (
               <Fragment key={message.serverId}>
-                {daySeparator && (
-                  <p className="py-1.5 text-center text-[12px] text-secondary-label">{formatDaySeparator(daySeparator)}</p>
-                )}
-                <MessageBubble
-                  message={message}
-                  isOwn={isOwn}
-                  senderName={senderName}
-                  onTapPhoto={conversation.setViewedPhoto}
-                  onOpenMenu={() => conversation.openMenu(message)}
-                />
+                {daySeparator && <DaySeparator date={daySeparator} />}
+                <div className={startsRun ? "pt-2.5" : "pt-0.5"}>
+                  <MessageBubble
+                    message={message}
+                    isOwn={isOwn}
+                    senderName={senderName}
+                    startsRun={startsRun}
+                    endsRun={endsRun}
+                    onTapPhoto={conversation.setViewedPhoto}
+                    onOpenMenu={() => conversation.openMenu(message)}
+                  />
+                </div>
               </Fragment>
             ))}
             {isPending && <PendingMessage text={chat.input} isSending={isSending} onRetry={() => void conversation.retry()} />}
@@ -91,8 +88,8 @@ function ChatConversation({ chat }: { chat: ChatWithMembers }) {
         </BottomAnchoredScroll>
         {messages.length === 0 && !isPending && (
           <ContentUnavailable
-            icon={MessageCircle}
-            title="No Messages"
+            icon={MessagesSquare}
+            title="No messages yet"
             description="Say hi!"
             className="pointer-events-none absolute inset-0"
           />
@@ -126,5 +123,35 @@ function ChatConversation({ chat }: { chat: ChatWithMembers }) {
       <MessageAlert title="Not deleted" message={conversation.deleteError} onClose={conversation.clearDeleteError} />
       <ReportDialog target={conversation.reportTarget} onClose={conversation.closeReport} />
     </ChatScreen>
+  );
+}
+
+/** The image and the name of the chat in the middle of the bar, which open the chat info */
+function TitleButton({
+  chat,
+  users,
+  currentUserId,
+  title,
+}: {
+  chat: ChatWithMembers;
+  users: Map<number, User>;
+  currentUserId: number | null;
+  title: string;
+}) {
+  return (
+    <Link
+      href={`/chat/${chat.serverId}/info`}
+      aria-label={`${title}, chat info`}
+      className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-field/20 active:opacity-60"
+    >
+      {/* A tap opens the chat info, not the photo */}
+      <ChatImage chat={chat} users={users} currentUserId={currentUserId} size={30} opensPhotoViewer={false} />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-subheadline font-semibold">{title}</span>
+        {chat.groupChat && (
+          <span className="truncate text-[11px] leading-[13px] text-secondary-label">{memberCountText(chat.members.length)}</span>
+        )}
+      </span>
+    </Link>
   );
 }

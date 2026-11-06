@@ -20,8 +20,20 @@ export function progressPercentage([primary, secondary]: [Muscle[], Muscle[]], a
   return Math.trunc(((primary.length + 0.33 * secondary.length) / allMuscles.length) * 100);
 }
 
-/** The muscles not trained as primary muscle, in the order of `allMuscles` (sorted by name on iOS) */
-export function notTrainedMuscles([primary]: [Muscle[], Muscle[]], allMuscles: readonly Muscle[]): Muscle[] {
+/**
+ * The muscles shown as not trained yet on Home (RecentMusclesView): those not trained at all first, then those only
+ * trained slightly as secondary muscle, which are orange on the body as well. Both in the order of `allMuscles`
+ * (sorted by name).
+ */
+export function notTrainedMuscles(
+  [primary, secondary]: [Muscle[], Muscle[]],
+  allMuscles: readonly Muscle[],
+): { muscles: Muscle[]; slightlyTrained: Set<number> } {
   const trained = new Set(primary.map((muscle) => muscle.serverId));
-  return allMuscles.filter((muscle) => !trained.has(muscle.serverId));
+  const slightlyTrained = new Set(secondary.map((muscle) => muscle.serverId));
+  const notTrained = allMuscles.filter((muscle) => !trained.has(muscle.serverId) && !slightlyTrained.has(muscle.serverId));
+  return {
+    muscles: [...notTrained, ...allMuscles.filter((muscle) => slightlyTrained.has(muscle.serverId))],
+    slightlyTrained,
+  };
 }
