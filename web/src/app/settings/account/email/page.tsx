@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { FormPage, FormSection, InputRow, LabeledRow } from "@/components/ui/Form";
-import { SaveButton, SETTINGS_BACK } from "@/components/settings/SaveButton";
+import { ACCOUNT_BACK, SaveButton } from "@/components/settings/SaveButton";
 import { Alert } from "@/components/ui/Alert";
 import { errorMessage, userApi } from "@/lib/api";
 import { trimmed } from "@/lib/auth/validation";
+import { goBack } from "@/lib/navigation";
 import { useCurrentUser } from "@/lib/repo/hooks";
 import type { User } from "@/types/models";
 
@@ -46,7 +47,7 @@ function ChangeEmail({ user }: { user: User }) {
   };
 
   return (
-    <FormPage title="Email" inline back={SETTINGS_BACK}>
+    <FormPage title="Email" inline back={ACCOUNT_BACK}>
       <form onSubmit={save} className="contents">
         <FormSection
           footer={
@@ -87,7 +88,7 @@ function ChangeEmail({ user }: { user: User }) {
         title="Confirm your new email"
         message={`We sent a link to ${sentTo}. Your email changes once you open it.`}
         onClose={() => setSentTo(null)}
-        buttons={[{ label: "OK", isDefault: true, onSelect: () => router.push(SETTINGS_BACK.href) }]}
+        buttons={[{ label: "OK", isDefault: true, onSelect: () => goBack(router, ACCOUNT_BACK.href) }]}
       />
     </FormPage>
   );

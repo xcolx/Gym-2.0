@@ -32,6 +32,11 @@ export function formatDate(date: Date): string {
   return `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${pad2(date.getFullYear() % 100)}`;
 }
 
+/** e.g. "November 2026" (`.dateTime.month(.wide).year()`) */
+export function formatMonthYear(date: Date, locale: string = appLocale()): string {
+  return date.toLocaleDateString(locale, { month: "long", year: "numeric" });
+}
+
 /** e.g. "08:05" (HH:mm), in the local time zone */
 export function timeFromDate(date: Date): string {
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;

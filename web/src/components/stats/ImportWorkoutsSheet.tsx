@@ -1,9 +1,8 @@
 "use client";
 
-import { History, Inbox } from "lucide-react";
+import { ArrowLeftRight, CircleCheck, CircleEqual, FilePlus, History, OctagonX, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { appColorForeground } from "@/lib/app-color";
 import type { LegacyWorkoutImportPlan } from "@/lib/domain/legacy-workout-import";
 import {
   readLegacyWorkoutFile,
@@ -13,6 +12,7 @@ import {
 } from "@/lib/domain/workout-file";
 import { importWorkouts, planImportOfWorkoutFile, planLegacyImportOfWorkoutFile } from "@/lib/repo";
 import { Alert } from "@/components/ui/Alert";
+import { ButtonRow, FormRow, FormSection, FormStack } from "@/components/ui/Form";
 import { Sheet, SheetButton } from "@/components/ui/overlay";
 
 /** The files of the export (JSON or CSV) and the CSV files of earlier versions (`allowedContentTypes`) */
@@ -21,34 +21,26 @@ const ACCEPT = ".json,.csv,.txt,application/json,text/csv,text/comma-separated-v
 const LEGACY_ACCEPT = ".csv,.txt,text/csv,text/comma-separated-values,text/plain";
 
 /** Port of ImportWorkoutsView.swift with ImportWorkoutsViewModel.swift */
-export function ImportWorkoutsSheet({
-  open,
-  onClose,
-  appColor,
-}: {
-  open: boolean;
-  onClose: () => void;
-  appColor: string;
-}) {
+export function ImportWorkoutsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      label="Import Workouts"
-      // iOS closes it by swiping down
+      title="Import workouts"
       trailing={
         <SheetButton bold onClick={onClose}>
           Done
         </SheetButton>
       }
+      grouped
     >
-      {/* A new state every time it is shown, like the @StateObject of the sheet */}
-      {open && <ImportWorkouts appColor={appColor} />}
+      {/* A new state every time it is shown, like the @State of the sheet */}
+      {open && <ImportWorkouts />}
     </Sheet>
   );
 }
 
-function ImportWorkouts({ appColor }: { appColor: string }) {
+function ImportWorkouts() {
   const input = useRef<HTMLInputElement>(null);
   const legacyInput = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -56,11 +48,14 @@ function ImportWorkouts({ appColor }: { appColor: string }) {
   // Set for the legacy import, the same object as `plan`
   const [legacyPlan, setLegacyPlan] = useState<LegacyWorkoutImportPlan | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  // Shown after the import was confirmed, until another file is picked
+  const [importedCount, setImportedCount] = useState<number | null>(null);
 
   const importFile = async (file: File, legacy: boolean) => {
     setImportError(null);
     setPlan(null);
     setLegacyPlan(null);
+    setImportedCount(null);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let result: WorkoutImportPlan;
@@ -90,123 +85,131 @@ function ImportWorkouts({ appColor }: { appColor: string }) {
     if (legacyPlan) setLegacyPlan({ ...legacyPlan, workouts: [] });
     try {
       await importWorkouts(workouts);
+      setImportedCount(workouts.length);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : String(error));
     }
   };
 
   const numImported = plan?.workouts.length ?? 0;
+  const existing = plan?.existingCount ?? 0;
+  const results = [
+    importedCount !== null && {
+      key: "imported",
+      icon: CircleCheck,
+      color: "text-[#34c759] dark:text-[#30d158]",
+      text: importedCount === 1 ? "1 workout imported" : `${importedCount} workouts imported`,
+    },
+    importError && { key: "error", icon: OctagonX, color: "text-[#ff3b30] dark:text-[#ff453a]", text: importError },
+    existing > 0 && {
+      key: "existing",
+      icon: CircleEqual,
+      color: "text-secondary-label",
+      text: existing === 1 ? "1 workout exists already and is skipped." : `${existing} workouts exist already and are skipped.`,
+    },
+    legacyPlan &&
+      legacyPlan.renamedExercises.length > 0 && {
+        key: "renamed",
+        icon: ArrowLeftRight,
+        color: "text-secondary-label",
+        text: `Matched: ${legacyPlan.renamedExercises.map((match) => `${match.legacyName} → ${match.exerciseName}`).join(", ")}`,
+      },
+    legacyPlan &&
+      legacyPlan.unmatchedExerciseNames.length > 0 && {
+        key: "unmatched",
+        icon: TriangleAlert,
+        color: "text-[#ff9500] dark:text-[#ff9f0a]",
+        text: `${legacyPlan.unmatchedWorkoutCount} workouts are skipped, these exercises could not be matched: ${legacyPlan.unmatchedExerciseNames.join(", ")}`,
+      },
+    plan &&
+      plan.missingExerciseNames.length > 0 && {
+        key: "missing",
+        icon: TriangleAlert,
+        color: "text-[#ff9500] dark:text-[#ff9f0a]",
+        text: `Skipped, these exercises don't exist: ${plan.missingExerciseNames.join(", ")}`,
+      },
+    plan &&
+      plan.invalidWorkouts.length > 0 && {
+        key: "invalid",
+        icon: TriangleAlert,
+        color: "text-[#ff9500] dark:text-[#ff9f0a]",
+        text: `Skipped, values out of range or more than 100 sets or exercises: ${plan.invalidWorkouts.join(", ")}`,
+      },
+  ].filter((result): result is { key: string; icon: LucideIcon; color: string; text: string } => !!result);
 
   return (
-    <>
-      <div className="flex flex-col items-center gap-[30px] px-4 text-center">
-        <h2 className="pt-4 text-title">Import Workouts</h2>
+    <FormStack>
+      <FormSection footer="A JSON or CSV file exported from Gym 2.0. Workouts that exist already are skipped.">
+        <ButtonRow onClick={() => input.current?.click()}>
+          <FilePlus size={20} aria-hidden />
+          Choose a Gym 2.0 file
+        </ButtonRow>
+      </FormSection>
 
-        <div className="flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            className="flex items-center gap-2 rounded-[10px] bg-app px-4 py-[7px] text-body font-semibold active:opacity-70"
-            style={{ color: appColorForeground(appColor) }}
-            onClick={() => input.current?.click()}
-          >
-            <Inbox size={20} />
-            Select File
-          </button>
-          <button
-            type="button"
-            className={
-              "flex items-center gap-2 rounded-[10px] bg-app/15 px-4 py-[7px] text-body font-semibold text-app " +
-              "active:opacity-70"
-            }
-            onClick={() => legacyInput.current?.click()}
-          >
-            <History size={20} />
-            Legacy Import
-          </button>
-        </div>
-        <input
-          ref={input}
-          type="file"
-          accept={ACCEPT}
-          className="hidden"
-          aria-label="Workout file"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            // Cleared, so the same file can be selected again
-            event.target.value = "";
-            if (file) void importFile(file, false);
-          }}
-        />
-        <input
-          ref={legacyInput}
-          type="file"
-          accept={LEGACY_ACCEPT}
-          className="hidden"
-          aria-label="Legacy workout file"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            event.target.value = "";
-            if (file) void importFile(file, true);
-          }}
-        />
+      <FormSection footer="A CSV file of an earlier version of the app. Its exercises are matched to the current ones by name.">
+        <ButtonRow onClick={() => legacyInput.current?.click()}>
+          <History size={20} aria-hidden />
+          Import from an earlier version
+        </ButtonRow>
+      </FormSection>
 
-        {importError && <p className="text-[#ff3b30]">Error: {importError}</p>}
+      {results.length > 0 && (
+        <FormSection header="Result">
+          {results.map(({ key, icon: Icon, color, text }) => (
+            <FormRow key={key} className="items-start">
+              <Icon size={20} className={`mt-px shrink-0 ${color}`} aria-hidden />
+              <span className="min-w-0 flex-1 break-words text-subheadline">{text}</span>
+            </FormRow>
+          ))}
+        </FormSection>
+      )}
 
-        <p className="text-footnote text-secondary-label">
-          Select a JSON or CSV file exported from Gym 2.0. Use Legacy Import for a CSV file of an earlier version, its
-          exercises are matched to the current ones by name.
-        </p>
-
-        {legacyPlan && legacyPlan.renamedExercises.length > 0 && (
-          <p className="text-secondary-label">
-            Matched exercises:{" "}
-            {legacyPlan.renamedExercises.map((match) => `${match.legacyName} → ${match.exerciseName}`).join(", ")}
-          </p>
-        )}
-        {legacyPlan && legacyPlan.unmatchedExerciseNames.length > 0 && (
-          <p className="text-[#ff9500]">
-            {legacyPlan.unmatchedWorkoutCount} workouts are not imported, since these exercises could not be
-            matched:{" "}
-            {legacyPlan.unmatchedExerciseNames.join(", ")}
-          </p>
-        )}
-
-        {plan && plan.existingCount > 0 && (
-          <p className="text-secondary-label">
-            {plan.existingCount} workouts of the file exist already and are not imported again.
-          </p>
-        )}
-        {plan && plan.missingExerciseNames.length > 0 && (
-          <p className="text-[#ff9500]">
-            Not imported, since these exercises do not exist: {plan.missingExerciseNames.join(", ")}
-          </p>
-        )}
-        {plan && plan.invalidWorkouts.length > 0 && (
-          <p className="text-[#ff9500]">
-            Not imported, since they contain values that are out of range or more than 100 sets or exercises:{" "}
-            {plan.invalidWorkouts.join(", ")}
-          </p>
-        )}
-      </div>
+      <input
+        ref={input}
+        type="file"
+        accept={ACCEPT}
+        className="hidden"
+        aria-label="Workout file"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          // Cleared, so the same file can be selected again
+          event.target.value = "";
+          if (file) void importFile(file, false);
+        }}
+      />
+      <input
+        ref={legacyInput}
+        type="file"
+        accept={LEGACY_ACCEPT}
+        className="hidden"
+        aria-label="Legacy workout file"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void importFile(file, true);
+        }}
+      />
 
       <Alert
         open={showConfirmation}
         title={
           legacyPlan
-            ? `Do you want to import ${numImported}/${legacyPlan.totalCount} correctly mapped workouts?`
-            : `Are you sure you want to import ${numImported} Workouts? This cannot be undone.`
+            ? `Import ${numImported} of ${legacyPlan.totalCount} workouts?`
+            : numImported === 1
+              ? "Import 1 workout?"
+              : `Import ${numImported} workouts?`
         }
         message={
           legacyPlan
-            ? "The other workouts contain exercises that could not be matched or exist already. This cannot be undone."
-            : undefined
+            ? "The other workouts contain exercises that could not be matched or exist already. This can't be undone."
+            : "This can't be undone."
         }
         buttons={[
           { label: "Cancel", role: "cancel" },
-          { label: "Import", role: "destructive", onSelect: () => void confirmImport() },
+          { label: "Import", isDefault: true, onSelect: () => void confirmImport() },
         ]}
         onClose={() => setShowConfirmation(false)}
       />
-    </>
+    </FormStack>
   );
 }

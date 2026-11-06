@@ -7,13 +7,14 @@ import { appColorForeground } from "@/lib/app-color";
 import { EXPORT_FORMATS, exportFileName, exportWorkouts, type ExportFormat } from "@/lib/domain/workout-file";
 import type { WorkoutWithExercises } from "@/types/models";
 import { AppColorSegmentedPicker } from "@/components/ui/AppColorSegmentedPicker";
+import { ButtonRow, FormRow, FormSection, FormStack, LabeledRow } from "@/components/ui/Form";
 import { Sheet, SheetButton } from "@/components/ui/overlay";
 import { canShareFile, downloadFile, shareOrDownloadFile } from "./share";
 
 /**
  * Port of WorkoutExportView.swift: exports the finished workouts as a file that can be shared or saved, and imported
  * again. "Export as …" opens the share sheet where the browser can share files (Android Chrome), and downloads the
- * file otherwise; with a share sheet, "Save to Device" downloads it as well.
+ * file otherwise; with a share sheet, "Save to device" downloads it as well.
  */
 export function WorkoutExportSheet({
   open,
@@ -30,8 +31,7 @@ export function WorkoutExportSheet({
     <Sheet
       open={open}
       onClose={onClose}
-      label="Export Workouts"
-      title="Export Workouts"
+      title="Export workouts"
       grouped
       trailing={
         <SheetButton bold onClick={onClose}>
@@ -65,68 +65,60 @@ function WorkoutExport({ workouts, appColor }: { workouts: readonly WorkoutWithE
       ? false
       : canShareFile(new File([""], exportFileName(format), { type: option.mimeType }));
   const disabled = workouts.length === 0;
-  const row = "flex w-full items-center gap-2 px-4 py-[11px] text-left text-app active:bg-field/40 disabled:opacity-40";
 
   return (
-    <div className="px-4 pt-4">
-      <div className="overflow-hidden rounded-[10px] bg-cell">
-        <div className="ml-4 flex justify-between border-b border-separator py-[11px] pr-4">
-          <span>Workouts</span>
-          <span className="text-secondary-label">{workouts.length}</span>
-        </div>
-        <div className="px-4 py-2">
-          <AppColorSegmentedPicker
-            label="Format"
-            options={EXPORT_FORMATS.map((item) => item.format)}
-            title={(value) => EXPORT_FORMATS.find((item) => item.format === value)!.title}
-            selection={format}
-            onChange={(value) => {
-              setFormat(value);
-              setErrorMessage(null);
-            }}
-            selectedForeground={appColorForeground(appColor)}
-          />
-        </div>
-      </div>
-      <p className="px-4 pb-6 pt-1.5 text-footnote text-secondary-label">
-        {option.explanation} Weights are in kg, times in seconds and distances in meters, so the file can be imported
-        again on any device.
-      </p>
+    <FormStack>
+      <FormSection
+        footer={`${option.explanation} Weights are in kg, times in seconds and distances in meters, so the file can be imported again on any device.`}
+      >
+        <LabeledRow label="Workouts" value={workouts.length} />
+        <FormRow>
+          <div className="w-full">
+            <AppColorSegmentedPicker
+              label="Format"
+              options={EXPORT_FORMATS.map((item) => item.format)}
+              title={(value) => EXPORT_FORMATS.find((item) => item.format === value)!.title}
+              selection={format}
+              onChange={(value) => {
+                setFormat(value);
+                setErrorMessage(null);
+              }}
+              selectedForeground={appColorForeground(appColor)}
+            />
+          </div>
+        </FormRow>
+      </FormSection>
 
-      <div className="overflow-hidden rounded-[10px] bg-cell">
+      <FormSection>
         {errorMessage ? (
-          <p className="px-4 py-[11px] text-[#ff3b30]">{errorMessage}</p>
+          <FormRow className="text-[#ff3b30] dark:text-[#ff453a]">{errorMessage}</FormRow>
         ) : (
           <>
-            <button
-              type="button"
-              className={row}
+            <ButtonRow
               disabled={disabled}
               onClick={() => {
                 const file = makeFile();
                 if (file) void shareOrDownloadFile(file);
               }}
             >
-              <Share size={20} />
+              <Share size={20} aria-hidden />
               Export as {option.title}
-            </button>
+            </ButtonRow>
             {probe && (
-              <button
-                type="button"
-                className={`${row} border-t border-separator`}
+              <ButtonRow
                 disabled={disabled}
                 onClick={() => {
                   const file = makeFile();
                   if (file) downloadFile(file);
                 }}
               >
-                <Download size={20} />
-                Save to Device
-              </button>
+                <Download size={20} aria-hidden />
+                Save to device
+              </ButtonRow>
             )}
           </>
         )}
-      </div>
-    </div>
+      </FormSection>
+    </FormStack>
   );
 }

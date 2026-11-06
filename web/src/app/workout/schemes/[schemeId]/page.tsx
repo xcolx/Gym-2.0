@@ -3,8 +3,8 @@
 import { notFound, useParams } from "next/navigation";
 import { useState } from "react";
 
-import { EditWorkout } from "@/components/workout/EditWorkout";
-import { PillButton } from "@/components/ui/Page";
+import { EditWorkout, StartLabel } from "@/components/workout/EditWorkout";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { Alert } from "@/components/ui/Alert";
 import { InProgressWorkoutChooser } from "@/components/workout/InProgressWorkoutChooser";
 import { useStartWorkout } from "@/components/workout/start-workout";
@@ -51,7 +51,8 @@ function SchemeWorkout({ scheme }: { scheme: WorkoutSchemeWithExercises }) {
       exerciseList={list}
       onExerciseListChange={setList}
     >
-      <PillButton
+      <PrimaryButton
+        disabled={list.length === 0}
         onClick={() =>
           void start(async () => {
             // the changes can be kept for the future or only for this workout
@@ -63,16 +64,16 @@ function SchemeWorkout({ scheme }: { scheme: WorkoutSchemeWithExercises }) {
           })
         }
       >
-        Start Workout
-      </PillButton>
+        <StartLabel />
+      </PrimaryButton>
       <InProgressWorkoutChooser {...chooser} />
       <Alert
         open={asksToSave}
         title="Do you want to save these changes for future use?"
-        message="If not it's only going to be changed for this time."
+        message="Otherwise it's only changed for this time."
         buttons={[
           { label: "Just once", role: "cancel", onSelect: () => void begin(false) },
-          { label: "Save for future", onSelect: () => void begin(true) },
+          { label: "Save for the future", onSelect: () => void begin(true) },
         ]}
         onClose={() => setAsksToSave(false)}
       />

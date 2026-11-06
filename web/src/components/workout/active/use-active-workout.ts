@@ -5,9 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { clearWorkoutStopwatches } from "@/components/workout/stopwatch-store";
 import { celebrateWorkout, setOpenedSinceTabEntered, setShownWorkout } from "@/components/workout/workout-navigation";
+import { doneSetCount } from "@/lib/domain/active-workout";
+import { exerciseUsesBodyweight } from "@/lib/domain/exercise";
 import { suggestedWorkoutEnd } from "@/lib/domain/workout";
 import { deleteWorkout, finishWorkout, workoutHasEnteredValues } from "@/lib/repo";
-import { useWorkout } from "@/lib/repo/hooks";
+import { useReferenceData, useUserSettings, useWorkout } from "@/lib/repo/hooks";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { clearWorkoutLastChange, workoutLastChange } from "@/lib/workout-last-change";
 import type { LocalId, WorkoutWithExercises } from "@/types/models";
@@ -104,4 +106,14 @@ export function useWhilstWorkout(workout: WorkoutWithExercises, leavingRef: Reac
     end,
     askToEnd,
   };
+}
+
+/** The sets with a value of every exercise of the workout, in their order (EndWorkoutView.doneSets) */
+export function useDoneSetCounts(workout: WorkoutWithExercises): number[] {
+  const settings = useUserSettings();
+  const reference = useReferenceData();
+  const bodyweight = settings?.bodyweight ?? 0;
+  return workout.workoutExercises.map(({ exercise, ...sets }) =>
+    doneSetCount(sets, !!exercise && !!reference && exerciseUsesBodyweight(exercise, reference), bodyweight),
+  );
 }

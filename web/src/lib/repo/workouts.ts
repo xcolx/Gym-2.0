@@ -84,7 +84,7 @@ export async function getWorkoutsInProgress(): Promise<Workout[]> {
 /**
  * Starts a workout now with the exercises in this order, each with one empty set (`Workout.create` + insert).
  * The caller checks first that no workout is in progress (`getWorkoutsInProgress()`), and gives a free workout without
- * name the name "Free Workout" (DEFAULT_FREE_WORKOUT_NAME). Returns the new workout.
+ * name the name "Free workout" (DEFAULT_FREE_WORKOUT_NAME). Returns the new workout.
  */
 export async function startWorkout(name: string, exerciseIds: readonly LocalId[]): Promise<Workout> {
   return write(workoutTables, (db) => startWorkoutIn(db, name, exerciseIds));

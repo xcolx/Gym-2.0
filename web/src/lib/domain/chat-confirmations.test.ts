@@ -30,7 +30,7 @@ describe("chatInfoConfirmation", () => {
     const actions = chatInfoActions();
     const dialog = chatInfoConfirmation({ kind: "remove", id: 2, username: "bea" }, chat(), ME, actions);
     expect(dialog?.title).toBe("Remove bea as a friend?");
-    expect(dialog?.buttons.map((button) => button.label)).toEqual(["Remove Friend"]);
+    expect(dialog?.buttons.map((button) => button.label)).toEqual(["Remove friend"]);
     dialog?.buttons[0].onSelect();
     expect(actions.removeFriend).toHaveBeenCalledWith(2);
   });
@@ -66,11 +66,11 @@ describe("chatInfoConfirmation", () => {
   it("deletes a direct chat or a group", () => {
     const direct = chatInfoConfirmation({ kind: "delete" }, chat(), ME, chatInfoActions());
     expect(direct?.title).toBe("Delete the chat?");
-    expect(direct?.buttons[0].label).toBe("Delete Chat");
+    expect(direct?.buttons[0].label).toBe("Delete chat");
     const group = chatInfoConfirmation({ kind: "delete" }, chat({ groupChat: true }), ME, chatInfoActions());
     expect(group?.title).toBe("Delete the group?");
     expect(group?.message).toBe("The group and all its messages are deleted for all members.");
-    expect(group?.buttons[0].label).toBe("Delete Group");
+    expect(group?.buttons[0].label).toBe("Delete group");
   });
 });
 
@@ -94,7 +94,7 @@ describe("friendsConfirmation", () => {
     const profile = makeUserDTO({ id: 3, username: "al" });
     const dialog = friendsConfirmation({ kind: "block", id: 3, username: "al", profile }, spies);
     expect(dialog?.message).toContain("your chat with them is hidden");
-    expect(dialog?.buttons.map((button) => button.label)).toEqual(["Block", "Block and Report…"]);
+    expect(dialog?.buttons.map((button) => button.label)).toEqual(["Block", "Block and report…"]);
     dialog?.buttons[0].onSelect();
     dialog?.buttons[1].onSelect();
     expect(spies.block).toHaveBeenCalledWith(3, profile);

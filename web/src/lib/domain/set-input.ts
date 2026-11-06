@@ -153,9 +153,3 @@ export function setInputChange(text: string, metric: SetMetric, stored: number |
 export function toggleSign(text: string): string {
   return text.startsWith("-") ? text.slice(1) : `-${text}`;
 }
-
-/** The set label of an entry: "1", "2", ... or for unilateral exercises "1  R" and "L" */
-export function setLabel(entryIndex: number, unilateral: boolean): string {
-  if (!unilateral) return String(entryIndex + 1);
-  return entryIndex % 2 === 0 ? `${entryIndex / 2 + 1}  R` : "L";
-}

@@ -1,34 +1,31 @@
-import { CircleCheck } from "lucide-react";
-
+import { ExerciseName } from "@/components/ui/ExerciseName";
 import { entryDescriptions } from "@/lib/domain/stats-screens";
 import type { UserSettingsValues } from "@/lib/repo/hooks";
 import type { WorkoutWithExercises } from "@/types/models";
 
-/** The exercises of a past workout with the description of every set, in a bordered box */
+/** The exercises of a past workout as cards, with the description of every set (PastWorkoutDetailView.swift) */
 export function PastWorkoutExerciseList({ workout, settings }: { workout: WorkoutWithExercises; settings: UserSettingsValues }) {
   return (
-    <div className="m-2.5 rounded-[10px] border-2 border-foreground p-2.5">
-      <ul>
-        {workout.workoutExercises.map((workoutExercise) => (
-          <li
-            key={workoutExercise.id}
-            className="flex items-start gap-2 border-b border-separator py-[11px] last:border-b-0"
-          >
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="break-words">{workoutExercise.exercise?.name ?? ""}</span>
-              {workoutExercise.exercise?.verified && (
-                <CircleCheck size={18} className="shrink-0 text-[#007aff]" aria-label="Verified" />
-              )}
-            </span>
-            <span className="flex-1" />
-            <span className="flex shrink-0 flex-col items-end">
+    <ul className="flex flex-col gap-4">
+      {[...workout.workoutExercises]
+        .sort((a, b) => a.index - b.index)
+        .map((workoutExercise) => (
+          <li key={workoutExercise.id} className="card flex flex-col gap-2 p-4">
+            <ExerciseName
+              name={workoutExercise.exercise?.name ?? ""}
+              verified={workoutExercise.exercise?.verified === true}
+              className="text-headline font-semibold"
+            />
+            <ol className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-subheadline">
               {entryDescriptions(workoutExercise, settings).map((description, index) => (
-                <span key={index}>{description}</span>
+                <li key={index} className="col-span-2 grid grid-cols-subgrid">
+                  <span className="text-right text-secondary-label tabular-nums">{index + 1}</span>
+                  <span>{description}</span>
+                </li>
               ))}
-            </span>
+            </ol>
           </li>
         ))}
-      </ul>
-    </div>
+    </ul>
   );
 }

@@ -4,8 +4,9 @@ import { notFound, useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 
-import { EditWorkout } from "@/components/workout/EditWorkout";
-import { PillButton } from "@/components/ui/Page";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
+
+import { EditWorkout, SaveLabel, SquareActionButton } from "@/components/workout/EditWorkout";
 import { Alert } from "@/components/ui/Alert";
 import { deleteScheme, updateScheme } from "@/lib/repo";
 import { useScheme } from "@/lib/repo/hooks";
@@ -26,7 +27,7 @@ export default function EditSchemePage() {
 
 function EditScheme({ scheme, onDelete }: { scheme: WorkoutSchemeWithExercises; onDelete: () => void }) {
   const router = useRouter();
-  // A local copy of the name and list, so nothing is saved before "Save Workout"
+  // A local copy of the name and list, so nothing is saved before "Save workout"
   const [title, setTitle] = useState(scheme.name);
   const [list, setList] = useState(scheme.exercises);
   const [asksToDelete, setAsksToDelete] = useState(false);
@@ -46,36 +47,26 @@ function EditScheme({ scheme, onDelete }: { scheme: WorkoutSchemeWithExercises; 
 
   return (
     <EditWorkout
-      navTitle={`Edit: ${scheme.name}`}
+      navTitle="Edit workout"
       back={{ href: "/workout", label: "Workout" }}
       workoutTitle={title}
       onWorkoutTitleChange={setTitle}
       exerciseList={list}
       onExerciseListChange={setList}
     >
-      <div className="grid w-full grid-cols-[2fr_auto_1fr] items-center px-2.5">
-        <span />
-        <PillButton onClick={() => void save()} disabled={name === ""}>
-          Save Workout
-        </PillButton>
-        <div className="flex justify-center">
-          <button
-            type="button"
-            aria-label="Delete workout"
-            onClick={() => setAsksToDelete(true)}
-            className="rounded-full border-2 border-[#ff3b30] p-[15px] text-[#ff3b30] active:opacity-60"
-          >
-            <Trash2 size={26} />
-          </button>
-        </div>
-      </div>
+      <SquareActionButton label="Delete workout" destructive onClick={() => setAsksToDelete(true)}>
+        <Trash2 size={21} aria-hidden />
+      </SquareActionButton>
+      <PrimaryButton onClick={() => void save()} disabled={name === "" || list.length === 0}>
+        <SaveLabel />
+      </PrimaryButton>
       <Alert
         open={asksToDelete}
-        title="Are you sure you want to delete this workout?"
-        message="There is no way to recover it."
+        title="Delete this workout?"
+        message="It can't be recovered."
         buttons={[
           { label: "Delete", role: "destructive", onSelect: () => void remove() },
-          { label: "Go back", role: "cancel" },
+          { label: "Cancel", role: "cancel" },
         ]}
         onClose={() => setAsksToDelete(false)}
       />

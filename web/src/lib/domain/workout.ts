@@ -27,7 +27,7 @@ export function durationInput(text: string): { text: string; minutes: number | n
 }
 
 /** The name a free workout gets when none was entered (FreeWorkoutView) */
-export const DEFAULT_FREE_WORKOUT_NAME = "Free Workout";
+export const DEFAULT_FREE_WORKOUT_NAME = "Free workout";
 
 /** Finished workouts started in the current week (Workout.currentWeek(), `date > startOfWeek && !inProgress`) */
 export function isInCurrentWeek(workout: Workout, now: Date = new Date(), weekStartsOn?: number): boolean {

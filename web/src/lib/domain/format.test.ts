@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { formatDaySeparator } from "./chat-feature";
-import { appLocale, firstWeekday } from "./format";
+import { appLocale, firstWeekday, formatMonthYear } from "./format";
 
 describe("appLocale", () => {
   it("is English with the region of the browser, like Locale.current of the English-only iOS app", () => {
@@ -15,5 +15,11 @@ describe("appLocale", () => {
     expect(formatDaySeparator(new Date(2026, 9, 15), appLocale(["de-DE"]))).toBe("Thursday, 15 October");
     expect(firstWeekday(appLocale(["de-DE"]))).toBe(1);
     expect(firstWeekday(appLocale(["en-US"]))).toBe(0);
+  });
+});
+
+describe("formatMonthYear", () => {
+  it("writes the month out with the year", () => {
+    expect(formatMonthYear(new Date(2026, 10, 5), "en-US")).toBe("November 2026");
   });
 });

@@ -48,7 +48,7 @@ export function chatInfoConfirmation(
       return {
         title: `Remove ${confirmation.username} as a friend?`,
         message: "You can't send each other messages in your direct chat anymore until you're friends again.",
-        buttons: [{ label: "Remove Friend", destructive: true, onSelect: () => actions.removeFriend(confirmation.id) }],
+        buttons: [{ label: "Remove friend", destructive: true, onSelect: () => actions.removeFriend(confirmation.id) }],
       };
     case "block":
       return {
@@ -58,7 +58,7 @@ export function chatInfoConfirmation(
         buttons: [
           { label: "Block", destructive: true, onSelect: () => actions.block(confirmation.id) },
           {
-            label: "Block and Report…",
+            label: "Block and report…",
             destructive: true,
             onSelect: () => actions.blockAndReport(confirmation.id, confirmation.username),
           },
@@ -68,11 +68,11 @@ export function chatInfoConfirmation(
       return {
         title: `Remove ${confirmation.username} from the group?`,
         message: "They can't see the group anymore. An admin can add them again.",
-        buttons: [{ label: "Remove from Group", destructive: true, onSelect: () => actions.removeFromGroup(confirmation.id) }],
+        buttons: [{ label: "Remove from group", destructive: true, onSelect: () => actions.removeFromGroup(confirmation.id) }],
       };
     case "leave": {
       const { title, message } = leaveGroupConfirmation(chat, currentUserId);
-      return { title, message, buttons: [{ label: "Leave Group", destructive: true, onSelect: actions.leave }] };
+      return { title, message, buttons: [{ label: "Leave group", destructive: true, onSelect: actions.leave }] };
     }
     case "delete":
       return {
@@ -80,7 +80,7 @@ export function chatInfoConfirmation(
         message: chat.groupChat
           ? "The group and all its messages are deleted for all members."
           : "The chat and all its messages are deleted for both of you.",
-        buttons: [{ label: chat.groupChat ? "Delete Group" : "Delete Chat", destructive: true, onSelect: actions.delete }],
+        buttons: [{ label: chat.groupChat ? "Delete group" : "Delete chat", destructive: true, onSelect: actions.delete }],
       };
   }
 }
@@ -109,7 +109,7 @@ export function friendsConfirmation(
       return {
         title: `Remove ${confirmation.username} as a friend?`,
         message: "You can't send each other messages in your direct chat anymore until you're friends again.",
-        buttons: [{ label: "Remove Friend", destructive: true, onSelect: () => actions.removeFriend(confirmation.id) }],
+        buttons: [{ label: "Remove friend", destructive: true, onSelect: () => actions.removeFriend(confirmation.id) }],
       };
     case "block":
       return {
@@ -119,7 +119,7 @@ export function friendsConfirmation(
         buttons: [
           { label: "Block", destructive: true, onSelect: () => actions.block(confirmation.id, confirmation.profile) },
           {
-            label: "Block and Report…",
+            label: "Block and report…",
             destructive: true,
             onSelect: () => actions.blockAndReport(confirmation.id, confirmation.username, confirmation.profile),
           },

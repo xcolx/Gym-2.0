@@ -35,11 +35,13 @@ describe("progressPercentage", () => {
 });
 
 describe("notTrainedMuscles", () => {
-  it("lists the muscles not trained as primary muscle in their order", () => {
-    expect(notTrainedMuscles([[muscles[1]], [muscles[0]]], muscles).map((muscle) => muscle.name)).toEqual([
-      "Chest",
-      "Front Deltoid",
-      "Quads",
-    ]);
+  it("lists the muscles not trained at all first, then those only trained as secondary muscle", () => {
+    const { muscles: shown, slightlyTrained } = notTrainedMuscles([[muscles[1]], [muscles[0]]], muscles);
+    expect(shown.map((muscle) => muscle.name)).toEqual(["Front Deltoid", "Quads", "Chest"]);
+    expect([...slightlyTrained]).toEqual([muscles[0].serverId]);
+  });
+
+  it("is empty once every muscle is trained as primary muscle", () => {
+    expect(notTrainedMuscles([[...muscles], []], muscles).muscles).toEqual([]);
   });
 });

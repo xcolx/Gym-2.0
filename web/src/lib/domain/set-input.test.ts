@@ -9,7 +9,6 @@ import {
   secondsFromText,
   setInputChange,
   setInputHeader,
-  setLabel,
   toggleSign,
 } from "./set-input";
 
@@ -104,13 +103,10 @@ describe("setInputChange", () => {
 });
 
 describe("labels", () => {
-  it("names the columns and sets", () => {
+  it("names the columns", () => {
     expect(setInputHeader("weights", imperial)).toBe("lbs");
     expect(setInputHeader("distance", metric)).toBe("m");
     expect(setInputHeader("intensity", metric)).toBe("Level");
-    expect(setLabel(0, false)).toBe("1");
-    expect(setLabel(2, true)).toBe("2  R");
-    expect(setLabel(3, true)).toBe("L");
     expect(toggleSign("5")).toBe("-5");
     expect(toggleSign("-5")).toBe("5");
   });

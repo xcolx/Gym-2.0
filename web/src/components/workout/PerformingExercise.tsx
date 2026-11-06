@@ -2,72 +2,77 @@
 
 // Port of ios/Gym 2.0/Features/Workout/ActiveWorkout/PerformingExerciseView.swift
 
-import { CircleCheck } from "lucide-react";
+import { Info } from "lucide-react";
 
+import { ExerciseHistoryCard } from "@/components/stats/ExerciseHistoryCard";
+import { ExerciseName } from "@/components/ui/ExerciseName";
 import { EditWorkoutExercise } from "@/components/workout/EditWorkoutExercise";
-import { formatDate } from "@/lib/domain/format";
-import { entryCount, entryDescription } from "@/lib/domain/workout-exercise";
+import { summaryOfWorkoutExercises } from "@/lib/domain/stats";
+import { personalRecordSet } from "@/lib/domain/stats-overview";
 import { useUserSettings } from "@/lib/repo/hooks";
 import { useExerciseHistory } from "@/lib/repo";
 import { UnitSystem, type LocalId, type WorkoutExerciseWithExercise } from "@/types/models";
 
+/**
+ * An exercise of the workout in progress: a slim title, the set table and the past times the exercise was done. Not one
+ * scroll view: the sets stay in place however long the history is, it scrolls on its own.
+ */
 export function PerformingExercise({
   workoutExercise,
+  number,
+  exerciseCount,
   workoutId,
   onShowExercise,
 }: {
   workoutExercise: WorkoutExerciseWithExercise;
+  /** The position of the exercise in the workout, from 1 */
+  number: number;
+  exerciseCount: number;
   workoutId: LocalId;
   onShowExercise: (exerciseId: LocalId) => void;
 }) {
   const exercise = workoutExercise.exercise;
   const history = useExerciseHistory(workoutExercise.exerciseId);
   const settings = useUserSettings();
-  const weightUnit = settings?.weightUnit ?? UnitSystem.metric;
-  const distanceUnit = settings?.distanceUnit ?? UnitSystem.metric;
-
-  const title = (
-    <span className="flex items-center gap-1.5 pl-2.5 text-left text-headline font-semibold">
-      {exercise?.name ?? ""}
-      {exercise?.verified && <CircleCheck size={18} className="shrink-0 text-[#007aff]" aria-label="Verified" />}
-    </span>
-  );
+  const units = { weightUnit: settings?.weightUnit ?? UnitSystem.metric, distanceUnit: settings?.distanceUnit ?? UnitSystem.metric };
+  const record = exercise && history ? personalRecordSet(exercise, history, summaryOfWorkoutExercises(history)) : null;
 
   return (
-    <div className="flex min-h-full flex-col px-2.5 pb-2.5">
-      <div className="flex min-h-11 items-center">
-        {exercise ? (
+    <div className="flex h-full flex-col gap-3 px-4 pb-2">
+      {/* one slim line, so that the sets get the space */}
+      <div className="flex min-h-9 shrink-0 items-center gap-2.5 px-1 pt-1">
+        <span
+          className="shrink-0 rounded-full bg-app/15 px-2 py-[3px] text-caption1 font-bold tabular-nums text-app"
+          aria-label={`Exercise ${number} of ${exerciseCount}`}
+        >
+          {number}/{exerciseCount}
+        </span>
+        <ExerciseName name={exercise?.name ?? ""} verified={exercise?.verified ?? false} className="min-w-0 flex-1 truncate text-headline font-semibold" />
+        {exercise && (
           // The exercise can't be added again from the performing workout
-          <button type="button" className="min-h-11 active:opacity-50" onClick={() => onShowExercise(exercise.id)}>
-            {title}
+          <button
+            type="button"
+            aria-label={`Details of ${exercise.name}`}
+            onClick={() => onShowExercise(exercise.id)}
+            className="-mr-2 flex size-9 shrink-0 items-center justify-center text-app active:opacity-50"
+          >
+            <Info size={22} aria-hidden />
           </button>
-        ) : (
-          title
         )}
       </div>
 
-      <EditWorkoutExercise workoutExercise={workoutExercise} stopwatchWorkoutId={workoutId} />
+      <div className="card shrink-0 p-4">
+        <EditWorkoutExercise workoutExercise={workoutExercise} stopwatchWorkoutId={workoutId} />
+      </div>
 
-      <div className="mt-2.5 flex flex-1 flex-col">
-        <p className="pl-2.5">History:</p>
-        <div className="mx-2.5 mt-1 flex-1 rounded-[10px] border-2 border-my-black px-0.5 py-2.5">
-          {history && history.length === 0 && (
-            <p className="px-3 py-2">You have never done this exercise. You will see your past workouts with this exercise here.</p>
-          )}
-          <ul>
-            {history?.map((past) => (
-              <li key={past.id} className="flex items-start gap-2 border-b border-separator px-3 py-2 last:border-b-0">
-                <span className="shrink-0">{formatDate(past.workout.date)}</span>
-                <span className="min-w-0 flex-1 break-words text-center">{past.workout.name}</span>
-                <span className="flex shrink-0 flex-col items-end">
-                  {Array.from({ length: entryCount(past) }, (_, index) => (
-                    <span key={index}>{entryDescription(past, index, weightUnit, distanceUnit)}</span>
-                  ))}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 pt-2">
+        <h2 className="px-1 text-title3 font-bold">History</h2>
+        {history && history.length === 0 && (
+          <p className="card p-4 text-subheadline text-secondary-label">
+            You have never done this exercise. You will see your past workouts with this exercise here.
+          </p>
+        )}
+        {history && history.length > 0 && <ExerciseHistoryCard history={history} record={record} units={units} scrolls />}
       </div>
     </div>
   );

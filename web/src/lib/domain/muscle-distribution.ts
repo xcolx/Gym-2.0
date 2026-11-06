@@ -14,21 +14,22 @@ export type CategoryCriteria = (typeof CATEGORY_CRITERIA)[number];
 const SECONDARY_FACTOR = 0.33;
 
 /**
- * The bar of every muscle (sorted by name) or muscle group in percent of the highest value, in the order of
- * `muscles` / `muscleGroups`. All 0 if nothing was trained.
+ * The rows of the distribution: every muscle or muscle group with its value, the most trained first, then by name
+ * (`rows` of DistributionByMuscleView.swift)
  */
-export function distributionPercentages(
+export function distributionRows(
   workouts: readonly WorkoutWithExercises[],
   muscles: readonly Muscle[],
   muscleGroups: readonly MuscleGroup[],
   value: ValueCriteria,
   category: CategoryCriteria,
-): number[] {
+): { name: string; value: number }[] {
+  const names = category === "Muscle" ? muscles : muscleGroups;
   const values =
     category === "Muscle" ? muscleValues(workouts, muscles, value) : muscleGroupValues(workouts, muscleGroups, value);
-  const highest = Math.max(0, ...values);
-  if (!(highest > 0)) return values;
-  return values.map((count) => count / (highest / 100));
+  return names
+    .map((item, index) => ({ name: item.name, value: values[index] }))
+    .sort((a, b) => b.value - a.value || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
 function muscleValues(

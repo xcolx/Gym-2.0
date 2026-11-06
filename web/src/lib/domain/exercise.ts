@@ -1,7 +1,7 @@
 // Port of ios/Gym 2.0/Core/Persistence/Extensions/Exercise+Helpers.swift. The reference data is passed in as
 // `ReferenceData` (see `useReferenceData()` in lib/repo).
 
-import type { Equipment, Exercise, Muscle, MuscleGroup, ReferenceData } from "@/types/models";
+import type { Equipment, Exercise, Muscle, ReferenceData } from "@/types/models";
 
 export { exerciseTrackedMetrics } from "./set-metric";
 
@@ -19,10 +19,6 @@ export const EXERCISE_LIMITS = {
 
 /** Names of the equipment for which the bodyweight is the default weight of a set */
 export const BODYWEIGHT_EQUIPMENT_NAMES: ReadonlySet<string> = new Set(["Body", "Pull Up Bar"]);
-
-export function exerciseMuscleGroup(exercise: Exercise, reference: ReferenceData): MuscleGroup | null {
-  return reference.muscleGroups.get(exercise.muscleGroupId) ?? null;
-}
 
 export function exerciseEquipment(exercise: Exercise, reference: Pick<ReferenceData, "equipment">): Equipment | null {
   return reference.equipment.get(exercise.equipmentId) ?? null;

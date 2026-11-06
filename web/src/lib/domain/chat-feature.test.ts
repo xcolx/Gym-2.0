@@ -6,14 +6,18 @@ import {
   adminChange,
   canRemoveMember,
   canSendText,
+  chatInfoSubtitle,
   chatPreview,
   blockedMembersWarning,
   filterPublicGroups,
   formatChatListDate,
+  formatDaySeparator,
+  groupInitials,
   isChatAdmin,
   isValidGroupName,
   leaveGroupConfirmation,
-  memberStatus,
+  isMemberAdmin,
+  memberDetails,
   messageRows,
   pollsChats,
   reportMessage,
@@ -110,9 +114,47 @@ describe("messageRows", () => {
     expect(rows.map((row) => row.isOwn)).toEqual([false, false, true, false, false]);
   });
 
+  it("groups the messages a sender sent within a few minutes into a run", () => {
+    const at = (minutes: number) => new Date(2026, 9, 14, 9, minutes);
+    const rows = messageRows(
+      [message(1, 2, at(0)), message(2, 2, at(3)), message(3, 2, at(9)), message(4, ME, at(10)), message(5, ME, at(11))],
+      chat(),
+      users,
+      ME,
+    );
+    expect(rows.map((row) => row.startsRun)).toEqual([true, false, true, true, false]);
+    expect(rows.map((row) => row.endsRun)).toEqual([false, true, true, false, true]);
+    expect(rows.map((row) => row.senderName)).toEqual(["bea", null, "bea", null, null]);
+  });
+
+  it("doesn't end the run of the last message while a text waits to be sent", () => {
+    const rows = messageRows([message(1, ME, new Date())], chat(), users, ME, true);
+    expect(rows[0].endsRun).toBe(false);
+  });
+
   it("shows no sender names in direct chats", () => {
     const rows = messageRows([message(1, 2, new Date())], chat({ groupChat: false }), users, ME);
     expect(rows[0].senderName).toBeNull();
+  });
+});
+
+describe("groupInitials", () => {
+  it("takes the first letter or number of the first two words", () => {
+    expect(groupInitials("Leg day crew")).toBe("LD");
+    expect(groupInitials("  run ")).toBe("R");
+    expect(groupInitials("#1 ✨club")).toBe("1C");
+    expect(groupInitials("💪 🏋️")).toBeNull();
+    expect(groupInitials(null)).toBeNull();
+  });
+});
+
+describe("formatDaySeparator", () => {
+  const now = new Date(2026, 10, 5, 12, 0);
+  it("names today and yesterday, adds the year only for other years", () => {
+    expect(formatDaySeparator(new Date(2026, 10, 5, 8, 0), "en-US", now)).toBe("Today");
+    expect(formatDaySeparator(new Date(2026, 10, 4, 23, 0), "en-US", now)).toBe("Yesterday");
+    expect(formatDaySeparator(new Date(2026, 9, 15), "en-US", now)).toBe("Thursday, October 15");
+    expect(formatDaySeparator(new Date(2025, 9, 15), "en-US", now)).toBe("October 15, 2025");
   });
 });
 
@@ -135,10 +177,28 @@ describe("chat info", () => {
 
   it("describes the members", () => {
     const [me, creator, blocked] = chat().members;
-    expect(memberStatus(chat(), creator, users.get(2))).toBe("Admin · Friend");
-    expect(memberStatus(chat(), blocked, users.get(3))).toBe("Blocked");
-    expect(memberStatus(chat(), { ...blocked, userId: 4, admin: true }, undefined)).toBe("Admin");
-    expect(memberStatus(chat(), me, users.get(ME))).toBeNull();
+    expect(memberDetails(creator.userId, users.get(2), ME)).toBe("Friend");
+    expect(memberDetails(blocked.userId, users.get(3), ME)).toBe("Blocked");
+    expect(memberDetails(4, undefined, ME)).toBeNull();
+    expect(memberDetails(me.userId, users.get(ME), ME)).toBe("You");
+    expect(isMemberAdmin(chat(), creator)).toBe(true);
+    expect(isMemberAdmin(chat(), blocked)).toBe(false);
+    expect(isMemberAdmin(chat({ groupChat: false }), creator)).toBe(false);
+  });
+
+  it("says what kind of chat it is below its name", () => {
+    expect(chatInfoSubtitle(chat(), users, ME)).toBe("Private group · 3 members");
+    expect(chatInfoSubtitle(chat({ isPublic: true }), users, ME)).toBe("Public group · 3 members");
+    const direct = (otherId: number) =>
+      chat({
+        groupChat: false,
+        members: [
+          { chatId: 10, userId: ME, lastReadMessageId: 0, admin: null },
+          { chatId: 10, userId: otherId, lastReadMessageId: 0, admin: null },
+        ],
+      });
+    expect(chatInfoSubtitle(direct(2), users, ME)).toBe("Friend");
+    expect(chatInfoSubtitle(direct(3), users, ME)).toBe("Blocked");
   });
 
   it("only lets admins change the group", () => {
@@ -206,8 +266,8 @@ describe("helpers", () => {
   it("titles and explains the reports of users, groups and messages", () => {
     expect(reportTitle({ kind: "user", id: 7, username: "anna" })).toBe("Report anna");
     expect(reportTitle({ kind: "chat", id: 4, name: "Lifters" })).toBe("Report Lifters");
-    expect(reportTitle({ kind: "message", id: 12, senderName: "anna" })).toBe("Report Message from anna");
-    expect(reportTitle({ kind: "message", id: 12, senderName: null })).toBe("Report Message");
+    expect(reportTitle({ kind: "message", id: 12, senderName: "anna" })).toBe("Report message from anna");
+    expect(reportTitle({ kind: "message", id: 12, senderName: null })).toBe("Report message");
     expect(reportMessage({ kind: "user", id: 7, username: "anna", blocks: true })).toBe(
       "They will be blocked as well. The report is reviewed within 24 hours.",
     );

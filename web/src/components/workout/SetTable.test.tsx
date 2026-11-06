@@ -72,9 +72,8 @@ describe("SetTable", () => {
 
     render(<SetTable workoutExercise={workoutExercise} actions={actions} />);
 
-    // Testing Library collapses the two spaces of "1  R"
-    expect(screen.getByLabelText("Reps of set 1 R")).toBeTruthy();
-    expect(screen.getByLabelText("Reps of set L")).toBeTruthy();
+    expect(screen.getByLabelText("Reps of set 1, right")).toBeTruthy();
+    expect(screen.getByLabelText("Reps of set 1, left")).toBeTruthy();
   });
 
   it("changes the sign of the intensity with the accessory button", async () => {

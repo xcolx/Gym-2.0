@@ -5,7 +5,6 @@ import {
   exerciseCanChangeTrackedMetrics,
   exerciseCanEdit,
   exerciseEquipment,
-  exerciseMuscleGroup,
   exercisePrimaryMuscles,
   exerciseSearchNames,
   exerciseSecondaryMuscles,
@@ -15,9 +14,8 @@ import {
 } from "./exercise";
 
 describe("reference data of an exercise", () => {
-  it("resolves the muscle group, the equipment and the muscles by server id", () => {
+  it("resolves the equipment and the muscles by server id", () => {
     const exercise = makeExercise({ muscleGroupId: 2, equipmentId: 3, primaryMuscleIds: [4, 99, 1], secondaryMuscleIds: [2] });
-    expect(exerciseMuscleGroup(exercise, reference)?.name).toBe("Legs");
     expect(exerciseEquipment(exercise, reference)?.name).toBe("Pull Up Bar");
     // in the order of the ids, unknown ones left out
     expect(exercisePrimaryMuscles(exercise, reference).map((muscle) => muscle.name)).toEqual(["Quads", "Chest"]);
@@ -27,7 +25,6 @@ describe("reference data of an exercise", () => {
 
   it("is null for unknown ids, e.g. before the first sync", () => {
     const exercise = makeExercise({ muscleGroupId: 99, equipmentId: 99 });
-    expect(exerciseMuscleGroup(exercise, reference)).toBeNull();
     expect(exerciseEquipment(exercise, reference)).toBeNull();
     expect(exerciseUsesBodyweight(exercise, reference)).toBe(false);
   });

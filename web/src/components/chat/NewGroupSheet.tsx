@@ -88,7 +88,7 @@ function NewGroupForm({ onClose, onCreate }: { onClose: () => void; onCreate: (c
     <Sheet
       open
       onClose={onClose}
-      title="New Group"
+      title="New group"
       grouped
       leading={<SheetButton onClick={onClose}>Cancel</SheetButton>}
       trailing={
@@ -109,7 +109,7 @@ function NewGroupForm({ onClose, onCreate }: { onClose: () => void; onCreate: (c
               : "Only the members you add can see the group. Add at least one friend."
           }
         >
-          <FormRow className="gap-4" rowClassName="focus-ring-within rounded-[10px]">
+          <FormRow className="gap-4" rowClassName="focus-ring-within rounded-[20px]">
             <GroupImagePicker previewUrl={image?.url ?? null} hash={null} onPick={pick} />
             <input
               value={name}

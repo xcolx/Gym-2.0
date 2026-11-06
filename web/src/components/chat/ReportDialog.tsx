@@ -27,7 +27,7 @@ export function ReportDialog({
   const send = async (target: ReportTarget, reason: string) => {
     try {
       await report(target, reason, block);
-      setResult({ title: "Report Sent", message: "Thank you. The report is reviewed within 24 hours." });
+      setResult({ title: "Report sent", message: "Thank you. The report is reviewed within 24 hours." });
     } catch (caught) {
       setResult({ title: "Could not report", message: errorMessage(caught) });
     }

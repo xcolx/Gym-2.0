@@ -20,7 +20,7 @@ export function AddMembersSheet({ chat, onClose }: { chat: ChatWithMembers; onCl
     <Sheet
       open
       onClose={onClose}
-      title="Add Members"
+      title="Add members"
       grouped
       leading={<SheetButton onClick={onClose}>Cancel</SheetButton>}
       trailing={
@@ -34,7 +34,7 @@ export function AddMembersSheet({ chat, onClose }: { chat: ChatWithMembers; onCl
       }
     >
       {isLoaded && candidates.length === 0 ? (
-        <ContentUnavailable icon={Users} title="No Friends to Add" description="All your friends are already in the group." className="h-full" />
+        <ContentUnavailable icon={Users} title="No friends to add" description="All your friends are already in the group." className="h-full" />
       ) : (
         <FormStack>
           <FormSection>

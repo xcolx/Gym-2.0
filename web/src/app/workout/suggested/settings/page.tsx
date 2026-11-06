@@ -1,106 +1,111 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Check, Sparkles } from "lucide-react";
 import { useState } from "react";
 
-import { Page, PageHeader, PillButton } from "@/components/ui/Page";
-import { suggestExercises } from "@/lib/domain/suggest";
-import { musclesTrained } from "@/lib/domain/workout";
-import { useEquipment, useExercises, useReferenceData, useWorkoutsThisWeek } from "@/lib/repo/hooks";
-import type { Equipment } from "@/types/models";
+import { Page, PageHeader } from "@/components/ui/Page";
+import { BottomActionBar, PrimaryButton } from "@/components/ui/PrimaryButton";
+import { suggestionRoute, useSuggestWorkout } from "@/components/workout/suggest-workout";
+import { suggestedExerciseCount } from "@/lib/domain/suggest";
+import { formatWorkoutMinutes, isAlwaysAvailable } from "@/lib/domain/workout-setup";
+import { useEquipment } from "@/lib/repo/hooks";
 
 const MIN = 15;
 const MAX = 180;
 
-/** e.g. "1 h 30 min" (SuggestedWorkoutSettingsView.formatTime) */
-function formatMinutes(minutes: number) {
-  const h = Math.trunc(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h} h`;
-  return `${h} h ${m} min`;
-}
-
-/** Bodyweight exercises are always possible */
-const isAlwaysAvailable = (item: Equipment) => item.name === "Body";
-
-/** Port of SuggestedWorkoutSettingsView.swift */
+/**
+ * Port of SuggestedWorkoutSettingsView.swift: how long the suggested workout should take and which equipment is
+ * available. The exercises are only picked when "Create workout" is tapped.
+ */
 export default function SuggestedWorkoutSettingsPage() {
   const router = useRouter();
   const [minutes, setMinutes] = useState(90);
-  // server ids of the selected equipment
+  // server ids of the selected equipment, bodyweight exercises are always possible
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const equipment = useEquipment();
-  const exercises = useExercises();
-  const workoutsThisWeek = useWorkoutsThisWeek();
-  const reference = useReferenceData();
+  const suggest = useSuggestWorkout();
+  const count = suggestedExerciseCount(minutes);
 
-  const isSelected = (item: Equipment) => isAlwaysAvailable(item) || selected.has(item.serverId);
-
-  const toggle = (item: Equipment) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(item.serverId)) next.delete(item.serverId);
-      else next.add(item.serverId);
+  const toggle = (id: number) =>
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
   const create = () => {
-    if (!equipment || !exercises || !workoutsThisWeek || !reference) return;
-    const available = new Set(equipment.filter(isSelected).map((item) => item.serverId));
-    const [trained] = musclesTrained(workoutsThisWeek, reference);
-    const ids = suggestExercises(exercises, available, minutes, trained).map((e) => e.id);
-    router.push(`/workout/suggested/${ids.join("+") || "empty"}`);
+    if (!suggest) return;
+    const settings = { minutes, equipmentIds: [...selected] };
+    router.push(suggestionRoute(suggest(settings), settings));
   };
 
   return (
-    <Page>
-      <PageHeader title="Suggested Workout" back={{ href: "/workout", label: "Workout" }} />
+    <Page className="bg-grouped">
+      <PageHeader inline title="Suggested workout" back={{ href: "/workout", label: "Workout" }} />
 
-      <div className="flex-1" />
-
-      <p className="p-2.5">Which Equipment is available for your Workout?</p>
-      <div className="grid grid-cols-2 gap-2">
-        {(equipment ?? []).map((item) => (
-          <div key={item.serverId} className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => toggle(item)}
-              disabled={isAlwaysAvailable(item)}
-              aria-pressed={isSelected(item)}
-              className={`rounded-[20px] p-2.5 text-headline font-semibold text-my-black transition-colors ${
-                isSelected(item) ? "bg-app" : "bg-my-gray"
-              }`}
-            >
-              {item.name}
-            </button>
+      <div className="flex flex-col gap-4 px-4 pb-6 pt-2">
+        <section className="card flex flex-col gap-3 p-4">
+          <h2 className="text-headline font-semibold">How long?</h2>
+          <p className="text-center font-rounded text-large-title font-bold tabular-nums" aria-live="polite">
+            {formatWorkoutMinutes(minutes)}
+          </p>
+          <div className="flex items-center gap-2 text-caption1 text-secondary-label">
+            <span>15 min</span>
+            <input
+              type="range"
+              min={MIN}
+              max={MAX}
+              step={15}
+              value={minutes}
+              onChange={(event) => setMinutes(Number(event.target.value))}
+              aria-label="Time"
+              aria-valuetext={formatWorkoutMinutes(minutes)}
+              className="ios-slider flex-1"
+              style={{ "--fill": `${((minutes - MIN) / (MAX - MIN)) * 100}%` } as React.CSSProperties}
+            />
+            <span>3 h</span>
           </div>
-        ))}
+          <p className="text-center text-footnote text-secondary-label">
+            {count === 1 ? "About 1 exercise" : `About ${count} exercises`}
+          </p>
+        </section>
+
+        <section className="card flex flex-col gap-3 p-4">
+          <h2 className="text-headline font-semibold">Which equipment do you have?</h2>
+          <div className="flex flex-wrap gap-2">
+            {(equipment ?? []).map((item) => {
+              const always = isAlwaysAvailable(item);
+              const isSelected = always || selected.has(item.serverId);
+              return (
+                <button
+                  key={item.serverId}
+                  type="button"
+                  aria-pressed={isSelected}
+                  // always selected, but not dimmed like a disabled button
+                  aria-disabled={always || undefined}
+                  onClick={() => !always && toggle(item.serverId)}
+                  className={`flex items-center gap-1 rounded-full px-3 py-2 text-subheadline font-medium transition-colors ${
+                    isSelected ? "bg-app text-app-foreground" : "bg-field/40 text-foreground"
+                  } ${always ? "cursor-default" : "active:opacity-70"}`}
+                >
+                  {isSelected && <Check size={13} strokeWidth={3.5} aria-hidden />}
+                  {item.name}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-footnote text-secondary-label">Bodyweight exercises are always included.</p>
+        </section>
       </div>
 
-      <p className="p-2.5 pt-[30px]">How much time do you want to spend for this workout?</p>
-      <p className="text-center">{formatMinutes(minutes)}</p>
-      <div className="flex items-center gap-2 px-2.5">
-        <span>15 min</span>
-        <input
-          type="range"
-          min={MIN}
-          max={MAX}
-          step={15}
-          value={minutes}
-          onChange={(e) => setMinutes(Number(e.target.value))}
-          aria-label="Time"
-          className="ios-slider flex-1"
-          style={{ "--fill": `${((minutes - MIN) / (MAX - MIN)) * 100}%` } as React.CSSProperties}
-        />
-        <span>3 h</span>
-      </div>
-
-      <div className="flex-[2]" />
-
-      <div className="flex justify-center pb-2.5 md:pb-6">
-        <PillButton onClick={create}>Create Workout for me!</PillButton>
-      </div>
+      <BottomActionBar>
+        <PrimaryButton onClick={create} disabled={!suggest}>
+          <Sparkles size={18} className="mr-2" aria-hidden />
+          Create workout
+        </PrimaryButton>
+      </BottomActionBar>
     </Page>
   );
 }

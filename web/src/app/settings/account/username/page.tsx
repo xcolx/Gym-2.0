@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { FormPage, FormSection, InputRow } from "@/components/ui/Form";
-import { SaveButton, SETTINGS_BACK } from "@/components/settings/SaveButton";
+import { ACCOUNT_BACK, SaveButton } from "@/components/settings/SaveButton";
 import { errorMessage } from "@/lib/api";
 import { refreshCurrentUser } from "@/lib/auth";
 import { usernameProblem } from "@/lib/auth/validation";
+import { goBack } from "@/lib/navigation";
 import { useCurrentUser } from "@/lib/repo/hooks";
 import { changeUsername } from "@/lib/repo/settings-feature";
 import type { User } from "@/types/models";
@@ -37,7 +38,7 @@ function ChangeUsername({ user }: { user: User }) {
     try {
       await changeUsername(user.serverId, username);
       await refreshCurrentUser().catch(() => undefined);
-      router.push(SETTINGS_BACK.href);
+      goBack(router, ACCOUNT_BACK.href);
     } catch (caught) {
       setError(errorMessage(caught));
       setIsSaving(false);
@@ -46,7 +47,7 @@ function ChangeUsername({ user }: { user: User }) {
 
   const message = problem ?? error;
   return (
-    <FormPage title="Username" inline back={SETTINGS_BACK}>
+    <FormPage title="Username" inline back={ACCOUNT_BACK}>
       <form onSubmit={save} className="contents">
         <FormSection
           footer={message ? <span className="text-[#ff3b30]">{message}</span> : "Your username can be changed once a minute."}
