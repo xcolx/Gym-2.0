@@ -28,16 +28,19 @@ struct PrimaryButtonStyle: ButtonStyle {
 }
 
 extension View {
-    /// The main buttons of a screen, fixed at its bottom above the content
-    func bottomActionBar<Actions: View>(@ViewBuilder _ actions: () -> Actions) -> some View {
+    /// The main buttons of a screen, fixed at its bottom above the content. Without `isPresented` the bar and its
+    /// background are left out, e.g. when the screen has no buttons in that context.
+    func bottomActionBar<Actions: View>(isPresented: Bool = true, @ViewBuilder _ actions: () -> Actions) -> some View {
         safeAreaInset(edge: .bottom) {
-            HStack(spacing: 12) {
-                actions()
+            if isPresented {
+                HStack(spacing: 12) {
+                    actions()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+                .background(.bar)
             }
-            .padding(.horizontal)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-            .background(.bar)
         }
     }
 }
