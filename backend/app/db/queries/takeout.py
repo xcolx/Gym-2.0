@@ -2,6 +2,7 @@
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.content_filter import REJECTED_MESSAGE_REASON
 from app.db.models import (
     AIConversation,
     AIMessage,
@@ -59,10 +60,15 @@ def get_reports(db: Session, user_id: int) -> list[Report]:
 def get_nudenet_reports(db: Session, user_id: int) -> list[Report]:
     """
     The open reports NudeNet created of the user's uploads (no reporter, the user as uploader, see
-    core.nudity_filter). Reports of the user by other users are left out.
+    core.nudity_filter). Reports of the user by other users are left out, and so are the automatic reports of messages
+    the word filter rejected (core.content_filter), which have no image.
     """
     return list(db.scalars(
-        select(Report).where(Report.reporter_id.is_(None), Report.uploader_id == user_id).order_by(Report.id)
+        select(Report).where(
+            Report.reporter_id.is_(None),
+            Report.uploader_id == user_id,
+            ~Report.reason.startswith(REJECTED_MESSAGE_REASON),
+        ).order_by(Report.id)
     ).all())
 
 
