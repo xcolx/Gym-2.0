@@ -346,7 +346,7 @@ class UserAdmin(SoftDeleteMixin, AdminView, model=User):
             ("Blocked by", "blocked-user", "blocked_id"),
             ("Reports sent", "report", "reporter_id"),
             ("Reported", "report", "reported_user_id"),
-            ("Uploads reported by NudeNet", "report", "uploader_id"),
+            ("Automatic reports", "report", "uploader_id"),
         ),
         "profile_image_url": image_preview(300),
         "profile_icon_url": image_preview(64),
@@ -491,8 +491,9 @@ class ReportAdmin(AdminView, model=Report):
     open report: handle it (delete the message, remove the image, delete the user, ...) and then delete the report.
     The report keeps a copy of the reported name, text and images, also after the original was deleted (the reference
     is empty then). Deleting the report removes its image copies.
-    NudeNet reports the uploaded images it blocked or flagged by itself (core.nudity_filter): the reporter shows
-    "NudeNet", the uploader is the user who uploaded it. A blocked upload's message or group was never created, the
+    NudeNet reports the uploaded images it blocked or flagged by itself (core.nudity_filter), and the word filter the
+    chat messages it rejected (core.content_filter): the reporter shows "Automatic", the uploader is the user who
+    uploaded or sent it. The message or group of a rejected upload, or a rejected message, was never created, the
     report only has its copy.
     """
     category = "Users & Social"
@@ -507,7 +508,7 @@ class ReportAdmin(AdminView, model=Report):
     column_searchable_list = ["reason"]
     column_default_sort = ("created_at", False)
     column_filters = [
-        NullFilter(Report.reporter_id, "Reported by", set_label="Users", unset_label="NudeNet"),
+        NullFilter(Report.reporter_id, "Reported by", set_label="Users", unset_label="Automatic"),
         NullFilter(Report.reported_user_id, "User reported"),
         NullFilter(Report.reported_chat_id, "Chat reported"),
         NullFilter(Report.reported_message_id, "Message reported"),
@@ -524,7 +525,7 @@ class ReportAdmin(AdminView, model=Report):
         "chat_image": "Group image (copy)", "message_text": "Message text (copy)", "message_image": "Message photo (copy)",
     }
     column_formatters = {
-        "reporter_id": link_to("user", empty="NudeNet"), "uploader_id": link_to("user"),
+        "reporter_id": link_to("user", empty="Automatic"), "uploader_id": link_to("user"),
         "reported_user_id": link_to("user"), "reported_chat_id": link_to("chat"), "reported_message_id": link_to("message"), "reason": truncate(80), "message_text": truncate(80),
         "profile_image": image_preview(40), "chat_image": image_preview(40), "message_image": image_preview(40),
     }

@@ -35,6 +35,9 @@ WHOLE_PART_ONLY = {
     "rape*", "rapist*", "dick", "dicks", "cock", "cocks", "ass", "anal", "cum", "sex", "tits", "fick", "retard*",
 }
 
+# The start of the reason of the automatic report of a rejected chat message, followed by the chat it was sent to
+REJECTED_MESSAGE_REASON = "Word filter rejected a message"
+
 _LEET = str.maketrans("013457@$!", "oieastasi")
 
 
