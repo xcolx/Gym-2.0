@@ -1,4 +1,5 @@
 import pytest
+from conftest import make_friends, read_takeout, run_sql
 
 from app.core import content_filter
 from app.core.errors import ObjectionableContentError
@@ -83,3 +84,53 @@ def test_group_names(name, objectionable):
             content_filter.check_group_name(name)
     else:
         content_filter.check_group_name(name)
+
+
+def _direct_chat(make_user):
+    alice, bob = make_user("alice"), make_user("bob")
+    make_friends(alice, bob)
+    response = alice.client.post("/v1/chats", json={"user_id": bob.id})
+    assert response.status_code == 201, response.text
+    return alice, response.json()["id"]
+
+
+def test_rejected_message_is_reported_with_an_unchanged_response(make_user):
+    alice, chat_id = _direct_chat(make_user)
+
+    response = alice.client.post(f"/v1/chats/{chat_id}/messages", data={"content": "send nudes"})
+
+    assert response.status_code == 400, response.text
+    assert response.json()["error"] == "ObjectionableContentError"
+    assert response.json()["detail"] == (
+        "Your message contains words that aren't allowed. See the Terms of Use at gym2.app/tos."
+    )
+    assert run_sql("SELECT count(*) FROM message")[0][0] == 0
+    [report] = [row._asdict() for row in run_sql("SELECT * FROM report")]
+    assert report["reason"] == f"{content_filter.REJECTED_MESSAGE_REASON} to chat {chat_id}"
+    assert (report["reporter_id"], report["uploader_id"]) == (None, alice.id)
+    assert (report["user_name"], report["message_text"]) == ("alice", "send nudes")
+    assert (report["reported_user_id"], report["reported_chat_id"], report["reported_message_id"]) == (None, None, None)
+
+
+def test_allowed_message_is_not_reported(make_user):
+    alice, chat_id = _direct_chat(make_user)
+
+    assert alice.client.post(f"/v1/chats/{chat_id}/messages", data={"content": "leg day?"}).status_code == 201
+    assert run_sql("SELECT count(*) FROM report")[0][0] == 0
+
+
+def test_takeout_contains_the_users_rejected_messages_only(make_user):
+    alice, chat_id = _direct_chat(make_user)
+    alice.client.post(f"/v1/chats/{chat_id}/messages", data={"content": "kys"})
+
+    takeout, _ = read_takeout(alice.client.get("/v1/users/me/takeout"))
+
+    [rejected] = takeout["rejected_messages"]
+    assert rejected == {
+        "reason": f"{content_filter.REJECTED_MESSAGE_REASON} to chat {chat_id}", "message_text": "kys",
+        "created_at": rejected["created_at"],
+    }
+    # Not listed as a report of an image, and not part of another user's data
+    assert takeout["nudenet_reports"] == []
+    carol = make_user("carol")
+    assert read_takeout(carol.client.get("/v1/users/me/takeout"))[0]["rejected_messages"] == []

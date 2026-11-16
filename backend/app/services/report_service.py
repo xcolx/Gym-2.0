@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import app.db.queries.chat as chat_crud
 import app.db.queries.reports as crud
 import app.db.queries.users as user_crud
+from app.core import content_filter
 from app.core.errors import (
     ChatNotFoundError,
     InvalidUserActionError,
@@ -148,3 +149,25 @@ def report_nudity(
         db.commit()
         raise ObjectionableContentError(BLOCKED_MESSAGE)
     db.flush()
+
+
+def report_rejected_message(db: Session, sender: User, chat_id: int, content: str) -> None:
+    """
+    Reports a chat message that the word filter rejected (core.content_filter.check_message) for the admin to review,
+    like report_nudity reports a blocked photo: no reporter, the sender as uploader, a copy of the text and the sender's
+    username, and the chat it was sent to in the reason. The message was never created, so nothing is referenced.
+
+    The request's transaction is rolled back and the report is committed on its own. The caller raises the filter's
+    error afterwards, so the response stays the same as without the report.
+    """
+    sender_id, user_name = sender.id, sender.user_name
+    db.rollback()
+    crud.create_report(
+        db,
+        reporter_id=None,
+        uploader_id=sender_id,
+        reason=f"{content_filter.REJECTED_MESSAGE_REASON} to chat {chat_id}",
+        user_name=user_name,
+        message_text=content,
+    )
+    db.commit()

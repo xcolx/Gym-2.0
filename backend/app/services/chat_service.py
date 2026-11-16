@@ -12,6 +12,7 @@ from app.core.errors import (
     ChatNotFoundError,
     InvalidUserActionError,
     MessageNotFoundError,
+    ObjectionableContentError,
     PermissionDeniedError,
     RelationshipNotFoundError,
     UserNotFoundError,
@@ -500,7 +501,8 @@ def send_message(
 ) -> MessageResponse:
     """
     If the user already sent a message with the same client UUID, that message is returned instead. Photos that NudeNet
-    blocks are rejected, the ones it flags or blocks are reported (report_service.report_nudity).
+    blocks are rejected, the ones it flags or blocks are reported (report_service.report_nudity). Texts the word filter
+    rejects are reported too (report_service.report_rejected_message).
     """
     if content is not None and not content.strip():
         content = None
@@ -509,7 +511,11 @@ def send_message(
     if content is not None and len(content) > MAX_MESSAGE_LENGTH:
         raise InvalidUserActionError(f"A message cannot be longer than {MAX_MESSAGE_LENGTH} characters.")
     if content is not None:
-        content_filter.check_message(content)
+        try:
+            content_filter.check_message(content)
+        except ObjectionableContentError:
+            report_service.report_rejected_message(db, user, chat_id, content)
+            raise
 
     # Checked before the chat is locked, so that the check doesn't hold up the other messages sent to it
     image = image_service.decode_image(image_contents) if image_contents is not None else None
