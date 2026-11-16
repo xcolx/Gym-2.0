@@ -1,6 +1,6 @@
 -r requirements.txt
 pytest==9.2.0
 pytest-cov==7.1.0
-ruff==0.17.3
+ruff==0.17.4
 mypy==2.4.1
-types-WTForms==3.2.1.20260518
+types-WTForms==3.3.0.20261104
