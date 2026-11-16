@@ -29,6 +29,14 @@ struct EditWorkoutExerciseView: View {
     }
 
     var body: some View {
+        // Removed from the workout and deleted: the view can be updated once more before it is removed, and reading a
+        // deleted exercise crashes
+        if !workoutExercise.isGone {
+            content
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 14) {
             NumberInsertView(workoutExercise: workoutExercise, limitsRows: limitsRows)
 

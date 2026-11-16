@@ -49,6 +49,14 @@ struct NumberInsertView: View {
     }
 
     var body: some View {
+        // Removed from the workout and deleted: the view can be updated once more before it is removed, and reading a
+        // deleted exercise crashes
+        if !workoutExercise.isGone {
+            content
+        }
+    }
+
+    private var content: some View {
 
         VStack(spacing: 6) {
             HStack(spacing: 8) {
@@ -268,7 +276,7 @@ struct NumberInsertView: View {
     // Takes the entered text over if it is valid, otherwise the field shows the stored value again.
     // An empty field and partial input like "-" or "1:" are kept as they are.
     func textChanged(_ metric: SetMetric, set: Int) {
-        guard let text = strings[metric]?[safe: set], workoutExercise.tracks(metric) else { return }
+        guard !workoutExercise.isGone, let text = strings[metric]?[safe: set], workoutExercise.tracks(metric) else { return }
 
         if let value = parse(text, metric: metric), metric.range.contains(value) {
             // Not set again for the value that is shown, e.g. right after setStrings formatted it
@@ -282,7 +290,8 @@ struct NumberInsertView: View {
     }
 
     func showStoredValue(_ field: Field) {
-        guard strings[field.metric]?.indices.contains(field.set) == true,
+        // e.g. the field loses the focus because its exercise was deleted
+        guard !workoutExercise.isGone, strings[field.metric]?.indices.contains(field.set) == true,
               let stored = workoutExercise.value(of: field.metric, at: field.set) else { return }
         strings[field.metric]?[field.set] = stored != 0 ? format(stored, metric: field.metric) : ""
     }
