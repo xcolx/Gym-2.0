@@ -7,7 +7,7 @@ import { aiApi } from "@/lib/api";
 import { AIChatModel } from "@/lib/domain/ai-chat";
 import { useStore } from "@/lib/store";
 import { useOnline } from "@/lib/use-online";
-import { AIMessage, AITypingIndicator, GymAIImage } from "./ai-messages";
+import { AIMessage, AIStreamingAnswer, AITypingIndicator, GymAIImage } from "./ai-messages";
 import { BottomAnchoredScroll, ChatScreen, scrollToBottom } from "./ChatScreen";
 import { Spinner } from "@/components/ui/controls";
 import { PageHeader } from "@/components/ui/Page";
@@ -30,11 +30,12 @@ export function AIChat({ conversationId }: { conversationId: number | null }) {
 
   useEffect(() => {
     void model.load();
+    return () => model.close();
   }, [model]);
 
   useEffect(() => {
     scrollToBottom(scrollRef.current);
-  }, [state.messages.length, state.isWaitingForAnswer]);
+  }, [state.messages.length, state.isWaitingForAnswer, state.streamingAnswer]);
 
   const send = () => {
     if (!canSend) return;
@@ -60,7 +61,8 @@ export function AIChat({ conversationId }: { conversationId: number | null }) {
                 onDiscard={() => model.discard(message.id)}
               />
             ))}
-            {state.isWaitingForAnswer && <AITypingIndicator />}
+            {state.isWaitingForAnswer &&
+              (state.streamingAnswer ? <AIStreamingAnswer content={state.streamingAnswer} /> : <AITypingIndicator />)}
           </div>
         </BottomAnchoredScroll>
 

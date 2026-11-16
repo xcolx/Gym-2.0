@@ -4,7 +4,8 @@
 //
 //  Created by Colin Rüegg on 24.10.2026.
 //
-//  The conversations with the AI coach: loading, sending (also into a new conversation), failed messages and the list
+//  The conversations with the AI coach: loading, sending (also into a new conversation), the streamed answer, lost
+//  connections, failed messages and the list
 //
 
 import Foundation
@@ -17,19 +18,33 @@ import Testing
     let backend = FakeBackend()
     var service: AIService { AIService(api: StubURLProtocol.client(handler: backend.handle)) }
 
-    nonisolated static func messageJSON(id: Int, role: String, content: String, conversationId: Int = 3) -> String {
-        #"{"id": \#(id), "conversation_id": \#(conversationId), "role": "\#(role)", "content": "\#(content)", "created_at": "2026-10-20T10:00:0\#(id % 10)+00:00"}"#
+    nonisolated static func messageJSON(id: Int, role: String, content: String, conversationId: Int = 3, clientUUID: String? = nil) -> String {
+        #"{"id": \#(id), "conversation_id": \#(conversationId), "client_uuid": \#(clientUUID.map { "\"\($0)\"" } ?? "null"), "role": "\#(role)", "content": "\#(content)", "created_at": "2026-10-20T10:00:0\#(id % 10)+00:00"}"#
     }
 
-    nonisolated static func conversationJSON(id: Int = 3, title: String? = "Leg day", messages: [String] = []) -> String {
-        #"{"id": \#(id), "title": \#(title.map { "\"\($0)\"" } ?? "null"), "created_at": "2026-10-20T10:00:00+00:00", "updated_at": "2026-10-20T10:00:00+00:00", "messages": [\#(messages.joined(separator: ","))]}"#
+    nonisolated static func conversationJSON(id: Int = 3, title: String? = "Leg day", messages: [String] = [], answerPending: Bool = false) -> String {
+        #"{"id": \#(id), "title": \#(title.map { "\"\($0)\"" } ?? "null"), "created_at": "2026-10-20T10:00:00+00:00", "updated_at": "2026-10-20T10:00:00+00:00", "messages": [\#(messages.joined(separator: ","))], "answer_pending": \#(answerPending)}"#
+    }
+
+    static let streamPath = "/ai/conversations/3/messages/stream"
+
+    /// The events of the answer "Answer to <text>" to a sent message, which is streamed in two parts
+    nonisolated static func answerEvents(to request: StubURLProtocol.Request, conversationId: Int = 3) -> [(String, String)] {
+        let content = request.json?["content"] as? String ?? ""
+        let userMessage = messageJSON(id: 11, role: "user", content: content, conversationId: conversationId, clientUUID: request.json?["client_uuid"] as? String)
+        let answer = messageJSON(id: 12, role: "assistant", content: "Answer to \(content)", conversationId: conversationId)
+        return [
+            ("start", #"{"user_message": \#(userMessage)}"#),
+            ("delta", #"{"content": "Answer "}"#),
+            ("delta", #"{"content": "to \#(content)"}"#),
+            ("done", #"{"user_message": \#(userMessage), "assistant_message": \#(answer)}"#),
+        ]
     }
 
     /// Answers the messages sent to the conversation with "Answer to <text>"
     func answerMessages(in conversationId: Int = 3) {
-        backend.on("POST", "/ai/conversations/\(conversationId)/messages") { request in
-            let content = request.json?["content"] as? String ?? ""
-            return .json(#"{"user_message": \#(Self.messageJSON(id: 11, role: "user", content: content, conversationId: conversationId)), "assistant_message": \#(Self.messageJSON(id: 12, role: "assistant", content: "Answer to \(content)", conversationId: conversationId))}"#, status: 201)
+        backend.on("POST", "/ai/conversations/\(conversationId)/messages/stream") { request in
+            .events(Self.answerEvents(to: request, conversationId: conversationId))
         }
     }
 
@@ -86,7 +101,7 @@ import Testing
 
         await model.send("Hi", using: service)
 
-        let request = try #require(backend.requests("POST", "/ai/conversations/3/messages").first)
+        let request = try #require(backend.requests("POST", Self.streamPath).first)
         #expect(request.json?["client_uuid"] as? String == model.messages[0].id.uuidString)
     }
 
@@ -101,21 +116,139 @@ import Testing
     }
 
     @Test func keepsAFailedMessageUntilItIsSentAgainOrDiscarded() async throws {
-        backend.on("POST", "/ai/conversations/3/messages") { _ in .json(#"{"error": "AIUnavailableError", "detail": "The AI is busy."}"#, status: 503) }
+        // The AI fails after it has started to answer
+        backend.on("POST", Self.streamPath) { request in
+            .events(Array(Self.answerEvents(to: request).prefix(2)) + [("error", #"{"error": "AIServiceUnavailableError", "detail": "The AI is busy."}"#)])
+        }
         let model = AIChatViewModel(conversation: try conversation())
 
         await model.send("Hi", using: service)
         #expect(model.messages.count == 1)
         #expect(model.messages[0].status == .failed("The AI is busy."))
+        #expect(model.streamingAnswer == nil)
         #expect(!model.canSend)
+        // Nothing is stored then, so there is no answer to wait for
+        #expect(backend.requests("GET", "/ai/conversations/3").isEmpty)
 
         answerMessages()
         await model.retry(model.messages[0], using: service)
         #expect(model.messages.map(\.content) == ["Hi", "Answer to Hi"])
         #expect(model.canSend)
         // Sent again with the same client UUID, the server answers only once
-        let uuids = backend.requests("POST", "/ai/conversations/3/messages").map { $0.json?["client_uuid"] as? String }
+        let uuids = backend.requests("POST", Self.streamPath).map { $0.json?["client_uuid"] as? String }
         #expect(uuids.count == 2 && uuids[0] == uuids[1])
+    }
+
+    @Test func showsTheAnswerWhileItIsWritten() async throws {
+        answerMessages()
+        let model = AIChatViewModel(conversation: try conversation())
+        let shown = Shown()
+        @MainActor func observe() {
+            withObservationTracking {
+                _ = model.streamingAnswer
+            } onChange: {
+                Task { @MainActor in
+                    shown.answers.append(model.streamingAnswer)
+                    observe()
+                }
+            }
+        }
+        observe()
+
+        await model.send("Hi", using: service)
+        await Task.yield()
+
+        // The typing indicator first (nil), then the growing answer, which the stored answer replaces
+        #expect(shown.answers.contains("Answer "))
+        #expect(shown.answers.contains("Answer to Hi"))
+        #expect(model.streamingAnswer == nil)
+        #expect(model.messages.map(\.content) == ["Hi", "Answer to Hi"])
+    }
+
+    @Test func loadsTheConversationUntilItHasTheAnswerAfterTheConnectionWasLost() async throws {
+        backend.on("POST", Self.streamPath) { request in
+            .events(Array(Self.answerEvents(to: request).prefix(2)), failure: URLError(.networkConnectionLost))
+        }
+        let model = AIChatViewModel(conversation: try conversation(), answerPollInterval: .milliseconds(1))
+        let loads = Counter()
+        backend.on("GET", "/ai/conversations/3") { [backend] _ in
+            let uuid = backend.requests("POST", Self.streamPath).first?.json?["client_uuid"] as? String
+            let userMessage = Self.messageJSON(id: 11, role: "user", content: "Hi", clientUUID: uuid)
+            // Still answering when it is loaded for the first time
+            if loads.next() == 1 {
+                return .json(Self.conversationJSON(messages: [userMessage], answerPending: true))
+            }
+            return .json(Self.conversationJSON(messages: [userMessage, Self.messageJSON(id: 12, role: "assistant", content: "Answer to Hi")]))
+        }
+
+        await model.send("Hi", using: service)
+
+        #expect(loads.count == 2)
+        #expect(model.messages.map(\.content) == ["Hi", "Answer to Hi"])
+        #expect(model.messages.allSatisfy { $0.status == .sent })
+        #expect(backend.requests("POST", Self.streamPath).first?.json?["client_uuid"] as? String == model.messages[0].id.uuidString)
+        #expect(!model.isWaitingForAnswer)
+        #expect(model.canSend)
+    }
+
+    @Test func failsTheMessageIfTheServerDoesntHaveItAfterTheConnectionWasLost() async throws {
+        backend.on("POST", Self.streamPath) { _ in throw URLError(.networkConnectionLost) }
+        backend.on("GET", "/ai/conversations/3") { _ in .json(Self.conversationJSON()) }
+        let model = AIChatViewModel(conversation: try conversation(), answerPollInterval: .milliseconds(1))
+
+        await model.send("Hi", using: service)
+
+        #expect(model.messages.map(\.isFailed) == [true])
+    }
+
+    @Test func waitsForTheAnswerOfAnEarlierTryInsteadOfFailing() async throws {
+        backend.on("POST", Self.streamPath) { _ in .json(#"{"error": "AIAnswerPendingError", "detail": "Still answering."}"#, status: 409) }
+        backend.on("GET", "/ai/conversations/3") { [backend] _ in
+            let uuid = backend.requests("POST", Self.streamPath).first?.json?["client_uuid"] as? String
+            return .json(Self.conversationJSON(messages: [Self.messageJSON(id: 11, role: "user", content: "Hi", clientUUID: uuid), Self.messageJSON(id: 12, role: "assistant", content: "Hello")]))
+        }
+        let model = AIChatViewModel(conversation: try conversation(), answerPollInterval: .milliseconds(1))
+
+        await model.send("Hi", using: service)
+
+        #expect(model.messages.map(\.content) == ["Hi", "Hello"])
+        #expect(model.messages.allSatisfy { $0.status == .sent })
+    }
+
+    @Test func loadsAConversationAgainUntilThePendingAnswerIsThere() async throws {
+        let loads = Counter()
+        backend.on("GET", "/ai/conversations/3") { _ in
+            let userMessage = Self.messageJSON(id: 1, role: "user", content: "Hi")
+            if loads.next() < 3 {
+                return .json(Self.conversationJSON(messages: [userMessage], answerPending: true))
+            }
+            return .json(Self.conversationJSON(messages: [userMessage, Self.messageJSON(id: 2, role: "assistant", content: "Hello")]))
+        }
+        let model = AIChatViewModel(conversation: try conversation(), answerPollInterval: .milliseconds(1))
+
+        await model.load(using: service)
+
+        #expect(loads.count == 3)
+        #expect(model.messages.map(\.content) == ["Hi", "Hello"])
+        #expect(!model.isWaitingForAnswer)
+    }
+
+    @Test func stopsLoadingForThePendingAnswerWhenTheChatIsClosed() async throws {
+        let loads = Counter()
+        backend.on("GET", "/ai/conversations/3") { _ in
+            _ = loads.next()
+            return .json(Self.conversationJSON(messages: [Self.messageJSON(id: 1, role: "user", content: "Hi")], answerPending: true))
+        }
+        let model = AIChatViewModel(conversation: try conversation(), answerPollInterval: .milliseconds(20))
+
+        let loading = Task { await model.load(using: service) }
+        while loads.count == 0 { await Task.yield() }
+        model.close()
+        await loading.value
+
+        #expect(loads.count <= 2)
+        #expect(!model.isWaitingForAnswer)
+        #expect(model.messages.map(\.content) == ["Hi"])
     }
 
     @Test func discardsAFailedMessage() async throws {
@@ -172,4 +305,25 @@ import Testing
     }
 
     typealias Response = StubURLProtocol.Response
+}
+
+/// Counts the requests of a route, which are handled outside of the main actor
+private final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    var count: Int { lock.withLock { value } }
+
+    func next() -> Int {
+        lock.withLock {
+            value += 1
+            return value
+        }
+    }
+}
+
+/// The values of `streamingAnswer` a test has seen
+@MainActor
+private final class Shown {
+    var answers: [String?] = []
 }

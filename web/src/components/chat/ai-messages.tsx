@@ -91,6 +91,20 @@ export function AIMessage({ message, onRetry, onDiscard }: { message: AIChatMess
   );
 }
 
+/** The answer of the AI while it is written: the bubble of an answer that grows, without a date yet */
+export function AIStreamingAnswer({ content }: { content: string }) {
+  return (
+    <div className="flex justify-start pr-12">
+      <p
+        aria-live="polite"
+        className="max-w-full whitespace-pre-wrap break-words rounded-[18px] bg-cell px-3 py-2 text-foreground select-text [overflow-wrap:anywhere]"
+      >
+        <InlineMarkdown source={content} linkClassName="text-app" />
+      </p>
+    </div>
+  );
+}
+
 /** How long the AI answers before the note that it can take a while */
 const WAIT_NOTE_DELAY_MS = 5000;
 

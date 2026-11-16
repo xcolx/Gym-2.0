@@ -60,6 +60,7 @@ The settings are read from environment variables, or from a `.env` file in `back
 | `IMAGE_STORAGE_PATH` | `/data/images` | Where uploaded images are stored |
 | `NUDITY_FILTER_MODEL_PATH` | `/opt/nudenet/640m.onnx` | NudeNet's model, part of the Docker image. Empty turns the check off (development only) |
 | `OLLAMA_URL`, `OLLAMA_MODEL` | the production server and model | The Ollama server and model that answer the AI chat |
+| `OLLAMA_TIMEOUT_SECONDS`, `AI_ANSWER_TIMEOUT_SECONDS` | `90`, `300` | How long the Ollama server may take to connect and for each part of its streamed answer, and for a whole answer |
 | `DEPRECATED_API_VERSIONS`, `RETIRED_API_VERSIONS` | `[]` | API versions that make the apps show an update notice or require an update |
 
 The production values are set in [docker-compose.prod.yml](../docker-compose.prod.yml) and the root

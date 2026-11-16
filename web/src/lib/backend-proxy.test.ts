@@ -84,6 +84,31 @@ describe("forwardToBackend", () => {
     vi.restoreAllMocks();
   });
 
+  it("doesn't limit a response that has started, e.g. a streamed answer of the AI", async () => {
+    const encoder = new TextEncoder();
+    let signal: AbortSignal | null | undefined;
+    const streaming = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      signal = init?.signal;
+      const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          controller.enqueue(encoder.encode("event: delta\n\n"));
+          await new Promise((resolve) => setTimeout(resolve, 40));
+          controller.enqueue(encoder.encode("event: done\n\n"));
+          controller.close();
+        },
+      });
+      return new Response(body, { headers: { "content-type": "text/event-stream" } });
+    });
+
+    const response = await forwardToBackend(new Request("http://localhost/api/v1/ai", { method: "POST" }), target, {
+      fetchImpl: streaming,
+      timeoutMs: 10,
+    });
+
+    expect(await response.text()).toBe("event: delta\n\nevent: done\n\n");
+    expect(signal?.aborted).toBe(false);
+  });
+
   it("keeps a response without body empty", async () => {
     const fetchImpl = vi.fn(async () => new Response(null, { status: 204 }));
     const response = await forwardToBackend(new Request("http://localhost/api/v1/x", { method: "DELETE" }), target, { fetchImpl });

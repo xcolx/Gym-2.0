@@ -117,6 +117,47 @@ final class APIClient {
         try await perform(endpoint)
     }
 
+    /// The server-sent events of a text/event-stream response. Returns once the response has started, the events
+    /// arrive while the sequence is read. The timeout of the endpoint is the longest time without any data: the
+    /// backend sends a comment every 15 seconds while it has nothing else.
+    func events(_ endpoint: Endpoint) async throws -> ServerSentEvents {
+        var request = try makeRequest(for: endpoint)
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let sentSession = hasSession
+
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do {
+            (bytes, response) = try await session.bytes(for: request)
+        } catch let error as URLError {
+            throw APIError.transport(error)
+        }
+
+        let httpResponse = try await handle(response, to: endpoint, sentSession: sentSession)
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            // An error is a JSON body like for the other requests
+            var data = Data()
+            do {
+                for try await byte in bytes {
+                    data.append(byte)
+                }
+            } catch let error as URLError {
+                throw APIError.transport(error)
+            }
+            throw error(for: httpResponse.statusCode, data: data)
+        }
+        return ServerSentEvents(bytes: bytes)
+    }
+
+    /// Decodes the data of a server-sent event like a response body.
+    func decode<Value: Decodable>(_ type: Value.Type = Value.self, from event: ServerSentEvent) throws -> Value {
+        do {
+            return try decoder.decode(Value.self, from: event.data)
+        } catch {
+            throw APIError.decoding(error)
+        }
+    }
+
     private func perform(_ endpoint: Endpoint) async throws -> Data {
         let request = try makeRequest(for: endpoint)
         let sentSession = hasSession
@@ -129,6 +170,15 @@ final class APIClient {
             throw APIError.transport(error)
         }
 
+        let httpResponse = try await handle(response, to: endpoint, sentSession: sentSession)
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw error(for: httpResponse.statusCode, data: data)
+        }
+        return data
+    }
+
+    /// What every response means for the session and the app version, no matter how its body is read.
+    private func handle(_ response: URLResponse, to endpoint: Endpoint, sentSession: Bool) async throws -> HTTPURLResponse {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
@@ -148,11 +198,7 @@ final class APIClient {
         } else if httpResponse.value(forHTTPHeaderField: "Deprecation") != nil {
             await onUpdateAvailable?()
         }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            throw error(for: httpResponse.statusCode, data: data)
-        }
-        return data
+        return httpResponse
     }
 
     private func makeRequest(for endpoint: Endpoint) throws -> URLRequest {

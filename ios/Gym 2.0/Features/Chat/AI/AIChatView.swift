@@ -15,6 +15,8 @@ struct AIChatView: View {
     @State private var userInput: String = ""
 
     private let bottomID = "bottom"
+    /// The answer that is being written keeps one identity while it grows
+    private static let streamingAnswerID = UUID()
 
     init(conversation: AIConversationDTO?) {
         _viewModel = State(initialValue: AIChatViewModel(conversation: conversation))
@@ -46,7 +48,11 @@ struct AIChatView: View {
                         }
 
                         if viewModel.isWaitingForAnswer {
-                            AITypingIndicatorView()
+                            if let answer = viewModel.streamingAnswer, !answer.isEmpty {
+                                AIMessageView(message: AIChatMessage(id: Self.streamingAnswerID, role: .assistant, content: answer, date: .now), isStreaming: true)
+                            } else {
+                                AITypingIndicatorView()
+                            }
                         }
 
                         Color.clear
@@ -63,6 +69,10 @@ struct AIChatView: View {
                 }
                 .onChange(of: viewModel.isWaitingForAnswer) {
                     withAnimation { proxy.scrollTo(bottomID, anchor: .bottom) }
+                }
+                .onChange(of: viewModel.streamingAnswer) {
+                    // Not animated: the answer grows many times per second
+                    proxy.scrollTo(bottomID, anchor: .bottom)
                 }
             }
             .overlay {
@@ -100,6 +110,7 @@ struct AIChatView: View {
         .navigationTitle(viewModel.title ?? "New conversation")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadIfNeeded() }
+        .onDisappear { viewModel.close() }
     }
 
     private var emptyState: some View {

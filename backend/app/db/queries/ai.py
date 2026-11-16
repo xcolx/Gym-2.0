@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.db.models import AIConversation, AIMessage
@@ -95,6 +95,10 @@ def get_answer_to(db: Session, message: AIMessage) -> AIMessage | None:
         )
         .order_by(AIMessage.id)
     ).first()
+
+
+def delete_message(db: Session, message_id: int) -> None:
+    db.execute(delete(AIMessage).where(AIMessage.id == message_id))
 
 
 def update_conversation(db: Session, conversation_id: int, title: str | None = None) -> None:

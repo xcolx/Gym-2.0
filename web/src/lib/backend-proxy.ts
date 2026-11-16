@@ -2,8 +2,9 @@
 export const DEFAULT_BACKEND_URL = "http://localhost:5000";
 
 /**
- * A request to the backend is given up after this long: a bit longer than the backend waits for the AI (90 s,
- * OLLAMA_TIMEOUT_SECONDS), and less than the 100 s after which Cloudflare gives up on gym2.app.
+ * A request to the backend is given up if its response hasn't started after this long: a bit longer than the backend
+ * waits for the AI to connect (90 s, OLLAMA_TIMEOUT_SECONDS), and less than the 100 s after which Cloudflare gives up
+ * on gym2.app. A response that has started isn't limited, so that streamed ones (the answers of the AI) can take longer.
  */
 const BACKEND_TIMEOUT_MS = 95_000;
 
@@ -63,7 +64,7 @@ const HOP_BY_HOP = new Set([
 /**
  * Sends the request to `target` and returns the backend's response as it is: status, headers (incl. every
  * Set-Cookie) and the streamed body. Nothing of the response tells the browser where the backend is. 502 if the backend
- * can't be reached, 504 if it doesn't answer within BACKEND_TIMEOUT_MS.
+ * can't be reached, 504 if its response doesn't start within BACKEND_TIMEOUT_MS.
  */
 export async function forwardToBackend(
   request: Request,
@@ -90,7 +91,9 @@ export async function forwardToBackend(
   if (proto) headers.set("x-forwarded-proto", proto);
 
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
-  const timeout = AbortSignal.timeout(timeoutMs);
+  // Only until the response starts. The signal of the request stays: a client that leaves also ends a streamed body.
+  const timeout = new AbortController();
+  const timer = setTimeout(() => timeout.abort(new DOMException("The backend didn't answer in time.", "TimeoutError")), timeoutMs);
   let response: Response;
   try {
     response = await fetchImpl(target, {
@@ -99,16 +102,18 @@ export async function forwardToBackend(
       // Next.js buffers the body for the proxy anyway (up to proxyClientMaxBodySize)
       body: hasBody ? await request.arrayBuffer() : undefined,
       redirect: "manual",
-      signal: AbortSignal.any([request.signal, timeout]),
+      signal: AbortSignal.any([request.signal, timeout.signal]),
     });
   } catch (error) {
     if (request.signal.aborted) return new Response(null, { status: 499 });
-    const timedOut = timeout.aborted;
+    const timedOut = timeout.signal.aborted;
     console.error(`[proxy] ${request.method} ${new URL(target).pathname} failed`, error);
     return Response.json(
       { detail: timedOut ? "The server didn't answer in time." : "The server could not be reached." },
       { status: timedOut ? 504 : 502 },
     );
+  } finally {
+    clearTimeout(timer);
   }
 
   const responseHeaders = new Headers();
