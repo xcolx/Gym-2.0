@@ -7,9 +7,9 @@
 
 import Foundation
 
-/// A message shown in the AI chat. The user's messages are shown as sent right away, the typing indicator shows
-/// that the answer is still coming. The server only stores a message together with its answer, so if that fails,
-/// the message is marked as failed.
+/// A message shown in the AI chat. The user's messages are shown as sent right away, the typing indicator and then
+/// the growing answer show that the answer is still coming. The server only keeps a message together with its answer,
+/// so if the AI fails, the message is marked as failed.
 struct AIChatMessage: Identifiable, Equatable {
     enum Status: Equatable {
         case sent
@@ -27,8 +27,9 @@ struct AIChatMessage: Identifiable, Equatable {
 }
 
 extension AIChatMessage {
+    /// The user's messages keep their client UUID as ID, so a message sent from this device stays the same message.
     init(_ message: AIMessageDTO) {
-        self.init(id: UUID(), role: message.role, content: message.content, date: message.createdAt)
+        self.init(id: message.clientUuid ?? UUID(), role: message.role, content: message.content, date: message.createdAt)
     }
 }
 
@@ -45,11 +46,21 @@ final class AIChatViewModel {
     private(set) var messages: [AIChatMessage] = []
     private(set) var isLoading = false
     private(set) var isWaitingForAnswer = false
+    /// The answer as far as the AI has written it, nil before its first part (the typing indicator is shown then).
+    private(set) var streamingAnswer: String?
     private(set) var loadError: String?
 
-    init(conversation: AIConversationDTO?) {
+    /// How often the conversation is loaded again while its answer is written without a connection that streams it
+    private let answerPollInterval: Duration
+    /// Whether the server was still answering the last message when the conversation was loaded
+    private var answerIsPending = false
+    /// Set when the chat was left, the conversation isn't loaded again and again then
+    private var isClosed = false
+
+    init(conversation: AIConversationDTO?, answerPollInterval: Duration = .seconds(3)) {
         conversationId = conversation?.id
         title = conversation?.title
+        self.answerPollInterval = answerPollInterval
     }
 
     /// A failed message has to be sent again or discarded first, so the messages reach the AI in the order they are shown.
@@ -57,18 +68,56 @@ final class AIChatViewModel {
         !isLoading && !isWaitingForAnswer && loadError == nil && !messages.contains { $0.isFailed }
     }
 
+    /// Loads the messages. If the AI is still answering the last one (sent before the chat was opened, or from another
+    /// device), the conversation is loaded again until it has the answer.
     func load(using service: AIService) async {
-        guard let conversationId, messages.isEmpty, !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false }
+        isClosed = false
+        guard let conversationId, !isLoading else { return }
+
+        if messages.isEmpty {
+            isLoading = true
+            do {
+                let conversation = try await service.conversation(id: conversationId)
+                show(conversation)
+                loadError = nil
+            } catch {
+                loadError = error.localizedDescription
+            }
+            isLoading = false
+        }
+        if answerIsPending {
+            await followPendingAnswer(in: conversationId, using: service)
+        }
+    }
+
+    /// Called when the chat is left. An answer that is being written is stored anyway and shown when the chat is opened again.
+    func close() {
+        isClosed = true
+    }
+
+    private func show(_ conversation: AIConversationDTO) {
+        title = conversation.title
+        messages = conversation.messages.map(AIChatMessage.init)
+        answerIsPending = conversation.answerPending
+    }
+
+    private func followPendingAnswer(in conversationId: Int, using service: AIService) async {
+        guard !isWaitingForAnswer else { return }
+        isWaitingForAnswer = true
+        defer { isWaitingForAnswer = false }
 
         do {
-            let conversation = try await service.conversation(id: conversationId)
-            title = conversation.title
-            messages = conversation.messages.map(AIChatMessage.init)
-            loadError = nil
+            while !isClosed {
+                try await Task.sleep(for: answerPollInterval)
+                let conversation = try await service.conversation(id: conversationId)
+                if !conversation.answerPending {
+                    // With the answer, or without the message if the AI failed
+                    show(conversation)
+                    return
+                }
+            }
         } catch {
-            loadError = error.localizedDescription
+            // Left the chat, offline or the server is down: the conversation shows what is known, opening it again continues
         }
     }
 
@@ -94,23 +143,72 @@ final class AIChatViewModel {
 
     private func deliver(_ message: AIChatMessage, using service: AIService) async {
         isWaitingForAnswer = true
-        defer { isWaitingForAnswer = false }
+        streamingAnswer = nil
+        defer {
+            isWaitingForAnswer = false
+            streamingAnswer = nil
+        }
 
         do {
             let conversationId = try await ensureConversation(using: service)
-            let response = try await service.send(message.content, to: conversationId, clientUuid: message.id)
-
-            updateMessage(message.id) {
-                $0.status = .sent
-                $0.date = response.userMessage.createdAt
-            }
-            messages.append(AIChatMessage(response.assistantMessage))
-            // The server makes the first message the title of a conversation without one
-            if title == nil {
-                title = String(message.content.prefix(Self.maxTitleLength)).trimmingCharacters(in: .whitespacesAndNewlines)
+            do {
+                let response = try await service.send(message.content, to: conversationId, clientUuid: message.id) { [weak self] event in
+                    switch event {
+                    case .start(let userMessage):
+                        self?.updateMessage(message.id) { $0.date = userMessage.createdAt }
+                    case .delta(let content):
+                        self?.streamingAnswer = (self?.streamingAnswer ?? "") + content
+                    }
+                }
+                updateMessage(message.id) {
+                    $0.status = .sent
+                    $0.date = response.userMessage.createdAt
+                }
+                messages.append(AIChatMessage(response.assistantMessage))
+                // The server makes the first message the title of a conversation without one
+                if title == nil {
+                    title = String(message.content.prefix(Self.maxTitleLength)).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            } catch where Self.answerMayStillCome(after: error) {
+                // Back to the typing indicator, the part of the answer that arrived comes again with the whole answer
+                streamingAnswer = nil
+                try await waitForAnswer(to: message, in: conversationId, after: error, using: service)
             }
         } catch {
             updateMessage(message.id) { $0.status = .failed(error.localizedDescription) }
+        }
+    }
+
+    /// Whether the server may be writing the answer although sending failed: the connection was lost (the answer is
+    /// written without it), or the server is still answering this message from an earlier try. Not if the AI itself
+    /// failed or the message was rejected, nothing is stored then.
+    private static func answerMayStillCome(after error: Error) -> Bool {
+        switch error as? APIError {
+        case .transport:
+            return true
+        case .server(let status, let code, _):
+            if code == "AIAnswerPendingError" { return true }
+            if code == "AIServiceUnavailableError" { return false }
+            return status >= 500
+        default:
+            return false
+        }
+    }
+
+    /// After sending failed with `cause` in a way that may have left the server writing the answer: loads the
+    /// conversation until it has the answer to the message. Throws `cause` if the server doesn't have the message (it
+    /// never arrived, or the AI failed) and the error of loading if the server can't be reached. Sending the message
+    /// again is safe in both cases, the server recognizes it by its client UUID.
+    private func waitForAnswer(to message: AIChatMessage, in conversationId: Int, after cause: Error, using service: AIService) async throws {
+        while true {
+            let conversation = try await service.conversation(id: conversationId)
+            guard let index = conversation.messages.firstIndex(where: { $0.clientUuid == message.id }) else { throw cause }
+            if index + 1 < conversation.messages.count {
+                show(conversation)
+                return
+            }
+            if isClosed { return }
+            try await Task.sleep(for: answerPollInterval)
         }
     }
 

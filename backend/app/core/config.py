@@ -54,8 +54,12 @@ class Settings(BaseSettings):
     )
     OLLAMA_TIMEOUT_SECONDS: int = Field(
         default=90,
-        description="How long to wait for an answer of the Ollama server before giving up. Below the 100 s after "
-                    "which Cloudflare gives up on gym2.app, so the client gets the backend's error instead."
+        description="How long to wait for the Ollama server to connect and for each part of its streamed answer "
+                    "before giving up."
+    )
+    AI_ANSWER_TIMEOUT_SECONDS: int = Field(
+        default=300,
+        description="How long the Ollama server may take for a whole answer before it is given up."
     )
     IMAGE_STORAGE_PATH: str = Field(
         default="/data/images",

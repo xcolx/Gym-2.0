@@ -17,6 +17,14 @@ final class StubURLProtocol: URLProtocol {
         var status: Int = 200
         var headers: [String: String] = ["Content-Type": "application/json"]
         var body: Data = Data()
+        /// Fails the response with this error after its body was received, like a connection that is lost meanwhile
+        var failure: URLError? = nil
+
+        /// A text/event-stream with the given events (name and data), as the backend sends them
+        static func events(_ events: [(String, String)], failure: URLError? = nil) -> Response {
+            let body = events.map { "event: \($0.0)\ndata: \($0.1)\n\n" }.joined(separator: ": ping\n\n")
+            return Response(headers: ["Content-Type": "text/event-stream"], body: Data(body.utf8), failure: failure)
+        }
 
         static func json(_ text: String, status: Int = 200, headers: [String: String] = [:]) -> Response {
             Response(status: status, headers: ["Content-Type": "application/json"].merging(headers) { $1 }, body: Data(text.utf8))
@@ -96,7 +104,11 @@ final class StubURLProtocol: URLProtocol {
             let httpResponse = HTTPURLResponse(url: url, statusCode: response.status, httpVersion: "HTTP/1.1", headerFields: response.headers)!
             client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: response.body)
-            client?.urlProtocolDidFinishLoading(self)
+            if let failure = response.failure {
+                client?.urlProtocol(self, didFailWithError: failure)
+            } else {
+                client?.urlProtocolDidFinishLoading(self)
+            }
         } catch {
             client?.urlProtocol(self, didFailWithError: error)
         }

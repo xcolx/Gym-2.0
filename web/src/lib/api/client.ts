@@ -3,7 +3,8 @@
 
 import { updateAvailable, updateRequired } from "./app-update";
 import { keysToCamelCase, keysToSnakeCase } from "./case";
-import { ApiError, parseErrorBody, statusText } from "./errors";
+import { ApiError, isApiError, parseErrorBody, statusText } from "./errors";
+import { readServerSentEvents, type ServerSentEvent } from "./sse";
 
 const API_VERSION = "v1";
 /** Relative to the origin of the page, proxied to the backend by Next.js */
@@ -23,8 +24,10 @@ interface Endpoint {
   json?: unknown;
   /** Sent as multipart/form-data, e.g. for the endpoints that take a file. See `formData()`. */
   form?: FormData;
-  /** Overrides the default timeout, in milliseconds */
+  /** Overrides the default timeout until the response starts, in milliseconds */
   timeoutMs?: number;
+  /** The Accept header, JSON by default */
+  accept?: string;
   signal?: AbortSignal;
 }
 
@@ -57,7 +60,7 @@ function endpointUrl(endpoint: Pick<Endpoint, "path" | "query">): string {
 }
 
 async function perform(endpoint: Endpoint): Promise<Response> {
-  const headers = new Headers({ Accept: "application/json" });
+  const headers = new Headers({ Accept: endpoint.accept ?? "application/json" });
   let body: BodyInit | undefined;
   if (endpoint.json !== undefined) {
     body = JSON.stringify(keysToSnakeCase(endpoint.json));
@@ -155,6 +158,26 @@ export async function sendForBlob(endpoint: Endpoint): Promise<Blob> {
     return await response.blob();
   } catch (error) {
     throw new ApiError("transport", { cause: error });
+  }
+}
+
+/**
+ * A streamed response has to send something this often, or the connection counts as lost. The backend sends a comment
+ * every 15 seconds while it has nothing else.
+ */
+const STREAM_IDLE_TIMEOUT_MS = 45_000;
+
+/**
+ * The server-sent events of a text/event-stream response, each as soon as it has arrived. The timeout of the endpoint
+ * is for the start of the response. A connection that is lost while reading throws a `transport` error.
+ */
+export async function* sendForEvents(endpoint: Endpoint): AsyncGenerator<ServerSentEvent> {
+  const response = await perform({ ...endpoint, accept: "text/event-stream" });
+  if (!response.body) throw new ApiError("invalidResponse");
+  try {
+    yield* readServerSentEvents(response.body, { idleTimeoutMs: STREAM_IDLE_TIMEOUT_MS });
+  } catch (error) {
+    throw isApiError(error) ? error : new ApiError("transport", { cause: error });
   }
 }
 

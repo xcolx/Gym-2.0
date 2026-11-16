@@ -39,11 +39,37 @@ final class AIService {
         try await api.send(.deleteAIConversation(id: id))
     }
 
-    /// Sends a message and waits for the answer of the AI, which can take a while.
-    /// If the AI is unavailable (503), nothing is stored and the message can be sent again.
-    /// Sending again with the same client UUID returns the stored message and answer instead of asking the AI again.
-    func send(_ content: String, to conversationId: Int, clientUuid: UUID? = nil) async throws -> SendAIMessageResponseDTO {
-        try await api.send(.sendAIMessage(conversationId: conversationId, SendAIMessageRequest(content: content, clientUuid: clientUuid)))
+    /// Sends a message and returns the stored message and answer once the AI has written it. Meanwhile `onEvent` gets
+    /// the answer as far as it is written: `.start` once the message is stored, a `.delta` for each part.
+    ///
+    /// If the AI fails (503, "AIServiceUnavailableError"), nothing is stored and the message can be sent again. A lost
+    /// connection (`APIError.transport`) doesn't stop the answer: it is written and stored anyway, the conversation has
+    /// it later (`answerPending`). Sending again with the same client UUID follows the answer that is being written
+    /// or returns the stored one, instead of asking the AI again.
+    func send(
+        _ content: String,
+        to conversationId: Int,
+        clientUuid: UUID? = nil,
+        onEvent: @MainActor (AIAnswerEvent) -> Void = { _ in }
+    ) async throws -> SendAIMessageResponseDTO {
+        let request = SendAIMessageRequest(content: content, clientUuid: clientUuid)
+        for try await event in try await api.events(.streamAIMessage(conversationId: conversationId, request)) {
+            switch event.event {
+            case "start":
+                await onEvent(.start(try api.decode(AIAnswerEventData.Start.self, from: event).userMessage))
+            case "delta":
+                await onEvent(.delta(try api.decode(AIAnswerEventData.Delta.self, from: event).content))
+            case "done":
+                return try api.decode(from: event)
+            case "error":
+                let body = try api.decode(APIErrorBody.self, from: event)
+                throw APIError.server(status: 503, code: body.code, message: body.message ?? "The AI is currently unavailable. Please try again later.")
+            default:
+                break
+            }
+        }
+        // Ended without the answer, e.g. because the backend was stopped
+        throw APIError.transport(URLError(.networkConnectionLost))
     }
 }
 
@@ -66,9 +92,9 @@ private extension Endpoint {
         Endpoint(method: .delete, path: "/ai/conversations/\(id)")
     }
 
-    // The server waits up to 90 seconds for the AI, so the default timeout of 30 seconds is too short. 100 seconds:
-    // Cloudflare gives up on api.gym2.app after that anyway.
-    static func sendAIMessage(conversationId: Int, _ request: SendAIMessageRequest) -> Endpoint {
-        Endpoint(method: .post, path: "/ai/conversations/\(conversationId)/messages", body: .json(request), timeout: 100)
+    // The answer is streamed. 60 seconds without any data, where the server sends something at least every 15 seconds,
+    // mean that the connection is lost.
+    static func streamAIMessage(conversationId: Int, _ request: SendAIMessageRequest) -> Endpoint {
+        Endpoint(method: .post, path: "/ai/conversations/\(conversationId)/messages/stream", body: .json(request), timeout: 60)
     }
 }

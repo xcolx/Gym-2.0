@@ -32,7 +32,8 @@ class SendAIMessageRequest(BaseModel):
     client_uuid: UUID | None = Field(
         default=None,
         description="Set by the client. If a message with the same client_uuid was already sent in the conversation, "
-                    "that message and its answer are returned instead of asking the AI again.",
+                    "that message and its answer are returned instead of asking the AI again. While the answer is "
+                    "still being written, the request follows it.",
         examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
     )
 
@@ -47,6 +48,11 @@ class AIMessageResponse(BaseModel):
         ...,
         description="The ID of the conversation this message belongs to",
         examples=[1]
+    )
+    client_uuid: UUID | None = Field(
+        default=None,
+        description="The client_uuid the message was sent with, null for the answers of the AI",
+        examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
     )
     role: Literal["user", "assistant"] = Field(
         ...,
@@ -90,6 +96,12 @@ class AIConversationResponse(BaseModel):
     messages: list[AIMessageResponse] = Field(
         default=[],
         description="Messages of the conversation, ordered from oldest to newest (empty in lists of conversations)"
+    )
+    answer_pending: bool = Field(
+        default=False,
+        description="Whether the AI is still answering the last message, which is the user's then. Load the "
+                    "conversation again after a few seconds to get the answer. If the AI fails, the message is "
+                    "removed again. Always false in lists of conversations."
     )
 
 

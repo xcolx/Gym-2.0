@@ -1,13 +1,54 @@
 // Port of ios/Gym 2.0/Core/Services/AIService.swift
 
-import { send, sendVoid } from "../client";
-import type { AIConversationDTO, SendAIMessageResponseDTO, UUIDString } from "../dto";
+import { keysToCamelCase } from "../case";
+import { send, sendForEvents, sendVoid } from "../client";
+import type { AIAnswerEvent, AIConversationDTO, AIMessageDTO, SendAIMessageResponseDTO, UUIDString } from "../dto";
+import { ApiError } from "../errors";
 
 /**
- * The server waits up to 90 seconds for the AI, so the default timeout of 30 seconds is too short. 100 seconds: Cloudflare
- * gives up on gym2.app after that anyway.
+ * Until the answer starts: the server answers as soon as it has stored the message. The answer itself can take minutes,
+ * a connection that is lost meanwhile is noticed by the missing events (see sendForEvents).
  */
-const SEND_TIMEOUT_MS = 100_000;
+const STREAM_START_TIMEOUT_MS = 30_000;
+
+/**
+ * Sends a message and yields the answer of the AI while it is written: `start` once the message is stored, a `delta`
+ * for each part of the answer and `done` with the stored message and answer.
+ *
+ * Throws a `server` error with the code "AIServiceUnavailableError" if the AI fails: nothing is stored then and the
+ * message can be sent again. A lost connection (`transport` error) doesn't stop the answer: it is written and stored
+ * anyway, the conversation has it later (`answerPending`). Sending again with the same client UUID follows the answer
+ * that is being written or returns the stored one, instead of asking the AI again.
+ */
+async function* sendStreaming(content: string, conversationId: number, clientUuid?: UUIDString | null): AsyncGenerator<AIAnswerEvent> {
+  const events = sendForEvents({
+    method: "POST",
+    path: `/ai/conversations/${conversationId}/messages/stream`,
+    json: { content, clientUuid },
+    timeoutMs: STREAM_START_TIMEOUT_MS,
+  });
+  for await (const { event, data } of events) {
+    let payload: unknown;
+    try {
+      payload = keysToCamelCase(JSON.parse(data));
+    } catch (error) {
+      throw new ApiError("decoding", { cause: error });
+    }
+    if (event === "start") {
+      yield { type: "start", userMessage: (payload as { userMessage: AIMessageDTO }).userMessage };
+    } else if (event === "delta") {
+      yield { type: "delta", content: (payload as { content: string }).content };
+    } else if (event === "done") {
+      yield { type: "done", response: payload as SendAIMessageResponseDTO };
+      return;
+    } else if (event === "error") {
+      const { error, detail } = payload as { error?: string; detail?: string };
+      throw new ApiError("server", { status: 503, code: error, message: detail });
+    }
+  }
+  // Ended without the answer, e.g. because the backend was stopped
+  throw new ApiError("transport");
+}
 
 export const aiApi = {
   /** All conversations without their messages, the most recently updated first. */
@@ -24,16 +65,5 @@ export const aiApi = {
 
   deleteConversation: (id: number) => sendVoid({ method: "DELETE", path: `/ai/conversations/${id}` }),
 
-  /**
-   * Sends a message and waits for the answer of the AI, which can take a while. If the AI is unavailable (503),
-   * nothing is stored and the message can be sent again. Sending again with the same client UUID returns the stored
-   * message and answer instead of asking the AI again.
-   */
-  send: (content: string, conversationId: number, clientUuid?: UUIDString | null) =>
-    send<SendAIMessageResponseDTO>({
-      method: "POST",
-      path: `/ai/conversations/${conversationId}/messages`,
-      json: { content, clientUuid },
-      timeoutMs: SEND_TIMEOUT_MS,
-    }),
+  sendStreaming,
 };

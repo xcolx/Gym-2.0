@@ -18,6 +18,9 @@ struct AIConversationDTO: Decodable, Identifiable, Equatable, Hashable {
     let updatedAt: Date
     /// Ordered from oldest to newest. Empty in the list of conversations.
     let messages: [AIMessageDTO]
+    /// Whether the AI is still answering the last message, which is the user's then. Loading the conversation again
+    /// a few seconds later has the answer, or neither of them if the AI failed. Always false in the list of conversations.
+    let answerPending: Bool
 }
 
 enum AIMessageRole: String, Decodable, Hashable {
@@ -28,6 +31,8 @@ enum AIMessageRole: String, Decodable, Hashable {
 struct AIMessageDTO: Decodable, Identifiable, Equatable, Hashable {
     let id: Int
     let conversationId: Int
+    /// The client UUID the message was sent with, nil for the answers of the AI
+    let clientUuid: UUID?
     let role: AIMessageRole
     let content: String
     let createdAt: Date
@@ -36,6 +41,25 @@ struct AIMessageDTO: Decodable, Identifiable, Equatable, Hashable {
 struct SendAIMessageResponseDTO: Decodable {
     let userMessage: AIMessageDTO
     let assistantMessage: AIMessageDTO
+}
+
+/// What the server sends before the stored answer while the AI answers a message.
+enum AIAnswerEvent {
+    /// The message is stored, the answer is written from now on also without the connection
+    case start(AIMessageDTO)
+    /// The next part of the answer
+    case delta(String)
+}
+
+/// The data of the events of POST /ai/conversations/{id}/messages/stream, see `AIService.send`
+enum AIAnswerEventData {
+    struct Start: Decodable {
+        let userMessage: AIMessageDTO
+    }
+
+    struct Delta: Decodable {
+        let content: String
+    }
 }
 
 // MARK: - Requests
