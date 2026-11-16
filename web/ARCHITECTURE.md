@@ -53,7 +53,7 @@ web/
       chat/                 ChatsView, [chatId] (ChatView), [chatId]/info, friends, groups, ai (Gym-AI)
       workout/              WorkoutView entry, free, schemes/{add,[schemeId],[schemeId]/edit}, suggested/settings,
                             suggested (?exercises=&minutes=&equipment=, see suggest-workout.ts), active/[workoutId]
-      stats/                StatsView, distribution, exercises/[exerciseId], past-workouts/[workoutId]/edit
+      stats/                StatsView, distribution, exercises/[exerciseId], past-workouts/[workoutId]/{edit,scheme}
       settings/             SettingsView, account (AccountView) and account/{username,email,password}, blocked-users,
                             sync (SyncView) and sync/problems
     components/

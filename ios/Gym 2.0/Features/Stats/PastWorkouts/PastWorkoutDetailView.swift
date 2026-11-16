@@ -38,6 +38,7 @@ private struct PastWorkoutDetailContentView: View {
     @State var showNotRepeatAlert: Bool = false
 
     @State var showSheet: Bool = false
+    @State private var showSchemeSheet = false
 
     /// The image of the workout while the share sheet shows it
     @State private var sharedImage: SharedFile?
@@ -147,6 +148,9 @@ private struct PastWorkoutDetailContentView: View {
                     Button("Edit workout", systemImage: "pencil") {
                         showSheet = true
                     }
+                    Button("Save to your workouts", systemImage: "plus.square.on.square") {
+                        showSchemeSheet = true
+                    }
                     Divider()
                     Button(role: .destructive) {
                         showDeleteAlert = true
@@ -191,6 +195,13 @@ private struct PastWorkoutDetailContentView: View {
         .fullScreenCover(isPresented: $showSheet, content: {
             EditPastWorkoutView(workout: workout, container: context.container)
         })
+        // A new workout scheme with the name and the exercises of this workout, which can still be changed. Above
+        // this screen and not in the workout tab, which would show a workout in progress instead.
+        .fullScreenCover(isPresented: $showSchemeSheet) {
+            NavigationStack {
+                AddSchemeWorkoutView(localName: workout.name, localExercises: vm.exercisesDone(in: workout), showsCancel: true)
+            }
+        }
         // The file is removed once it was shared or the sheet was closed
         .sheet(item: $sharedImage, onDismiss: removeSharedImages) { image in
             ShareSheet(items: [image.url]) {

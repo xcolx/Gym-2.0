@@ -1,7 +1,7 @@
 "use client";
 
 import { notFound, useRouter } from "next/navigation";
-import { Ellipsis, Pencil, Play, RotateCcw, Trash } from "lucide-react";
+import { Ellipsis, ListPlus, Pencil, Play, RotateCcw, Trash } from "lucide-react";
 
 import { HighlightedBody } from "@/components/ui/HighlightedBody";
 import { Alert } from "@/components/ui/Alert";
@@ -56,6 +56,11 @@ export function PastWorkoutDetailScreen({ workoutId }: { workoutId: string }) {
               items={[
                 { label: "Continue workout", icon: Play, onSelect: () => showAlert("continue") },
                 { label: "Edit workout", icon: Pencil, onSelect: () => router.push(`/stats/past-workouts/${workout.id}/edit`) },
+                {
+                  label: "Save to your workouts",
+                  icon: ListPlus,
+                  onSelect: () => router.push(`/stats/past-workouts/${workout.id}/scheme`),
+                },
                 { label: "Delete workout", icon: Trash, destructive: true, onSelect: () => showAlert("delete") },
               ]}
             >

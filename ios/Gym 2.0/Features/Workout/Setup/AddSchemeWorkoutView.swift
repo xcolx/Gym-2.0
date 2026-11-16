@@ -8,11 +8,14 @@
 import SwiftData
 import SwiftUI
 
+/// A new workout scheme, empty or prefilled with the name and exercises of a past workout
 struct AddSchemeWorkoutView: View {
     
     @State var workoutScheme = WorkoutScheme()
     @State var localName: String = ""
     @State var localExercises: [Exercise] = []
+    /// Shown as a sheet with its own navigation stack, which has no back button to leave it with
+    var showsCancel = false
     
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) var context
@@ -28,6 +31,13 @@ struct AddSchemeWorkoutView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(localExercises.isEmpty || localName.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .toolbar {
+            if showsCancel {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
         }
     }
 }
