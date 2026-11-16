@@ -44,9 +44,10 @@ struct SchemeWorkoutView: View {
                 localExercises = workoutScheme.sortedExercises
             }
             .alert("Do you want to save these changes for future use?", isPresented: $showSaveForTheFutureAlert) {
-                Button("Just once", role: .cancel) {}
+                Button("Just once", role: .cancel) { startWorkout() }
                 Button("Save for the future") {
                     WorkoutSchemeRepository(context: context).update(workoutScheme, name: localName, exercises: localExercises)
+                    startWorkout()
                 }
             } message: {
                 Text("Otherwise it's only changed for this time.")
@@ -63,8 +64,14 @@ struct SchemeWorkoutView: View {
             return
         }
         if workoutScheme.sortedExercises != localExercises || workoutScheme.name != localName {
-            showSaveForTheFutureAlert.toggle()
+            // The workout only starts with the answer: pushing its view right away would dismiss the alert
+            showSaveForTheFutureAlert = true
+        } else {
+            startWorkout()
         }
+    }
+
+    private func startWorkout() {
         let workout = Workout.create(name: localName, exercises: localExercises, bodyWeight: userSettings.bodyweight ?? 0)
         WorkoutSchemeRepository(context: context).startWorkout(workout, from: workoutScheme)
         navigationStackPath.append(.workout(workout))
