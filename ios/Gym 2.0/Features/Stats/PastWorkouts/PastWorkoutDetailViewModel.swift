@@ -9,7 +9,7 @@ import Foundation
 import Observation
 import OSLog
 
-/// Continuing, repeating and deleting a finished workout
+/// Continuing, repeating and deleting a finished workout, and saving it as one of the user's own workouts
 @MainActor
 @Observable
 final class PastWorkoutDetailViewModel {
@@ -38,7 +38,13 @@ final class PastWorkoutDetailViewModel {
     // nil while a workout is in progress, which the workout tab would show instead.
     func exercisesToRepeat(_ workout: Workout) -> [Exercise]? {
         guard workouts.inProgressWorkouts()?.isEmpty ?? false else { return nil }
-        return workout.workoutExercises
+        return exercisesDone(in: workout)
+    }
+
+    /// The exercises of the workout in the order they were done, deleted ones left out: the exercises of the
+    /// workout scheme made from it
+    func exercisesDone(in workout: Workout) -> [Exercise] {
+        workout.workoutExercises
             .sorted { $0.index < $1.index }
             .compactMap(\.exercise)
             .filter { !$0.isGone }

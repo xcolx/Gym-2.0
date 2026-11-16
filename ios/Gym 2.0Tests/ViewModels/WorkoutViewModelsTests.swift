@@ -222,6 +222,19 @@ extension GlobalStateTests {
             #expect(model.exercisesToRepeat(past)?.map(\.name) == ["Leg Press", "Squat"])
         }
 
+        @Test func savesTheExercisesAsAWorkoutAlsoWhileAnotherWorkoutIsInProgress() throws {
+            let exercises = ["Squat", "Lunge", "Leg Press"].map { store.exercise($0) }
+            let past = store.workout("Legs", exercises: exercises.map { ($0, Sets(reps: [10])) })
+            past.workoutExercises.first { $0.exercise?.name == "Squat" }?.index = 5
+            _ = inProgress([])
+            try store.context.save()
+            store.context.delete(exercises[1])
+            try store.context.save()
+            let model = PastWorkoutDetailViewModel(workouts: workouts)
+
+            #expect(model.exercisesDone(in: past).map(\.name) == ["Leg Press", "Squat"])
+        }
+
         @Test func deletesAPastWorkoutAlsoOnTheServer() throws {
             let workout = store.workout("Legs", serverId: 3)
             try store.context.save()
