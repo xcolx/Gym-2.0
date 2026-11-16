@@ -188,6 +188,7 @@ def _no_network(monkeypatch):
 
     monkeypatch.setattr(httpx, "post", blocked)
     monkeypatch.setattr(httpx, "get", blocked)
+    monkeypatch.setattr(httpx, "stream", blocked)
 
 
 @pytest.fixture(autouse=True)

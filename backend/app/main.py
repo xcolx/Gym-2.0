@@ -245,6 +245,7 @@ async def business_validation_handler(request: Request, exc: errors.AppException
     )
 
 @app.exception_handler(errors.ExerciseInUseError)
+@app.exception_handler(errors.AIAnswerPendingError)
 async def conflict_handler(request: Request, exc: errors.AppException):
     return JSONResponse(
         status_code=409,

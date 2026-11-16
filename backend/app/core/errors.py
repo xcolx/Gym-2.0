@@ -117,6 +117,10 @@ class AIServiceUnavailableError(AppException):
     """Raised when the Ollama server cannot be reached, times out or returns an unusable answer."""
     pass
 
+class AIAnswerPendingError(AppException):
+    """Raised when a message is sent to a conversation whose previous message is still being answered."""
+    pass
+
 class SyncTimeExpiredError(AppException):
     """
     Raised by the delta endpoints for a last sync time older than DELTA_MAX_AGE (app.db.queries.sync). Rows deleted

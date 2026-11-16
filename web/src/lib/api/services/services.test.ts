@@ -135,11 +135,40 @@ describe("JSON bodies", () => {
   });
 
   it("sends the AI message with its client UUID, a new conversation without title", async () => {
-    await aiApi.send("Hi", 4, "uuid");
-    expect(request()).toMatchObject({ url: "/api/v1/ai/conversations/4/messages", method: "POST" });
+    const stream = [
+      'event: start\ndata: {"user_message": {"id": 1, "client_uuid": "uuid"}}\n\n',
+      ': ping\n\nevent: delta\ndata: {"content": "Do "}\n\nevent: delta\ndata: {"content": "squats"}\n\n',
+      'event: done\ndata: {"user_message": {"id": 1}, "assistant_message": {"id": 2, "conversation_id": 4}}\n\n',
+    ].join("");
+    fetchMock.mockResolvedValueOnce(new Response(stream, { headers: { "Content-Type": "text/event-stream" } }));
+
+    const events = [];
+    for await (const event of aiApi.sendStreaming("Hi", 4, "uuid")) events.push(event);
+
+    expect(request()).toMatchObject({ url: "/api/v1/ai/conversations/4/messages/stream", method: "POST" });
     expect(json()).toEqual({ content: "Hi", client_uuid: "uuid" });
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("Accept")).toBe("text/event-stream");
+    expect(events).toEqual([
+      { type: "start", userMessage: { id: 1, clientUuid: "uuid" } },
+      { type: "delta", content: "Do " },
+      { type: "delta", content: "squats" },
+      { type: "done", response: { userMessage: { id: 1 }, assistantMessage: { id: 2, conversationId: 4 } } },
+    ]);
     await aiApi.createConversation();
     expect(json(1)).toEqual({});
+  });
+
+  it("fails the AI answer with the error of the AI or of a connection that ended early", async () => {
+    const read = async (stream: string) => {
+      fetchMock.mockResolvedValueOnce(new Response(stream, { headers: { "Content-Type": "text/event-stream" } }));
+      for await (const event of aiApi.sendStreaming("Hi", 4, "uuid")) void event;
+    };
+
+    await expect(
+      read('event: delta\ndata: {"content": "Do"}\n\nevent: error\ndata: {"error": "AIServiceUnavailableError", "detail": "Busy."}\n\n'),
+    ).rejects.toMatchObject({ kind: "server", status: 503, code: "AIServiceUnavailableError", message: "Busy." });
+    await expect(read('event: delta\ndata: {"content": "Do"}\n\n')).rejects.toMatchObject({ kind: "transport" });
+    await expect(read("event: delta\ndata: {oops\n\n")).rejects.toMatchObject({ kind: "decoding" });
   });
 
   it("reports only the given ids", async () => {

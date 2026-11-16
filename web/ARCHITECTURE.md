@@ -107,7 +107,8 @@ web/
       backend-proxy.ts      backendUrl(), backendTarget(), forwardToBackend() of src/proxy.ts
       pwa/                  service-worker.ts (registration, waiting update, applyUpdate), install-prompt.ts
       api/                  network layer (Core/Networking + the network methods of Core/Services)
-        client.ts           send/sendVoid/sendForBlob, Endpoint, formData, onUnauthorized, API_BASE_PATH (/api/v1)
+        client.ts           send/sendVoid/sendForBlob/sendForEvents, Endpoint, formData, onUnauthorized, API_BASE_PATH (/api/v1)
+        sse.ts              readServerSentEvents(): the events of a streamed response (the answers of the Gym-AI)
         errors.ts           ApiError (APIError.swift), isRejection, parseErrorBody
         app-update.ts       appUpdateStore/useAppUpdate: 410 → update required, Deprecation header → notice
         case.ts             snake_case <-> camelCase of JSON bodies
@@ -245,9 +246,11 @@ then reads it from the right and skips the proxies it trusts (uvicorn's `FORWARD
 compose network and Cloudflare), so the first address it doesn't trust is the client. A request that skipped Cloudflare
 gets its header replaced by Traefik and arrives as "<client>" alone, which works with the same setting. Without it the
 backend sees every web user with the web server's address (one rate limit for all). A backend that can't be reached is answered with 502,
-one that takes longer than 95 s (`BACKEND_TIMEOUT_MS`; the backend waits up to 90 s for the AI, Cloudflare gives up
-after 100 s) with 504, both with a JSON
-`detail` the client shows. It doesn't use `NextResponse.rewrite(external URL)`: Next.js adds the header
+one whose response hasn't started after 95 s (`BACKEND_TIMEOUT_MS`; Cloudflare gives up after 100 s) with 504, both
+with a JSON `detail` the client shows. A response that has started isn't limited: the answers of the Gym-AI are
+streamed as server-sent events (`POST /ai/conversations/{id}/messages/stream`, read with `sendForEvents()` of
+`lib/api/client.ts` and `lib/api/sse.ts`) and can take minutes. The backend sends them with
+`Cache-Control: no-transform`, so nothing on the way compresses and thereby buffers them. It doesn't use `NextResponse.rewrite(external URL)`: Next.js adds the header
 `x-middleware-rewrite` with the rewritten (internal backend) URL to every such response and has no option to leave it
 out. `BACKEND_URL` is read per request, so the production image is built without it and gets it at runtime, e.g.
 `BACKEND_URL=http://backend:5000` on the web service of docker-compose.prod.yml (default `http://localhost:5000`).

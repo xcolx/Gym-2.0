@@ -12,6 +12,8 @@ import SwiftUI
 struct AIMessageView: View {
 
     let message: AIChatMessage
+    /// The answer while the AI is writing it, which has no date yet
+    var isStreaming = false
     var onRetry: () -> Void = {}
     var onDiscard: () -> Void = {}
 
@@ -37,6 +39,8 @@ struct AIMessageView: View {
                     .opacity(message.isFailed ? 0.6 : 1)
 
                 switch message.status {
+                case .sent where isStreaming:
+                    EmptyView()
                 case .sent:
                     Text(formattedDate)
                         .font(.caption2)
