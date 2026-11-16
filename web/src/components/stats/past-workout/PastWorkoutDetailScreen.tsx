@@ -5,12 +5,14 @@ import { Ellipsis, Pencil, Play, RotateCcw, Trash } from "lucide-react";
 
 import { HighlightedBody } from "@/components/ui/HighlightedBody";
 import { Alert } from "@/components/ui/Alert";
-import { ShareTextButton } from "@/components/stats/ShareTextButton";
+import { ShareImageButton } from "@/components/stats/ShareImageButton";
+import { renderWorkoutShareImage } from "@/components/stats/workout-share-image";
 import { Menu } from "@/components/ui/Menu";
 import { Page, PageHeader } from "@/components/ui/Page";
 import { BottomActionBar, PrimaryButton } from "@/components/ui/PrimaryButton";
 import { appLocale } from "@/lib/domain/format";
-import { pastWorkoutShareText, pastWorkoutSummaryLines } from "@/lib/domain/stats-screens";
+import { pastWorkoutSummaryLines } from "@/lib/domain/stats-screens";
+import { workoutShareImageContent } from "@/lib/domain/workout-share-image";
 import { musclesTrainedInWorkout } from "@/lib/domain/workout";
 
 import { PastWorkoutExerciseList } from "./PastWorkoutExerciseList";
@@ -45,7 +47,10 @@ export function PastWorkoutDetailScreen({ workoutId }: { workoutId: string }) {
         back={{ href: "/stats/past-workouts", label: "Past workouts" }}
         trailing={
           <>
-            <ShareTextButton text={() => pastWorkoutShareText(workout, settings)} label="Share workout" />
+            <ShareImageButton
+              image={() => renderWorkoutShareImage(workoutShareImageContent(workout, settings), { primary, secondary })}
+              label="Share workout"
+            />
             <Menu
               label="More"
               items={[

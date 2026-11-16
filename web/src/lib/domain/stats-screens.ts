@@ -55,30 +55,6 @@ export function entryDescriptions(workoutExercise: WorkoutExercise, units: Displ
   );
 }
 
-/** The text the share button of a past workout shares (`getShareText()`) */
-export function pastWorkoutShareText(workout: WorkoutWithExercises, units: DisplayUnits, now: Date = new Date()): string {
-  // "just completed" only fits a workout of the last day
-  const isRecent = now.getTime() - workout.date.getTime() < 24 * 60 * 60 * 1000;
-  let text = isRecent
-    ? "I just completed a workout and tracked it with Gym 2.0! Check it out:"
-    : "I tracked a workout with Gym 2.0! Check it out:";
-  text += "\n\n";
-  text += workout.name;
-  text += "\n";
-  text += pastWorkoutSummaryLines(workout, units)
-    .map((line) => `${line.title}: ${line.value}`)
-    .join("\n");
-  text += "\n\n";
-  for (const workoutExercise of [...workout.workoutExercises].sort((a, b) => a.index - b.index)) {
-    let description = "💪";
-    description += workoutExercise.exercise?.name ?? "";
-    description += "\n";
-    for (const entry of entryDescriptions(workoutExercise, units)) description += `${entry}\n`;
-    text += `${description}\n`;
-  }
-  return text;
-}
-
 // MARK: - Interesting facts
 
 export function interestingFactShareText(factText: string): string {

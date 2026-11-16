@@ -94,8 +94,11 @@ function serverMask(hash: string): Promise<{ mask: string | null; retry: boolean
   return promise;
 }
 
-/** The mask of the muscle: from the server, or the bundled image if the server has none */
-async function loadMask(muscle: Muscle): Promise<string | null> {
+/**
+ * The mask of the muscle as an object URL: from the server, or the bundled image if the server has none. Also used to
+ * draw the body on a canvas (workout-share-image.ts).
+ */
+export async function loadMuscleMask(muscle: Muscle): Promise<string | null> {
   const fromServer = muscle.imageUrl ? await serverMask(muscle.imageUrl) : { mask: null, retry: false };
   const mask = fromServer.mask ?? (await bundledMask(muscle));
   if (!fromServer.retry) resolvedMasks.set(cacheKey(muscle), mask);
@@ -109,7 +112,7 @@ function MuscleHighlight({ muscle, color, className = "" }: { muscle: Muscle; co
 
   useEffect(() => {
     let cancelled = false;
-    loadMask(muscle).then((mask) => {
+    loadMuscleMask(muscle).then((mask) => {
       if (!cancelled) setLoaded({ key, mask });
     });
     return () => {

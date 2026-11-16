@@ -39,8 +39,15 @@ private struct PastWorkoutDetailContentView: View {
 
     @State var showSheet: Bool = false
 
+    /// The image of the workout while the share sheet shows it
+    @State private var sharedImage: SharedFile?
+    @State private var isMakingShareImage = false
+    @State private var madeShareImages: [URL] = []
+
     @Environment(\.modelContext) var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.imageService) private var imageService
     @Environment(UserSettings.self) var userSettings
 
     @Binding var tabSelection: String
@@ -127,9 +134,10 @@ private struct PastWorkoutDetailContentView: View {
         .navigationTitle(workout.name)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: getShareText()){
+                Button(action: shareWorkout) {
                     Label("Share workout", systemImage: "square.and.arrow.up")
                 }
+                .disabled(isMakingShareImage)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -183,6 +191,36 @@ private struct PastWorkoutDetailContentView: View {
         .fullScreenCover(isPresented: $showSheet, content: {
             EditPastWorkoutView(workout: workout, container: context.container)
         })
+        // The file is removed once it was shared or the sheet was closed
+        .sheet(item: $sharedImage, onDismiss: removeSharedImages) { image in
+            ShareSheet(items: [image.url]) {
+                sharedImage = nil
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    // Makes the image of the workout and opens the share sheet with it
+    func shareWorkout() {
+        guard !isMakingShareImage else { return }
+        isMakingShareImage = true
+        let content = WorkoutShareImageContent(workout: workout, summaryLines: summaryLines(), weightUnit: userSettings.weightUnit, distanceUnit: userSettings.distanceUnit)
+        let musclesTrained = workout.musclesTrained()
+        Task {
+            let file = await WorkoutShareImageView.renderFile(content: content, musclesTrained: musclesTrained, colorScheme: colorScheme, imageService: imageService)
+            isMakingShareImage = false
+            if let file {
+                madeShareImages.append(file)
+                sharedImage = SharedFile(url: file)
+            }
+        }
+    }
+
+    func removeSharedImages() {
+        for file in madeShareImages {
+            try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+        }
+        madeShareImages = []
     }
     
     func continueWorkout() {
@@ -234,41 +272,10 @@ private struct PastWorkoutDetailContentView: View {
         }
         return lines
     }
-    
-    func getShareText() -> String {
-        // "just completed" only fits a workout of the last day
-        let isRecent = Date.now.timeIntervalSince(workout.date) < 24 * 60 * 60
-        var text = isRecent
-            ? "I just completed a workout and tracked it with Gym 2.0! Check it out:"
-            : "I tracked a workout with Gym 2.0! Check it out:"
-        
-        text += "\n\n"
-                
-        text += "\(workout.name)"
-        text += "\n"
-        text += summaryLines().map { "\($0.title): \($0.value)" }.joined(separator: "\n")
-        
-        text += "\n\n"
-        
-        for workoutExercise in workout.workoutExercises.sorted(by: { $0.index < $1.index }) {
-            
-            var exerciseDescription = ""
-            
-            exerciseDescription += "💪"
-            exerciseDescription += workoutExercise.exercise?.name ?? ""
-           
-            exerciseDescription += "\n"
-           
-            for setIndex in 0..<workoutExercise.entryCount {
-                exerciseDescription += workoutExercise.entryDescription(at: setIndex, weightUnit: userSettings.weightUnit, distanceUnit: userSettings.distanceUnit) + "\n"
-            }
-           
-           text += exerciseDescription + "\n"
-        }
-        
-        return text
-    }
-    
 }
 
-
+/// A file the share sheet shows
+private struct SharedFile: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
