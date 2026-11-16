@@ -104,20 +104,20 @@ Counted with [scc](https://github.com/boyter/scc) and updated regularly, not on 
 <!-- LOC:START -->
 | Language | Files | Code | Comments | Blanks |
 | --- | ---: | ---: | ---: | ---: |
-| TypeScript | 368 | 29,368 | 2,911 | 3,762 |
-| Swift | 181 | 19,990 | 2,688 | 3,722 |
-| Python | 89 | 11,518 | 1,354 | 3,174 |
-| JavaScript | 7 | 627 | 97 | 77 |
-| YAML | 4 | 476 | 56 | 29 |
-| HTML | 5 | 343 | 0 | 7 |
+| TypeScript | 402 | 33,297 | 3,392 | 4,149 |
+| Swift | 199 | 23,436 | 3,226 | 3,964 |
+| Python | 90 | 12,109 | 1,480 | 3,316 |
+| JavaScript | 8 | 692 | 115 | 84 |
+| YAML | 9 | 658 | 66 | 39 |
+| HTML | 5 | 363 | 0 | 7 |
 | SQL | 1 | 260 | 35 | 27 |
-| CSS | 1 | 198 | 19 | 13 |
-| Shell | 4 | 83 | 32 | 15 |
+| CSS | 1 | 218 | 22 | 17 |
+| Shell | 5 | 192 | 49 | 32 |
 | Dockerfile | 5 | 69 | 12 | 38 |
 | TOML | 1 | 45 | 1 | 7 |
 | Docker ignore | 1 | 12 | 1 | 0 |
 | INI | 1 | 8 | 0 | 0 |
-| **Total** | **668** | **62,997** | **7,206** | **10,871** |
+| **Total** | **728** | **71,359** | **8,399** | **11,680** |
 <!-- LOC:END -->
 
 ## Getting started
