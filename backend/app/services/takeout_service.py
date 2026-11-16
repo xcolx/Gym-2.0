@@ -39,6 +39,7 @@ def build_takeout(db: Session, user: User) -> dict[str, Any]:
     blocks = crud.get_blocks(db, user.id)
     reports = crud.get_reports(db, user.id)
     nudenet_reports = crud.get_nudenet_reports(db, user.id)
+    rejected_message_reports = crud.get_rejected_message_reports(db, user.id)
     exercises = crud.get_exercises(db, user.id)
     workouts = crud.get_workouts(db, user.id)
     schemes = crud.get_workout_schemes(db, user.id)
@@ -160,6 +161,15 @@ def build_takeout(db: Session, user: User) -> dict[str, Any]:
                 "created_at": _iso(report.created_at),
             }
             for report in nudenet_reports
+        ],
+        # The chat messages the word filter rejected, with the chat they were sent to in the reason
+        "rejected_messages": [
+            {
+                "reason": report.reason,
+                "message_text": report.message_text,
+                "created_at": _iso(report.created_at),
+            }
+            for report in rejected_message_reports
         ],
         "exercises": [
             {

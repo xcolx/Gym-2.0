@@ -4,7 +4,7 @@ import { A, H3, LegalPage, List, Section } from "@/components/ui/LegalPage";
 // stored, who receives it, how long it is kept or the AI model (OLLAMA_MODEL, section 5) changes, and with the privacy
 // manifest of the iOS app (PrivacyInfo.xcprivacy).
 
-const LAST_UPDATED = "November 13, 2026";
+const LAST_UPDATED = "November 16, 2026";
 const CONTACT_EMAIL = "privacy@colinrueegg.com";
 const SOURCE_CODE_URL = "https://github.com/xcolx/Gym-2.0";
 
@@ -110,7 +110,8 @@ export function PrivacyPolicy() {
             a list of words that aren&apos;t allowed (slurs, sexual content and harassment, see the Terms of Use). A
             message that contains one is rejected and not delivered. The rejected message then creates a report like a
             user would, with a copy of its text, your username, the chat you sent it to and when. These reports are
-            kept like the others above, also when you delete your account. Nothing is stored about messages that pass
+            kept like the others above, also when you delete your account, and are part of your data takeout (section
+            10). Nothing is stored about messages that pass
             the check, apart from the messages themselves.
           </li>
         </List>
@@ -347,11 +348,9 @@ export function PrivacyPolicy() {
         <List>
           <li>
             <b>Access</b> your data and receive it in a portable format: Settings → Account → Data Takeout downloads a
-            ZIP file with all data stored about your account in a JSON file, including the reports the automatic check
-            of images created of your uploads, and the images themselves. Reports that other users sent about you are
-            not included, to protect the people who reported. Reports of your rejected chat messages aren&apos;t part
-            of the takeout yet: contact us at <A href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</A> to receive
-            them.
+            ZIP file with all data stored about your account in a JSON file, including the reports the automatic checks
+            created of your uploads and of your rejected chat messages, and the images themselves. Reports that other
+            users sent about you are not included, to protect the people who reported.
           </li>
           <li>
             <b>Correct</b> your data: your profile, workouts, schemes and exercises can be edited in the app.

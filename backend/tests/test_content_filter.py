@@ -1,10 +1,8 @@
 import pytest
-from conftest import make_friends, run_sql
+from conftest import make_friends, read_takeout, run_sql
 
-import app.db.queries.takeout as takeout_crud
 from app.core import content_filter
 from app.core.errors import ObjectionableContentError
-from app.db.session import SessionLocal
 
 
 @pytest.mark.parametrize("message", [
@@ -121,9 +119,18 @@ def test_allowed_message_is_not_reported(make_user):
     assert run_sql("SELECT count(*) FROM report")[0][0] == 0
 
 
-def test_report_of_a_rejected_message_is_not_in_the_takeout_image_reports(make_user):
+def test_takeout_contains_the_users_rejected_messages_only(make_user):
     alice, chat_id = _direct_chat(make_user)
     alice.client.post(f"/v1/chats/{chat_id}/messages", data={"content": "kys"})
 
-    with SessionLocal() as db:
-        assert takeout_crud.get_nudenet_reports(db, alice.id) == []
+    takeout, _ = read_takeout(alice.client.get("/v1/users/me/takeout"))
+
+    [rejected] = takeout["rejected_messages"]
+    assert rejected == {
+        "reason": f"{content_filter.REJECTED_MESSAGE_REASON} to chat {chat_id}", "message_text": "kys",
+        "created_at": rejected["created_at"],
+    }
+    # Not listed as a report of an image, and not part of another user's data
+    assert takeout["nudenet_reports"] == []
+    carol = make_user("carol")
+    assert read_takeout(carol.client.get("/v1/users/me/takeout"))[0]["rejected_messages"] == []

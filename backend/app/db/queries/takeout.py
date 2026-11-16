@@ -61,13 +61,27 @@ def get_nudenet_reports(db: Session, user_id: int) -> list[Report]:
     """
     The open reports NudeNet created of the user's uploads (no reporter, the user as uploader, see
     core.nudity_filter). Reports of the user by other users are left out, and so are the automatic reports of messages
-    the word filter rejected (core.content_filter), which have no image.
+    the word filter rejected, see get_rejected_message_reports.
     """
     return list(db.scalars(
         select(Report).where(
             Report.reporter_id.is_(None),
             Report.uploader_id == user_id,
             ~Report.reason.startswith(REJECTED_MESSAGE_REASON),
+        ).order_by(Report.id)
+    ).all())
+
+
+def get_rejected_message_reports(db: Session, user_id: int) -> list[Report]:
+    """
+    The open reports the word filter created of the chat messages it rejected of the user (no reporter, the user as
+    uploader, see core.content_filter). The rejected messages were never stored, the reports only have their copy.
+    """
+    return list(db.scalars(
+        select(Report).where(
+            Report.reporter_id.is_(None),
+            Report.uploader_id == user_id,
+            Report.reason.startswith(REJECTED_MESSAGE_REASON),
         ).order_by(Report.id)
     ).all())
 
