@@ -472,23 +472,6 @@ private struct DataTakeoutView: View {
 
 // MARK: - Shared
 
-/// The system share sheet, which unlike ShareLink tells when it's done
-private struct ShareSheet: UIViewControllerRepresentable {
-
-    let items: [Any]
-    let onComplete: () -> Void
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        controller.completionWithItemsHandler = { _, _, _, _ in
-            onComplete()
-        }
-        return controller
-    }
-
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
-}
-
 enum UnpushedChanges {
     static let message = "Some of your changes could not be uploaded, e.g. because you are offline. They stay on this device and are uploaded the next time you log in with this account."
 }

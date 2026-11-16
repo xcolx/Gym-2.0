@@ -7,7 +7,6 @@ import { makeMuscleMask, maskAlpha, maskSize } from "./muscle-mask";
 import {
   exerciseStatsLines,
   interestingFactShareText,
-  pastWorkoutShareText,
   pastWorkoutSummaryLines,
 } from "./stats-screens";
 
@@ -101,22 +100,6 @@ describe("past workout (PastWorkoutDetailView)", () => {
         .map((line) => `${line.title}: ${line.value}`)
         .slice(2),
     ).toEqual(["Sets: 1", "Exercise time: 0 s", "Avg intensity: –", "Distance: 0 m"]);
-  });
-
-  it("shares the workout with all its sets", () => {
-    const anHourLater = new Date(workout.date.getTime() + 60 * 60 * 1000);
-    expect(pastWorkoutShareText(workout, metric, anHourLater)).toBe(
-      "I just completed a workout and tracked it with Gym 2.0! Check it out:\n\nPush\n" +
-        "Date: 12.10.26\nTime trained: 1 h 15 min\nSets: 4\nReps: 18\nVolume: 1.1k kg\nExercise time: 8 min\n" +
-        "Avg intensity: lvl 7.5\nDistance: 3.5 km\n\n" +
-        "💪Bench Press\n10x, 60.0 kg\n8x, 62.5 kg\n\n" +
-        "💪Rowing\n8:00, lvl 7.5, 2 km\n0:00, lvl 0, 1.5 km\n\n",
-    );
-  });
-
-  it("doesn't say just completed for a workout older than a day", () => {
-    const twoDaysLater = new Date(workout.date.getTime() + 2 * 24 * 60 * 60 * 1000);
-    expect(pastWorkoutShareText(workout, metric, twoDaysLater)).toMatch(/^I tracked a workout with Gym 2\.0! Check it out:\n\nPush\n/);
   });
 
   it("shares a fact", () => {

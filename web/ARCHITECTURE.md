@@ -86,6 +86,8 @@ web/
                             use-friends-screen.ts, use-context-menu.tsx (long press / right click → ActionSheet)
         groups/             PublicGroupsScreen.tsx, PublicGroupRow.tsx, use-public-groups.ts
       stats/                the stats tab
+        workout-share-image.ts  draws the 2:3 image the share button of a past workout shares on a canvas
+                            (WorkoutShareImageView.swift, its content: lib/domain/workout-share-image.ts)
         past-workout/       PastWorkoutDetailScreen.tsx, PastWorkoutExerciseList.tsx, use-past-workout-detail.ts,
                             EditPastWorkoutScreen.tsx, use-edit-past-workout.ts (the draft of EditPastWorkoutView)
       home/, settings/      components of one tab
@@ -645,9 +647,9 @@ backend, also offline. What is still different from iOS or left to do:
 
 - No push updates: chats are polled (3 s list, 1 s open chat) while the page is visible, like the iOS app.
 - Photos of chats and the AI chat need a connection (as on iOS); the profile image upload too.
-- Exporting a file opens the share sheet only where the browser can share files (Android Chrome), otherwise it's a
-  download; importing uses the file picker. The Legacy Import button of the import sheet reads the CSV export of earlier
-  versions like on iOS. There is no import of the V2 data (LegacyImportView, iOS only: it uploads the data of the
+- Exporting a file or sharing the image of a past workout opens the share sheet only where the browser can share
+  files (Android Chrome), otherwise it's a download; importing uses the file picker. The Legacy Import button of the
+  import sheet reads the CSV export of earlier versions like on iOS. There is no import of the V2 data (LegacyImportView, iOS only: it uploads the data of the
   previous, offline-only iOS app version, which the web app never had).
 - Default exercises come from the server (like iOS, which seeds nothing).
 
