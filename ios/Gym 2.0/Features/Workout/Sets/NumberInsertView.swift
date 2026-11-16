@@ -20,6 +20,23 @@ struct NumberInsertView: View {
 
     @FocusState var focusedField: Field?
 
+    // Triggers of the haptics. They are played from here, not from the buttons of the stopwatch in the keyboard toolbar.
+    @State private var stopwatchEvent = StopwatchEvent(kind: .stopped)
+    @State private var rejectedInputs = 0
+
+    /// What the stopwatch did last. The count tells two equal events in a row apart, e.g. stopped twice.
+    private struct StopwatchEvent: Equatable {
+        enum Kind {
+            case started, paused, stopped
+        }
+        var kind: Kind
+        var count = 0
+
+        mutating func note(_ kind: Kind) {
+            self.kind = kind
+            count += 1
+        }
+    }
 
     struct Field: Hashable {
         let metric: SetMetric
@@ -102,6 +119,16 @@ struct NumberInsertView: View {
                     showStoredValue(oldField)
                 }
             }
+            // The stopwatch is started right before the set, without looking at the phone any longer
+            .sensoryFeedback(trigger: stopwatchEvent) { _, event in
+                switch event.kind {
+                case .started: .impact(weight: .medium)
+                case .paused: .impact(weight: .light)
+                case .stopped: .success
+                }
+            }
+            // The field silently shows the stored value again
+            .sensoryFeedback(.error, trigger: rejectedInputs)
 
     }
 
@@ -250,6 +277,7 @@ struct NumberInsertView: View {
             }
         } else {
             showStoredValue(Field(metric: metric, set: set))
+            rejectedInputs += 1
         }
     }
 
@@ -347,6 +375,7 @@ struct NumberInsertView: View {
             if stopwatch.isRunning {
                 Button("Pause") {
                     store.pause(key, fieldSeconds: fieldSeconds)
+                    stopwatchEvent.note(.paused)
                 }
                 Button("Stop") {
                     stopStopwatch(field, key: key, store: store, fieldSeconds: fieldSeconds)
@@ -354,6 +383,7 @@ struct NumberInsertView: View {
             } else if stopwatch.accumulated > 0 {
                 Button("Resume") {
                     store.start(key, fieldSeconds: fieldSeconds)
+                    stopwatchEvent.note(.started)
                 }
                 Button("Stop") {
                     stopStopwatch(field, key: key, store: store, fieldSeconds: fieldSeconds)
@@ -361,6 +391,7 @@ struct NumberInsertView: View {
             } else {
                 Button("Start") {
                     store.start(key, fieldSeconds: fieldSeconds)
+                    stopwatchEvent.note(.started)
                 }
             }
         }
@@ -371,6 +402,7 @@ struct NumberInsertView: View {
         let value = min(max(seconds, SetMetric.time.range.lowerBound), SetMetric.time.range.upperBound)
         workoutExercise.setValue(value, of: .time, at: field.set)
         showStoredValue(field)
+        stopwatchEvent.note(.stopped)
     }
 
     // e.g. "1:05.3", with the tenths of a second so the user sees it running

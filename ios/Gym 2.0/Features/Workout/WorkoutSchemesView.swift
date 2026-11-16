@@ -28,6 +28,8 @@ struct WorkoutSchemesView: View {
     // A new workout can only be started if none is in progress
     @Query(filter: #Predicate<Workout> { $0.inProgress == true }) private var workoutsInProgress: [Workout]
     @State private var showsWorkoutInProgress = false
+    /// Counts the started workouts, the trigger of the haptic
+    @State private var startedWorkouts = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -86,6 +88,7 @@ struct WorkoutSchemesView: View {
         } message: {
             Text("Choose the workout you would like to edit")
         }
+        .sensoryFeedback(.impact(weight: .medium), trigger: startedWorkouts)
         .inProgressWorkoutChooser(isPresented: $showsWorkoutInProgress, title: "A workout is already in progress", message: "Finish or cancel it before you start a new one.") { workout in
             navigationStackPath = [.workout(workout)]
         }
@@ -162,5 +165,6 @@ struct WorkoutSchemesView: View {
         let workout = Workout.create(name: scheme.name, exercises: scheme.sortedExercises, bodyWeight: userSettings.bodyweight ?? 0)
         WorkoutSchemeRepository(context: context).startWorkout(workout, from: scheme)
         navigationStackPath.append(.workout(workout))
+        startedWorkouts += 1
     }
 }

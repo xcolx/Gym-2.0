@@ -25,6 +25,8 @@ struct SchemeWorkoutView: View {
     // A new workout can only be started if none is in progress
     @Query(filter: #Predicate<Workout> { $0.inProgress == true }) private var workoutsInProgress: [Workout]
     @State private var showsWorkoutInProgress = false
+    /// Counts the started workouts, the trigger of the haptic
+    @State private var startedWorkouts = 0
         
     var body: some View {
         
@@ -49,6 +51,7 @@ struct SchemeWorkoutView: View {
             } message: {
                 Text("Otherwise it's only changed for this time.")
             }
+            .sensoryFeedback(.impact(weight: .medium), trigger: startedWorkouts)
             .inProgressWorkoutChooser(isPresented: $showsWorkoutInProgress, title: "A workout is already in progress", message: "Finish or cancel it before you start a new one.") { workout in
                 navigationStackPath = [.workout(workout)]
             }
@@ -65,5 +68,6 @@ struct SchemeWorkoutView: View {
         let workout = Workout.create(name: localName, exercises: localExercises, bodyWeight: userSettings.bodyweight ?? 0)
         WorkoutSchemeRepository(context: context).startWorkout(workout, from: workoutScheme)
         navigationStackPath.append(.workout(workout))
+        startedWorkouts += 1
     }
 }

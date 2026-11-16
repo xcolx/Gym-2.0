@@ -46,6 +46,7 @@ struct SuggestedWorkoutSettingsView: View {
                     }
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .sensoryFeedback(.selection, trigger: timeForWorkout)
                     Text(WorkoutSuggestion.exerciseCount(minutes: timeForWorkout) == 1 ? "About 1 exercise" : "About \(WorkoutSuggestion.exerciseCount(minutes: timeForWorkout)) exercises")
                         .font(.footnote)
                         .foregroundStyle(.secondary)

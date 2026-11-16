@@ -22,6 +22,8 @@ struct FreeWorkoutView: View {
     // A new workout can only be started if none is in progress
     @Query(filter: #Predicate<Workout> { $0.inProgress == true }) private var workoutsInProgress: [Workout]
     @State private var showsWorkoutInProgress = false
+    /// Counts the started workouts, the trigger of the haptic
+    @State private var startedWorkouts = 0
 
     var body: some View {
         EditWorkoutView(navStackTitle: "Free workout", workoutTitle: $workoutTitle, exerciseList: $exerciseList) {
@@ -31,6 +33,7 @@ struct FreeWorkoutView: View {
             // also without exercises, they can be added during the workout
             .buttonStyle(PrimaryButtonStyle())
         }
+        .sensoryFeedback(.impact(weight: .medium), trigger: startedWorkouts)
         .inProgressWorkoutChooser(isPresented: $showsWorkoutInProgress, title: "A workout is already in progress", message: "Finish or cancel it before you start a new one.") { workout in
             navigationStackPath = [.workout(workout)]
         }
@@ -47,5 +50,6 @@ struct FreeWorkoutView: View {
         let workout = Workout.create(name: workoutTitle, exercises: exerciseList, bodyWeight: userSettings.bodyweight ?? 0)
         WorkoutRepository(context: context).start(workout)
         navigationStackPath.append(.workout(workout))
+        startedWorkouts += 1
     }
 }

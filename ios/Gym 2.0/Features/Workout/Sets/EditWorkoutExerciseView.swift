@@ -15,6 +15,10 @@ struct EditWorkoutExerciseView: View {
     var limitsRows = true
     @Environment(UserSettings.self) var userSettings
 
+    // Triggers of the haptics. Not the number of entries, which the unilateral switch changes too.
+    @State private var addedSets = 0
+    @State private var removedSets = 0
+
     private var bodyWeight: Double {
         userSettings.bodyweight ?? 0
     }
@@ -63,6 +67,8 @@ struct EditWorkoutExerciseView: View {
                 .tint(userSettings.appColor)
             }
         }
+        .sensoryFeedback(.increase, trigger: addedSets)
+        .sensoryFeedback(.decrease, trigger: removedSets)
     }
 
     private func addSet() {
@@ -73,6 +79,7 @@ struct EditWorkoutExerciseView: View {
             workoutExercise.appendEntry(bodyWeight: bodyWeight)
         }
         workoutExercise.workout?.noteChange()
+        addedSets += 1
     }
 
     private func removeSet() {
@@ -83,5 +90,6 @@ struct EditWorkoutExerciseView: View {
             }
             workoutExercise.removeEntry(at: workoutExercise.entryCount - 1)
         }
+        removedSets += 1
     }
 }

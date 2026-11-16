@@ -70,6 +70,8 @@ struct StatsView: View {
             .onDisappear {
                 selectedActivityDay = nil
             }
+            // only when a day is selected, not when the selection is removed
+            .sensoryFeedback(.selection, trigger: selectedActivityDay) { _, day in day != nil }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Statistics")
             .navigationDestination(for: StatsRoute.self) { route in

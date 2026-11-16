@@ -51,6 +51,8 @@ struct HomeView: View {
         }
         .background(Color(.systemGroupedBackground))
         .ignoresSafeArea(.keyboard)
+        // only when a muscle is selected, not when the selection is removed
+        .sensoryFeedback(.selection, trigger: selectedMuscle) { _, muscle in muscle != nil }
         .onDisappear {
             selectedMuscle = nil
         }
