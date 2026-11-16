@@ -166,6 +166,8 @@ private struct EndWorkoutContentView: View {
         } message: {
             Text("No set of this workout has a value, so there is nothing to save. Do you want to discard the workout?")
         }
+        // "Finish workout" asks something instead of ending the workout
+        .sensoryFeedback(.warning, trigger: model.suggestedEnd != nil || model.asksToDiscardEmpty) { _, asks in asks }
     }
 
     /// Leaves the workout, celebrating it if it was saved

@@ -47,5 +47,7 @@ struct AppColorSegmentedPicker<Option: Hashable>: View {
         }
         .padding(2)
         .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 9))
+        // like the segmented control of the system
+        .sensoryFeedback(.selection, trigger: selection)
     }
 }

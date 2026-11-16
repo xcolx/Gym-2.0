@@ -160,6 +160,10 @@ struct ExercisesView: View {
             }
             .animation(.snappy(duration: 0.2), value: picked.isEmpty)
         }
+        // A tap on a row picks the exercise, which only the small badge shows
+        .sensoryFeedback(trigger: picked.count) { old, new in
+            new > old ? .increase : .decrease
+        }
         // Not on a view inside the stack: its presentations are created anew when the app goes to the background,
         // which lost the input of the exercise being created
         .fullScreenCover(isPresented: $showCreateExerciseSheet) {

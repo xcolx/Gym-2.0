@@ -39,5 +39,6 @@ private struct DeleteWorkoutConfirmation: ViewModifier {
             } message: {
                 Text("The workout is deleted. This can't be reverted.")
             }
+            .sensoryFeedback(.warning, trigger: isPresented) { _, isPresented in isPresented }
     }
 }
