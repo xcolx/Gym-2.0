@@ -29,7 +29,9 @@ struct PerformingExerciseView: View {
     ) var pastWorkoutExercises: [WorkoutExercise]
 
     var body: some View {
-        if navigationStackPath != [] {
+        // An exercise removed in the overview is deleted and saved right away. This page can be updated once more before
+        // it is removed, and reading a deleted exercise crashes.
+        if navigationStackPath != [] && !workoutExercise.isGone {
             // Not one scroll view: the sets stay in place however long the history is, it scrolls on its own
             VStack(alignment: .leading, spacing: 12) {
                 title

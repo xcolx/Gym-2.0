@@ -74,8 +74,9 @@ final class EditPerformingWorkoutViewModel {
 
         for exercise in exercisesToDelete {
             if let index = workout.workoutExercises.firstIndex(of: exercise) {
-                workouts.delete(exercise, synced: !defersDeletions)
+                // removed first, so that the views of the workout are updated without the exercise before it is deleted
                 workout.workoutExercises.remove(at: index)
+                workouts.delete(exercise, synced: !defersDeletions)
             }
         }
 
