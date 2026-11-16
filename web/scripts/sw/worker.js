@@ -5,7 +5,6 @@
 
 const PRECACHE = `gym2-precache-${MANIFEST.version}`;
 const LAZY_CACHE = `gym2-assets-${MANIFEST.lazy.version}`;
-const NAVIGATION_TIMEOUT_MS = 3000;
 
 const assetUrls = new Set(MANIFEST.assets);
 const lazyUrls = new Set(MANIFEST.lazy.urls);
@@ -67,8 +66,9 @@ self.addEventListener("activate", (event) => {
           .filter((name) => name.startsWith("gym2-") && name !== PRECACHE && name !== LAZY_CACHE && name !== IMAGE_CACHE)
           .map((name) => caches.delete(name)),
       );
-      // Starts the network request of a navigation while the worker boots
-      await self.registration.navigationPreload?.enable();
+      // Pages are answered from the precache, so no request is started for them. Earlier versions enabled the preload:
+      // its request fails offline, and nothing may depend on how the browser treats a failed preload.
+      await self.registration.navigationPreload?.disable().catch(() => undefined);
       await self.clients.claim();
     })(),
   );
@@ -108,7 +108,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(navigation(event, url));
+    event.respondWith(navigation(request, url));
   } else if (assetUrls.has(url.pathname)) {
     // By path: Next.js adds a hash as query to the links of the icons
     event.respondWith(precached(request, url.pathname));
@@ -147,58 +147,32 @@ async function cachedImage(request, pathname) {
   return response;
 }
 
-async function navigation(event, url) {
-  if (self.navigator.onLine !== false) {
-    try {
-      const response = await withTimeout(networkResponse(event), NAVIGATION_TIMEOUT_MS);
-      // A server error (e.g. while deploying) is answered from the precache as well
-      if (response.status < 500) return response;
-    } catch {
-      // Offline, server unreachable or too slow
-    }
+/**
+ * Cache first, like the files of the build: the precached page belongs to the precached chunks, opens without waiting
+ * for a slow connection and doesn't depend on the network at all. A new deployment arrives as a new worker (see
+ * "Updates" in ARCHITECTURE.md). Only what isn't a page of the app (or wasn't precached) goes to the server.
+ */
+async function navigation(request, url) {
+  const page = await precachedPage(url);
+  if (page) return page;
+  try {
+    return await fetch(request);
+  } catch (error) {
+    const notFound = await caches.match(MANIFEST.notFound, { cacheName: PRECACHE, ignoreVary: true });
+    if (notFound) return notFound;
+    throw error;
   }
-  return (await precachedPage(url)) ?? fetch(event.request);
 }
 
-async function networkResponse(event) {
-  if (event.preloadResponse) {
-    // Settled even if the precache answers first, otherwise the browser logs a cancelled preload
-    event.waitUntil(event.preloadResponse.catch(() => undefined));
-    const preloaded = await event.preloadResponse;
-    if (preloaded) return preloaded;
-  }
-  return fetch(event.request);
-}
-
-function withTimeout(promise, milliseconds) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout")), milliseconds);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-}
-
-/** The precached HTML of the page, a template filled with the values of the URL, or the 404 page */
+/** The precached HTML of the page or a template filled with the values of the URL, undefined if there is none */
 async function precachedPage(url) {
-  const cache = await caches.open(PRECACHE);
   const found = findPage(normalizePathname(url.pathname), MANIFEST.pages);
-  if (found) {
-    const cached = await cache.match(found.page.url, { ignoreVary: true });
-    if (cached && found.page.params.length === 0) return cached;
-    if (cached) {
-      const headers = new Headers(cached.headers);
-      headers.delete("content-length");
-      headers.delete("etag");
-      return new Response(fillTemplate(await cached.text(), found.values), { status: cached.status, headers });
-    }
-  }
-  return cache.match(MANIFEST.notFound, { ignoreVary: true });
+  if (!found) return undefined;
+  const cache = await caches.open(PRECACHE);
+  const cached = await cache.match(found.page.url, { ignoreVary: true });
+  if (!cached || found.page.params.length === 0) return cached;
+  // The body is text now: the headers of the transfer don't describe it anymore
+  const headers = new Headers(cached.headers);
+  for (const name of ["content-length", "content-encoding", "etag"]) headers.delete(name);
+  return new Response(fillTemplate(await cached.text(), found.values), { status: cached.status, headers });
 }

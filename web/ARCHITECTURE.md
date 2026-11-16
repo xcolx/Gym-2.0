@@ -274,9 +274,12 @@ servers apart (cookies of `localhost` are shared across ports).
   first, also offline and across deployments. A changed image of an exercise, user or chat has a new hash and is loaded
   then. `lib/pwa/image-cache.ts` removes the images nothing in the database references after every pull (unreferenced
   ones only once they're older than 7 days, e.g. the images of public groups) and all of them on logout.
-  Navigations: network first (3 s timeout, also on 5xx) with the precached page as fallback, unknown pages → the
-  precached 404. RSC requests of client-side navigations go to the network; offline they fail and Next falls back to a
-  full navigation, which the worker answers from the precache. Precached files are served cache first.
+  Navigations: cache first, the precached page (or filled template) without asking the server, so a page opens at
+  once on a bad connection and offline (also in an installed app on iOS, where the navigation preload is switched
+  off: nothing waits for a request that fails offline). Only URLs that aren't a page of the app go to the network,
+  offline → the precached 404. RSC requests of client-side navigations go to the network; offline they fail and Next
+  falls back to a full navigation, which the worker answers from the precache. Precached files are served cache
+  first. `e2e/offline.spec.ts` opens the dynamic pages offline (production build only).
 - Updates: a deployment is a new `sw.js` (version hash of the build). The browser finds it on navigations, the app also
   checks when it comes back to the foreground (at most every 30 min). The new worker installs and waits, the app shows
   "Update available" (once a day, shared with the Deprecation notice); "Update" (also on the 410 screen) lets it take
