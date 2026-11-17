@@ -44,7 +44,7 @@ def delete_in_admin(user_id):
     from app.db.session import SessionLocal
 
     with SessionLocal() as session:
-        UserAdmin().soft_delete(session, session.get(User, user_id))
+        UserAdmin().soft_delete(session, session.get_one(User, user_id))
         session.commit()
 
 
