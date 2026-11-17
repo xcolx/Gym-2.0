@@ -40,16 +40,30 @@ def signup_with_email(
     db: Session = DbSession
 ):
     """
-    Sends the verification email. The response is the same whether or not the email is already registered.
+    Sends the verification email. The response is the same whether or not the email is already registered. If it is,
+    the address gets an email about the attempt instead: how to log in or reset the password, or how to reenable the
+    account if it was deleted. An account that never verified the email is replaced by the new signup.
     """
     result = auth_service.signup_with_email(db, payload)
 
     # Sent after the response, so the response time doesn't reveal whether the email was already registered
-    if result:
-        user, raw_token = result
-        assert user.email_verify_expire is not None  # Set with the token
+    if result and result.outcome == "created":
+        user, raw_token = result.user, result.raw_token
+        assert raw_token is not None and user.email_verify_expire is not None  # Set with the token
         background_tasks.add_task(
             mail_service.send_verification_email, user.email, user.id, raw_token, user.email_verify_expire
+        )
+    elif result and result.outcome == "registered":
+        user = result.user
+        background_tasks.add_task(
+            mail_service.send_account_notice_email, user.email, user.id, "signup_registered",
+            result.raw_token, user.pw_reset_expire if result.raw_token else None
+        )
+    elif result:
+        user = result.user
+        background_tasks.add_task(
+            mail_service.send_account_notice_email, user.email, user.id, "signup_deleted",
+            removal_date=auth_service.removal_date(user)
         )
 
     return {"success": True, "message": SIGNUP_MESSAGE}
@@ -131,7 +145,8 @@ def forgot_password(
     db: Session = DbSession
 ):
     """
-    Sends an email with a link to the password reset page (GET /reset-password).
+    Sends an email with a link to the password reset page (GET /reset-password), also for an account its user
+    deleted: the email then explains that only logging in reenables the account.
     The response is the same whether or not an account exists for the email.
     """
     result = auth_service.request_password_reset(db, payload.email)
@@ -141,7 +156,8 @@ def forgot_password(
         user, raw_token = result
         assert user.pw_reset_expire is not None  # Set with the token
         background_tasks.add_task(
-            mail_service.send_password_reset_email, user.email, user.id, raw_token, user.pw_reset_expire
+            mail_service.send_password_reset_email, user.email, user.id, raw_token, user.pw_reset_expire,
+            auth_service.removal_date(user)
         )
 
     return {"success": True, "message": FORGOT_PASSWORD_MESSAGE}
@@ -177,11 +193,17 @@ def reset_password(
         return _reset_password_page(token=token, error="The passwords don't match.", status_code=status.HTTP_400_BAD_REQUEST)
 
     try:
-        auth_service.reset_password(db, token, password)
+        deleted = auth_service.reset_password(db, token, password)
     except AuthenticationError as error:
         return _reset_password_page(message=error.message, status_code=status.HTTP_400_BAD_REQUEST)
     except WeakPasswordError as error:
         return _reset_password_page(token=token, error=error.message, status_code=status.HTTP_400_BAD_REQUEST)
+
+    if deleted:
+        return _reset_password_page(message=(
+            "Your password has been changed. Your account is still deleted: log in with your new password in the app "
+            "to reenable it."
+        ))
 
     return _reset_password_page(message="Your password has been changed. You can now log in with your new password in the app.")
 
@@ -203,15 +225,24 @@ def login_with_email(
     request: Request,
     payload: EmailLoginRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: Session = DbSession
 ):
     """
-    Sets an HTTP-only session cookie on success.
+    Sets an HTTP-only session cookie on success. An account its user deleted is reenabled by the login, which the
+    account's address is told by email.
     """
-
-    raw_token, max_age_seconds = auth_service.login_with_email(db, payload, request.client.host if request.client else None)
+    raw_token, max_age_seconds, reenabled_user = auth_service.login_with_email(
+        db, payload, request.client.host if request.client else None
+    )
 
     set_session_cookie(response, raw_token, max_age_seconds)
+
+    if reenabled_user:
+        background_tasks.add_task(
+            mail_service.send_account_notice_email, reenabled_user.email, reenabled_user.id, "reenabled"
+        )
+        return {"success": True, "message": "Welcome back! Your account has been reenabled."}
 
     return {
         "success": True,

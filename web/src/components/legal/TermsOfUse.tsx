@@ -5,7 +5,7 @@ import { A, LegalPage, List, Section } from "@/components/ui/LegalPage";
 // reporting, blocking, reports handled within 24 hours), section 11 the minimum terms Apple requires of a custom
 // license agreement and section 12 how these terms relate to the open source license of the code.
 
-const LAST_UPDATED = "October 24, 2026";
+const LAST_UPDATED = "November 17, 2026";
 const CONTACT_EMAIL = "tos@colinrueegg.com";
 const SOURCE_CODE_URL = "https://github.com/xcolx/Gym-2.0";
 
@@ -20,7 +20,10 @@ export function TermsOfUse() {
             Reports are reviewed within 24 hours, the content is removed and the users who posted it are banned.
           </li>
           <li>Gym 2.0 and the Gym-AI give no medical advice. Train at your own risk.</li>
-          <li>You can delete your account at any time in Settings → Account.</li>
+          <li>
+            You can delete your account at any time in Settings → Account. For 30 days you get it back by logging in
+            again, then it is removed permanently.
+          </li>
           <li>
             The source code is open source under the GNU AGPL v3. These terms cover the service we run, not the code.
           </li>
@@ -141,9 +144,21 @@ export function TermsOfUse() {
 
       <Section title="9. Ending your account">
         <p>
-          You can delete your account at any time in Settings → Account → Delete Account. We may suspend or delete
-          accounts that break these terms, in serious cases without notice, and accounts that are needed to protect
-          other users or Gym 2.0.
+          You can delete your account at any time in Settings → Account → Delete Account. You are logged out
+          everywhere, and your messages, direct chats, group memberships and profile image are deleted right away.
+        </p>
+        <p>
+          The account itself and the rest of its data are kept for 30 days and then removed permanently. During these
+          30 days, logging in with your email and password reenables the account with the data that is still there
+          (such as your workouts, workout schemes, exercises and friends), and we tell you so by email. What was
+          deleted right away is not restored. If you forgot your password, you can still reset it during this time;
+          resetting it alone does not reenable the account, logging in afterwards does. If you do not log in, nothing
+          else is needed for the account to be removed. Until then its username and email address stay reserved, so
+          no new account can be created with them.
+        </p>
+        <p>
+          We may suspend or delete accounts that break these terms, in serious cases without notice, and accounts that
+          are needed to protect other users or Gym 2.0.
         </p>
       </Section>
 

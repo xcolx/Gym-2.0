@@ -41,6 +41,9 @@ const VERIFY_URL = process.env.VERIFY_URL || 'http://localhost:5000/v1/auth/veri
 // The token is appended as ?token=...
 const RESET_URL = process.env.RESET_URL || 'http://localhost:5000/v1/auth/reset-password';
 
+// The login of the web app, which the emails about an existing account link to
+const LOGIN_URL = process.env.LOGIN_URL || 'http://localhost:3000/auth';
+
 // Every step of sending (connecting, the server's greeting, each SMTP command) gives up after this long,
 // see MAILSERVER_TIMEOUT_SECONDS in the backend's mail_service.py
 const SMTP_TIMEOUT_MS = 15 * 1000;
@@ -130,18 +133,22 @@ function formatValidity(minutes) {
     return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 }
 
-// The plain text and HTML version of an email, with a button that opens the link if there is one
-function renderEmail({ heading, paragraphs, buttonLabel, link, footer }) {
-    const text = [...paragraphs, ...(link ? [link] : []), footer].join('\n\n');
-    const button = link ? `
+// The plain text and HTML version of an email, with a button for every link ({ label, url }), the first one highlighted
+function renderEmail({ heading, paragraphs, links = [], footer }) {
+    const text = [
+        ...paragraphs,
+        ...links.map(({ label, url }) => (links.length > 1 ? `${label}: ${url}` : url)),
+        footer
+    ].join('\n\n');
+    const buttons = links.map(({ label, url }, index) => `
     <p style="margin: 30px 0;">
-        <a href="${escapeHtml(link)}" style="background: #667eea; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none;">${escapeHtml(buttonLabel)}</a>
+        <a href="${escapeHtml(url)}" style="background: ${index === 0 ? '#667eea' : '#8a8f98'}; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none;">${escapeHtml(label)}</a>
     </p>
-    <p style="color: #888; font-size: 12px;">Or copy this link into your browser:<br>${escapeHtml(link)}</p>` : '';
+    <p style="color: #888; font-size: 12px;">Or copy this link into your browser:<br>${escapeHtml(url)}</p>`).join('');
     const html = `
 <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px;">
     <h2 style="color: #667eea;">${escapeHtml(heading)}</h2>
-    ${paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('\n    ')}${button}
+    ${paragraphs.map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join('\n    ')}${buttons}
     <p style="color: #888; font-size: 12px;">${escapeHtml(footer)}</p>
 </div>`.trim();
     return { text, html };
@@ -159,8 +166,7 @@ function verificationEmail({ reason, link, validity }) {
                     'address and you log in with that one.',
                     `The link is valid for ${validity}.`
                 ],
-                buttonLabel: 'Confirm email',
-                link,
+                links: [{ label: 'Confirm email', url: link }],
                 footer: 'If you did not change the email address of a Gym 2.0 account, someone may have entered yours ' +
                     'by mistake. You can safely ignore this email.'
             })
@@ -175,14 +181,33 @@ function verificationEmail({ reason, link, validity }) {
                 'Please verify your email address by opening the link below.',
                 `The link is valid for ${validity}.`
             ],
-            buttonLabel: 'Verify email',
-            link,
+            links: [{ label: 'Verify email', url: link }],
             footer: 'If you did not sign up for Gym 2.0, you can safely ignore this email.'
         })
     };
 }
 
-function passwordResetEmail({ link, validity }) {
+// removalDate is set for a deleted account: the day it is removed permanently
+function passwordResetEmail({ link, validity, removalDate }) {
+    if (removalDate) {
+        return {
+            subject: 'Reset the password of your deleted Gym 2.0 account',
+            ...renderEmail({
+                heading: 'Reset your password',
+                paragraphs: [
+                    'Someone requested to reset the password of your Gym 2.0 account. This account has been deleted ' +
+                    `and is removed permanently on ${removalDate}. Resetting the password does not change that.`,
+                    'If you want your account back, log in before that day: logging in reenables the account. You can ' +
+                    'log in with your old password, or set a new one with the link below and log in with that one.',
+                    `The link is valid for ${validity}.`
+                ],
+                links: [{ label: 'Reset password', url: link }],
+                footer: 'If you did not request this, you can safely ignore this email. Your account stays deleted ' +
+                    'and your password stays the same.'
+            })
+        };
+    }
+
     return {
         subject: 'Reset your Gym 2.0 password',
         ...renderEmail({
@@ -191,9 +216,76 @@ function passwordResetEmail({ link, validity }) {
                 'Someone requested to reset the password of your Gym 2.0 account. Open the link below to set a new password.',
                 `The link is valid for ${validity}.`
             ],
-            buttonLabel: 'Reset password',
-            link,
+            links: [{ label: 'Reset password', url: link }],
             footer: 'If you did not request this, you can safely ignore this email. Your password stays the same.'
+        })
+    };
+}
+
+const SIGNUP_ATTEMPT_FOOTER = 'If you did not try to sign up, someone may have entered your email address by ' +
+    'mistake. You can safely ignore this email, nothing was changed.';
+
+// What an address is told about its account, see AccountNotice in the backend's mail_service.py.
+// resetLink and validity are only set for an account with a password, removalDate only for a deleted account.
+function accountNoticeEmail({ notice, resetLink, validity, removalDate }) {
+    if (notice === 'signup_registered') {
+        return {
+            subject: 'You already have a Gym 2.0 account',
+            ...renderEmail({
+                heading: 'This email address already has an account',
+                paragraphs: [
+                    'Someone tried to sign up for Gym 2.0 with your email address, which already has an account. ' +
+                    'No new account was created.',
+                    resetLink
+                        ? 'If that was you, log in instead. If you forgot your password, you can set a new one with ' +
+                            `the second link, which is valid for ${validity}.`
+                        : 'If that was you, log in instead.'
+                ],
+                links: [
+                    { label: 'Log in', url: LOGIN_URL },
+                    ...(resetLink ? [{ label: 'Reset password', url: resetLink }] : [])
+                ],
+                footer: SIGNUP_ATTEMPT_FOOTER
+            })
+        };
+    }
+
+    if (notice === 'signup_deleted') {
+        return {
+            subject: 'Your deleted Gym 2.0 account can be reenabled',
+            ...renderEmail({
+                heading: 'This email address has a deleted account',
+                paragraphs: [
+                    'Someone tried to sign up for Gym 2.0 with your email address. There is already an account with ' +
+                    'this address, which has been deleted' +
+                    (removalDate ? ` and is removed permanently on ${removalDate}.` : '.') +
+                    ' No new account was created.',
+                    'Do you want your account back? Just log in again with your old password, which reenables it ' +
+                    'with your workouts, workout schemes, exercises and friends. Your messages, direct chats, group ' +
+                    'memberships and profile image were deleted with the account and do not come back. If you forgot ' +
+                    'your password, use "Forgot password" on the login screen first.',
+                    'If you want a new account instead, you can sign up with this email address once the deleted ' +
+                    'account has been removed.'
+                ],
+                links: [{ label: 'Log in', url: LOGIN_URL }],
+                footer: SIGNUP_ATTEMPT_FOOTER
+            })
+        };
+    }
+
+    return {
+        subject: 'Your Gym 2.0 account has been reenabled',
+        ...renderEmail({
+            heading: 'Welcome back!',
+            paragraphs: [
+                'Your deleted Gym 2.0 account was reenabled, because someone logged in to it. Your workouts, workout ' +
+                'schemes, exercises and friends are back. Your messages, direct chats, group memberships and profile ' +
+                'image were deleted with the account and are not restored.',
+                'If you still want your account deleted, delete it again in Settings → Account → Delete Account and ' +
+                'do not log in afterwards.'
+            ],
+            footer: 'If that was not you, someone else knows your password: reset it with "Forgot password" on the ' +
+                'login screen, which also logs the account out everywhere.'
         })
     };
 }
@@ -219,6 +311,13 @@ function alreadyRegisteredEmail() {
 function rejectRequest(req, res, reason) {
     log('warn', 'Rejected request', { path: req.path, reason });
     return res.status(400).json({ error: reason });
+}
+
+const ACCOUNT_NOTICES = ['signup_registered', 'signup_deleted', 'reenabled'];
+
+// A date as the backend formats it for the text of an email, e.g. "December 17, 2026"
+function isOptionalDate(value) {
+    return value === undefined || (typeof value === 'string' && value.length > 0 && value.length <= 40);
 }
 
 // Checks the fields both endpoints share. Returns the reason the request is invalid, or null.
@@ -275,12 +374,16 @@ app.post('/api/send-verification', async (req, res) => {
     });
 });
 
+// removal_date is only sent for a deleted account
 app.post('/api/send-password-reset', async (req, res) => {
-    const { email, user_id, token, expires_in_minutes } = req.body ?? {};
+    const { email, user_id, token, expires_in_minutes, removal_date } = req.body ?? {};
 
     const invalid = validateEmailRequest({ email, user_id, token, expires_in_minutes });
     if (invalid) {
         return rejectRequest(req, res, invalid);
+    }
+    if (!isOptionalDate(removal_date)) {
+        return rejectRequest(req, res, 'removal_date must be a short string');
     }
 
     const link = `${RESET_URL}?token=${encodeURIComponent(token)}`;
@@ -289,8 +392,47 @@ app.post('/api/send-password-reset', async (req, res) => {
         type: 'password_reset',
         userId: user_id,
         to: email,
-        email: passwordResetEmail({ link, validity: formatValidity(expires_in_minutes) }),
-        successMessage: 'Password reset email sent'
+        email: passwordResetEmail({ link, validity: formatValidity(expires_in_minutes), removalDate: removal_date }),
+        successMessage: 'Password reset email sent',
+        logFields: { deleted_account: Boolean(removal_date) }
+    });
+});
+
+// notice is "signup_registered" (with token and expires_in_minutes of a password reset link, if the account has a
+// password), "signup_deleted" (with removal_date) or "reenabled"
+app.post('/api/send-account-notice', async (req, res) => {
+    const { email, user_id, notice, token, expires_in_minutes, removal_date } = req.body ?? {};
+
+    if (typeof email !== 'string' || !Number.isInteger(user_id)) {
+        return rejectRequest(req, res, 'email and user_id are required');
+    }
+    if (!isValidEmail(email)) {
+        return rejectRequest(req, res, 'Invalid email address');
+    }
+    if (!ACCOUNT_NOTICES.includes(notice)) {
+        return rejectRequest(req, res, `notice must be one of: ${ACCOUNT_NOTICES.join(', ')}`);
+    }
+    const hasResetLink = token !== undefined || expires_in_minutes !== undefined;
+    if (hasResetLink && (notice !== 'signup_registered' || typeof token !== 'string' || !token
+        || !Number.isInteger(expires_in_minutes) || expires_in_minutes < 1)) {
+        return rejectRequest(req, res, 'token and expires_in_minutes (a positive integer) belong together and to signup_registered');
+    }
+    if (!isOptionalDate(removal_date)) {
+        return rejectRequest(req, res, 'removal_date must be a short string');
+    }
+
+    await sendEmail(res, {
+        type: 'account_notice',
+        userId: user_id,
+        to: email,
+        email: accountNoticeEmail({
+            notice,
+            resetLink: hasResetLink ? `${RESET_URL}?token=${encodeURIComponent(token)}` : null,
+            validity: hasResetLink ? formatValidity(expires_in_minutes) : null,
+            removalDate: removal_date
+        }),
+        successMessage: 'Account notice email sent',
+        logFields: { notice }
     });
 });
 

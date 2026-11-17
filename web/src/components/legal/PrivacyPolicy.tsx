@@ -4,7 +4,7 @@ import { A, H3, LegalPage, List, Section } from "@/components/ui/LegalPage";
 // stored, who receives it, how long it is kept or the AI model (OLLAMA_MODEL, section 5) changes, and with the privacy
 // manifest of the iOS app (PrivacyInfo.xcprivacy).
 
-const LAST_UPDATED = "November 16, 2026";
+const LAST_UPDATED = "November 17, 2026";
 const CONTACT_EMAIL = "privacy@colinrueegg.com";
 const SOURCE_CODE_URL = "https://github.com/xcolx/Gym-2.0";
 
@@ -304,8 +304,11 @@ export function PrivacyPolicy() {
             <b>Deleted account</b>: you are logged out everywhere, your profile images are removed and the messages and
             photos you sent in chats are deleted immediately, as if you had deleted each of them yourself. Your direct
             chats are deleted and you leave your groups (a group without members is deleted). The account and
-            all its data are removed permanently 30 days later. Exercises that were verified for all users stay available,
-            without your name.
+            all its data are removed permanently 30 days later. Until then, logging in with your email and password
+            reenables the account with the data that is still there, which we confirm by email; what was deleted
+            immediately is not restored. If someone tries to sign up with your email address during this time, we
+            tell you by email that the deleted account can still be reenabled. Exercises that were verified for all
+            users stay available, without your name.
           </li>
           <li>
             <b>Unconfirmed sign ups</b>: removed after 3 days. Email links expire after 24 hours (verification) or 60

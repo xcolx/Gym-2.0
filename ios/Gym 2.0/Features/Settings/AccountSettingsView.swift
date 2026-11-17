@@ -139,7 +139,7 @@ private struct AccountView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("You will be logged out and can't log in with this account anymore.")
+            Text("You will be logged out and your account is removed permanently after 30 days. If you log in again before that, your account is reenabled.")
         }
         // A second step, so that no account is deleted by mistake
         .alert("Are you sure?", isPresented: $model.showsFinalDeleteConfirmation) {
@@ -154,7 +154,7 @@ private struct AccountView: View {
             Button("Cancel") {}
                 .keyboardShortcut(.defaultAction)
         } message: {
-            Text("All of your progress and all data stored on Gym 2.0 will be deleted: your workouts, workout schemes, exercises, stats, chats, friends and your profile. This can't be undone. Enter your password to confirm.")
+            Text("All of your progress and all data stored on Gym 2.0 will be deleted: your workouts, workout schemes, exercises, stats, chats, friends and your profile. Your messages, chats and profile image are deleted right away and can't be restored. The rest is removed permanently after 30 days, unless you log in again before that. Enter your password to confirm.")
         }
     }
 }

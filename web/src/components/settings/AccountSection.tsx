@@ -122,7 +122,7 @@ export function AccountSections({ user }: { user: User }) {
       <Alert
         open={showsDeleteConfirmation}
         title="Delete your account?"
-        message="You will be logged out and can't log in with this account anymore."
+        message="You will be logged out and your account is removed permanently after 30 days. If you log in again before that, your account is reenabled."
         onClose={() => setShowsDeleteConfirmation(false)}
         buttons={[
           {
@@ -141,7 +141,7 @@ export function AccountSections({ user }: { user: User }) {
       <Alert
         open={showsFinalDeleteConfirmation}
         title="Are you sure?"
-        message="All of your progress and all data stored on Gym 2.0 will be deleted: your workouts, workout schemes, exercises, stats, chats, friends and your profile. This can't be undone. Enter your password to confirm."
+        message="All of your progress and all data stored on Gym 2.0 will be deleted: your workouts, workout schemes, exercises, stats, chats, friends and your profile. Your messages, chats and profile image are deleted right away and can't be restored. The rest is removed permanently after 30 days, unless you log in again before that. Enter your password to confirm."
         onClose={() => setShowsFinalDeleteConfirmation(false)}
         buttons={[
           { label: "Delete", role: "destructive", disabled: !canDelete, onSelect: () => void doDeleteAccount() },

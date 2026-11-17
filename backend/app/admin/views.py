@@ -12,6 +12,7 @@ from starlette.responses import RedirectResponse, Response
 
 import app.db.queries.chat as chat_crud
 import app.db.queries.session as crud_session
+import app.db.queries.users as crud_users
 from app.admin.base import (
     AdminView,
     NullFilter,
@@ -312,7 +313,8 @@ class UserAdmin(SoftDeleteMixin, AdminView, model=User):
     """
     Users are created through the signup only. The delete button deletes the account like the user would (soft delete,
     logout everywhere, images discarded, sent messages deleted, which a restore doesn't bring back). The prune job
-    removes the account 30 days later. "active" means that the email is verified.
+    removes the account 30 days later. Until then the user reenables it by logging in again, like after deleting it
+    themselves. "active" means that the email is verified.
     """
     category = "Users & Social"
     can_create = False
@@ -362,10 +364,7 @@ class UserAdmin(SoftDeleteMixin, AdminView, model=User):
             user_service.delete_user_account(session, obj)
 
     def restore(self, session: Session, obj: User) -> None:
-        obj.deleted_at = None
-        # The images were discarded with the deletion (the deleted messages, direct chats and left groups aren't restored either)
-        obj.profile_image_url = None
-        obj.profile_icon_url = None
+        crud_users.restore_deleted_user(obj)
 
     def delete_permanently(self, session: Session, obj: User) -> None:
         # The reports of the user go with it (ON DELETE CASCADE), their image copies with them

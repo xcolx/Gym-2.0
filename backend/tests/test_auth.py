@@ -34,15 +34,120 @@ def test_signup_normalizes_email(client, outbox):
     assert outbox.last("verification").email == email_of("alice")
 
 
-def test_signup_with_registered_email_gives_same_response_without_email(client, outbox):
-    first = signup(client, "alice", email_of("alice"))
-    second = signup(client, "alice2", email_of("alice"))
+def delete_account(user):
+    assert user.client.request("DELETE", "/v1/users/me", json={"password": user.password}).status_code == 204
+
+
+def delete_in_admin(user_id):
+    from app.admin.views import UserAdmin
+    from app.db.models import User
+    from app.db.session import SessionLocal
+
+    with SessionLocal() as session:
+        UserAdmin().soft_delete(session, session.get(User, user_id))
+        session.commit()
+
+
+def test_signup_with_registered_email_gives_same_response_and_tells_the_account(make_user, client, outbox):
+    alice = make_user("alice")
+    first = signup(client, "bob", email_of("bob"))
+    outbox.mails.clear()
+
+    second = signup(client, "alice2", alice.email, password="Other-Passw0rd")
 
     assert second.status_code == first.status_code == 201
     assert second.json() == first.json()
-    assert len(outbox.mails) == 1
+    [mail] = outbox.mails
+    assert (mail.kind, mail.reason, mail.email, mail.user_id) == ("account_notice", "signup_registered", alice.email, alice.id)
+    assert run_sql('SELECT count(*) FROM "user"')[0][0] == 2
+    # The account is untouched and the email carries a working password reset link
+    assert login(new_client(), alice.email).status_code == 200
+    assert client.get("/v1/auth/reset-password", params={"token": mail.token}).status_code == 200
+
+
+def test_signup_with_unverified_email_replaces_the_unverified_account(client, outbox):
+    signup(client, "alice", email_of("alice"))
+    old_mail = outbox.last("verification")
+
+    # The same username is free again, since its account is replaced
+    response = signup(client, "alice", email_of("alice"), password="Other-Passw0rd")
+
+    assert response.status_code == 201
+    new_mail = outbox.last("verification")
+    assert len(outbox.mails) == 2 and new_mail.user_id != old_mail.user_id
+    assert [row[0] for row in run_sql('SELECT id FROM "user"')] == [new_mail.user_id]
+    assert verify(client, old_mail).status_code == 401
+    assert verify(client, new_mail).status_code == 200
+    assert login(client, email_of("alice")).status_code == 401
+    assert login(client, email_of("alice"), "Other-Passw0rd").status_code == 200
+
+
+def test_signup_replacing_an_unverified_account_still_rejects_a_taken_username(make_user, client, outbox):
+    make_user("bob")
+    signup(client, "alice", email_of("alice"))
+    old_mail = outbox.last("verification")
+
+    assert signup(client, "bob", email_of("alice")).status_code == 400
+    assert verify(client, old_mail).status_code == 200
+
+
+def test_signup_does_not_replace_an_unverified_account_that_logged_in_before(make_user, client, outbox):
+    alice = make_user("alice")
+    run_sql('UPDATE "user" SET active = false WHERE id = :id', id=alice.id)
+    outbox.mails.clear()
+
+    assert signup(client, "alice2", alice.email).status_code == 201
+
+    assert outbox.last().reason == "signup_registered"
+    assert [row[0] for row in run_sql('SELECT id FROM "user"')] == [alice.id]
+
+
+def test_signup_with_email_of_deleted_account_tells_how_to_reenable_it(make_user, client, outbox):
+    alice = make_user("alice")
+    delete_account(alice)
+    outbox.mails.clear()
+
+    assert signup(client, "alice2", alice.email).status_code == 201
+
+    [mail] = outbox.mails
+    assert (mail.kind, mail.reason, mail.email, mail.token) == ("account_notice", "signup_deleted", alice.email, None)
+    assert mail.removal_date
     assert run_sql('SELECT count(*) FROM "user"')[0][0] == 1
 
+
+def test_login_reenables_a_deleted_account(make_user, outbox):
+    alice = make_user("alice")
+    profile = alice.client.get("/v1/users/me").json()
+    delete_account(alice)
+    outbox.mails.clear()
+
+    assert login(alice.client, alice.email, "Wrong-Passw0rd").status_code == 401
+    assert run_sql('SELECT deleted_at IS NOT NULL FROM "user" WHERE id = :id', id=alice.id)[0][0] is True
+
+    response = login(alice.client, alice.email)
+
+    assert response.status_code == 200
+    assert "reenabled" in response.json()["message"]
+    assert alice.client.get("/v1/users/me").json()["id"] == profile["id"]
+    assert run_sql('SELECT deleted_at FROM "user" WHERE id = :id', id=alice.id)[0][0] is None
+    [mail] = outbox.mails
+    assert (mail.kind, mail.reason, mail.email) == ("account_notice", "reenabled", alice.email)
+    # Only the login that reenabled the account sends the email
+    assert login(new_client(), alice.email).status_code == 200
+    assert len(outbox.mails) == 1
+
+
+def test_account_deleted_in_the_admin_is_reenabled_like_a_self_deleted_one(make_user, client, outbox):
+    alice = make_user("alice")
+    delete_in_admin(alice.id)
+    outbox.mails.clear()
+
+    assert signup(client, "alice2", alice.email).status_code == 201
+    assert outbox.last().reason == "signup_deleted"
+
+    assert login(new_client(), alice.email).status_code == 200
+    assert outbox.last().reason == "reenabled"
+    assert run_sql('SELECT deleted_at FROM "user" WHERE id = :id', id=alice.id)[0][0] is None
 
 def test_signup_with_taken_username_is_rejected(client):
     signup(client, "alice", email_of("alice"))
@@ -370,6 +475,27 @@ def test_forgot_password_sends_reset_link(make_user, outbox):
     assert mail.email == user.email
     stored = run_sql('SELECT pw_reset_token FROM "user" WHERE id = :id', id=user.id)[0][0]
     assert stored and stored != mail.token
+
+
+def test_forgot_password_for_deleted_account_resets_password_without_reenabling(make_user, client, outbox):
+    alice = make_user("alice")
+    delete_account(alice)
+
+    assert client.post("/v1/auth/forgot-password", json={"email": alice.email}).status_code == 200
+
+    mail = outbox.last("password_reset")
+    assert mail.email == alice.email and mail.removal_date
+    response = client.post("/v1/auth/reset-password", data={
+        "token": mail.token, "password": "New-Passw0rd", "password_confirmation": "New-Passw0rd"
+    })
+    assert response.status_code == 200
+    assert "still deleted" in response.text
+    assert run_sql('SELECT deleted_at IS NOT NULL FROM "user" WHERE id = :id', id=alice.id)[0][0] is True
+
+    # The old password stopped working, the new one reenables the account
+    assert login(new_client(), alice.email).status_code == 401
+    assert login(new_client(), alice.email, "New-Passw0rd").status_code == 200
+    assert run_sql('SELECT deleted_at FROM "user" WHERE id = :id', id=alice.id)[0][0] is None
 
 
 def test_forgot_password_for_unknown_email_sends_nothing(client, outbox):

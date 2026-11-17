@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import Literal, NamedTuple
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from app.core.errors import AuthenticationError, EmailVerificationError, UserAlr
 from app.db.models import User
 from app.schemas.auth import EmailLoginRequest, EmailSignUpRequest
 from app.services import mail_service
+from app.services.maintenance_service import RETENTION
 
 USERNAME_TAKEN_MESSAGE = "This username is already taken."
 USERNAME_UNIQUE_CONSTRAINT = "user_user_name_key"
@@ -71,24 +73,91 @@ def mark_email_verified(db: Session, user: User) -> None:
     user.email_verify_expire = None
 
 
-def signup_with_email(db: Session, payload: EmailSignUpRequest) -> tuple[User, str] | None:
+class Signup(NamedTuple):
     """
-    Returns the new user and the raw verification token, or None if the email is already registered, which isn't
-    reported to the caller. The password is hashed before any lookup to keep the response time the same in both cases.
+    What a signup led to and which email its address gets:
+    - "created": a new unverified account, raw_token is its email verification token
+    - "registered": the email already has an account, raw_token is a password reset token (None without a password)
+    - "deleted": the email has an account its user deleted, which a login reenables
+    """
+    outcome: Literal["created", "registered", "deleted"]
+    user: User
+    raw_token: str | None = None
+
+
+def removal_date(user: User) -> str | None:
+    """The day a deleted account is removed permanently by the prune job, as the emails state it, e.g. "December 17, 2026"."""
+    if user.deleted_at is None:
+        return None
+    removed_at = user.deleted_at + RETENTION
+    return f"{removed_at:%B} {removed_at.day}, {removed_at.year}"
+
+
+def _is_unverified_signup(user: User) -> bool:
+    """
+    A signup whose email was never verified, like the ones the prune job removes after a few days. Accounts that have
+    logged in before aren't, e.g. one that was marked unverified in the admin.
+    """
+    return not user.active and user.last_login is None and user.deleted_at is None
+
+
+def _issue_password_reset(user: User) -> str:
+    """Sets a new password reset token and expiry on the user, which replaces the previous one, and returns the raw token."""
+    raw_token = security.generate_password_reset_token()
+    user.pw_reset_token = security.hash_session_token(raw_token)
+    user.pw_reset_expire = datetime.now(UTC) + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES)
+    return raw_token
+
+
+def _signup_with_registered_email(db: Session, user: User) -> Signup | None:
+    """
+    The email of a signup already belongs to an account, which is told about the attempt instead: how to log in or
+    reset the password, or how to reenable the account if it was deleted. Returns None for a deleted account without
+    a password, which can't be reenabled by a login and gets no email.
+    """
+    if user.deleted_at is not None:
+        if not user.pw_hash:
+            return None
+        return Signup("deleted", user)
+
+    if not user.pw_hash:
+        return Signup("registered", user)
+
+    raw_token = _issue_password_reset(user)
+    # Committed before the email is sent, so the link never carries a token that isn't stored yet
+    db.commit()
+    return Signup("registered", user, raw_token)
+
+
+def signup_with_email(db: Session, payload: EmailSignUpRequest) -> Signup | None:
+    """
+    Creates an unverified account. If the email already belongs to one, nothing is created and the response stays
+    the same, but the address is told about it (see Signup), so the email the response promises does arrive. An
+    account of this email that never verified it is replaced by the new signup: whoever owns the address may have
+    mistyped the password or never received the link, and its old verification link stops working.
+    Returns None if no email has to be sent.
+    The password is hashed before any lookup to keep the response time the same in all cases.
     """
     security.validate_password_strength(payload.password)
     hashed_password = security.get_password_hash(payload.password)
 
     content_filter.check_username(payload.username)
-    if crud_users.get_user_by_username(db, username=payload.username):
+    email_owner = crud_users.get_user_by_email(db, email=payload.email, include_deleted=True)
+    replaced_id = email_owner.id if email_owner and _is_unverified_signup(email_owner) else None
+
+    # The username of the replaced account is free again
+    username_owner = crud_users.get_user_by_username(db, username=payload.username)
+    if username_owner and username_owner.id != replaced_id:
         raise UserAlreadyExistsError(USERNAME_TAKEN_MESSAGE)
 
-    if crud_users.get_user_by_email(db, email=payload.email, include_deleted=True):
-        return None
+    if email_owner and replaced_id is None:
+        return _signup_with_registered_email(db, email_owner)
 
     try:
-        # Savepoint, so a concurrent signup with the same email/username only rolls back this insert
+        # Savepoint, so a concurrent signup with the same email/username only rolls back this replacement and insert
         with db.begin_nested():
+            if replaced_id is not None:
+                crud_users.delete_user_permanently(db, replaced_id)
             new_user = crud_users.create_user_with_email(
                 db=db,
                 username=payload.username,
@@ -107,7 +176,7 @@ def signup_with_email(db: Session, payload: EmailSignUpRequest) -> tuple[User, s
     # Committed before the email is sent, so the link never points to a user that doesn't exist yet
     db.commit()
 
-    return new_user, raw_token
+    return Signup("created", new_user, raw_token)
 
 
 def resend_verification_email(db: Session, email: str) -> tuple[User, str] | None:
@@ -161,11 +230,12 @@ def verify_email(db: Session, user_id: int, token: str) -> str:
     return "Email verified successfully! You can now log in."
 
 
-def login_with_email(db: Session, payload: EmailLoginRequest, ip_address: str | None) -> tuple[str, int]:
+def login_with_email(db: Session, payload: EmailLoginRequest, ip_address: str | None) -> tuple[str, int, User | None]:
     """
-    Returns the raw session token and its maximum lifetime in seconds.
+    Logging in to a deleted account reenables it, as long as the prune job hasn't removed it yet.
+    Returns the raw session token, its maximum lifetime in seconds and the user if the account was reenabled (None otherwise).
     """
-    user = crud_users.get_user_by_email(db, email=payload.email)
+    user = crud_users.get_user_by_email(db, email=payload.email, include_deleted=True)
 
     # Always runs bcrypt, also for unknown emails and OAuth-only accounts, so timing doesn't reveal accounts
     password_valid = security.verify_password(payload.password, user.pw_hash if user else None)
@@ -179,6 +249,10 @@ def login_with_email(db: Session, payload: EmailLoginRequest, ip_address: str | 
 
     if not user.active:
         raise EmailVerificationError("Email not verified. Please verify your email before logging in.")
+
+    reenabled = user.deleted_at is not None
+    if reenabled:
+        crud_users.restore_deleted_user(user)
 
     crud_users.update_on_successful_login(db, user.id)
 
@@ -194,7 +268,7 @@ def login_with_email(db: Session, payload: EmailLoginRequest, ip_address: str | 
 
     # The cookie lives as long as the session can at most, the database decides whether it is still valid
     max_lifetime = crud_session.get_session_lifetime().max
-    return raw_token, int(max_lifetime.total_seconds())
+    return raw_token, int(max_lifetime.total_seconds()), user if reenabled else None
 
 
 INVALID_RESET_LINK_MESSAGE = "This password reset link is invalid or has expired. Please request a new one."
@@ -204,16 +278,15 @@ def request_password_reset(db: Session, email: str) -> tuple[User, str] | None:
     """
     Stores the hash and expiry of a new password reset token on the user and returns the user and the raw token
     for the email link. A new request replaces the token, so only the newest link works.
+    A deleted account gets the link too: the new password doesn't reenable the account, logging in with it does.
     Returns None if there is no account with a password for the email, which is not reported to the caller.
     """
-    user = crud_users.get_user_by_email(db, email=email)
+    user = crud_users.get_user_by_email(db, email=email, include_deleted=True)
 
     if not user or not user.pw_hash:
         return None
 
-    raw_token = security.generate_password_reset_token()
-    user.pw_reset_token = security.hash_session_token(raw_token)
-    user.pw_reset_expire = datetime.now(UTC) + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES)
+    raw_token = _issue_password_reset(user)
 
     # Committed before the email is sent, so the link never carries a token that isn't stored yet
     db.commit()
@@ -231,11 +304,12 @@ def get_user_for_password_reset(db: Session, token: str) -> User:
     return user
 
 
-def reset_password(db: Session, token: str, new_password: str) -> None:
+def reset_password(db: Session, token: str, new_password: str) -> bool:
     """
     Sets the new password of the user of a valid password reset token, invalidates the token and logs the user out
     on all devices. Since the link proves the user owns the email, an account whose email wasn't verified yet is
-    activated as well.
+    activated as well. A deleted account stays deleted until its user logs in.
+    Returns whether the account is deleted.
     """
     user = get_user_for_password_reset(db, token)
 
@@ -254,6 +328,8 @@ def reset_password(db: Session, token: str, new_password: str) -> None:
 
     crud_session.delete_all_sessions_for_user(db, user.id)
     db.flush()
+
+    return user.deleted_at is not None
 
 
 def logout_session(db: Session, raw_token: str | None) -> None:

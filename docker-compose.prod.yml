@@ -186,6 +186,7 @@ services:
       EMAIL_PASS: ${EMAIL_PASS:?EMAIL_PASS must be set in .env}
       VERIFY_URL: https://api.gym2.app/v1/auth/verify-email
       RESET_URL: https://api.gym2.app/v1/auth/reset-password
+      LOGIN_URL: https://gym2.app/auth
       # The mail server is in the same DMZ (mail-vm on VM102), reached directly instead of out through VM100 and
       # back in through the public edge. By address, see SMTP_HOST in infra/mailserver/server.js.
       SMTP_HOST: 192.168.4.102

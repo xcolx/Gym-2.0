@@ -74,15 +74,31 @@ def get_active_user_by_username(db: Session, username: str) -> User | None:
 
 def get_user_by_reset_token(db: Session, token: str) -> User | None:
     """
-    Only if the token hasn't expired yet.
+    Only if the token hasn't expired yet. Deleted accounts are included, since their users can still reset the password
+    to reenable the account by logging in.
     """
     return db.scalars(
         select(User).where(
             User.pw_reset_token == token,
-            User.pw_reset_expire > datetime.now(UTC),
-            User.deleted_at.is_(None)
+            User.pw_reset_expire > datetime.now(UTC)
         )
     ).first()
+
+
+def delete_user_permanently(db: Session, user_id: int) -> None:
+    """Deleted in SQL, so that the dependent rows are removed by the ON DELETE rules of the database."""
+    db.execute(delete(User).where(User.id == user_id))
+
+
+def restore_deleted_user(user: User) -> None:
+    """
+    Undoes the soft deletion of an account. The profile images were discarded with the deletion, and the deleted
+    messages, direct chats and left groups aren't restored either.
+    """
+    user.deleted_at = None
+    user.profile_image_url = None
+    user.profile_icon_url = None
+    user.updated_image_at = datetime.now(UTC)
 
 
 def update_on_failed_login(db: Session, user_id: int) -> None:

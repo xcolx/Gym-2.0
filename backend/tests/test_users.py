@@ -458,7 +458,6 @@ def test_delete_account_logs_out_everywhere(make_user):
     assert 'session_token=""' in response.headers["set-cookie"]
     assert run_sql("SELECT count(*) FROM session WHERE user_id = :id", id=user.id)[0][0] == 0
     assert other_device.get("/v1/users/me").status_code == 401
-    assert login(new_client(), user.email).status_code == 401
     assert run_sql('SELECT deleted_at IS NOT NULL FROM "user" WHERE id = :id', id=user.id)[0][0] is True
 
 
