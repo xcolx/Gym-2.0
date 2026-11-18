@@ -88,6 +88,7 @@ services:
       EMAIL_PASS: ${EMAIL_PASS}
       VERIFY_URL: ${VERIFY_URL:-http://localhost:5000/v1/auth/verify-email}
       RESET_URL: ${RESET_URL:-http://localhost:5000/v1/auth/reset-password}
+      LOGIN_URL: ${LOGIN_URL:-http://localhost:3000/auth}
     networks:
       - mail
       - mail-egress

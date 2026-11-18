@@ -89,7 +89,7 @@ Gym 2.0 is designed, built and run by one developer, from the native iOS app to 
 | [`web/`](web) | The offline-first web app (PWA), see [web/README.md](web/README.md) | Next.js 16, React 19, Tailwind 4, Dexie |
 | [`backend/`](backend) | The REST API (`/v1`), the admin interface and the database migrations, see [backend/README.md](backend/README.md) | FastAPI, SQLAlchemy, Flyway, PostgreSQL |
 | [`infra/`](infra) | The Dockerfiles and operations of the production stack, see [infra/README.md](infra/README.md) | Docker |
-| [`infra/mailserver/`](infra/mailserver) | Sends the account emails (verification, email change, password reset, already registered), only reachable by the backend | Node.js |
+| [`infra/mailserver/`](infra/mailserver) | Sends the account emails (verification, email change, password reset, notices about an existing or deleted account), only reachable by the backend | Node.js |
 | [`infra/backup/`](infra/backup) | The nightly backup and the restore script | restic, pg_dump |
 | [`infra/offsite-backup/`](infra/offsite-backup) | The server that stores the encrypted offsite backups, see [infra/offsite-backup/README.md](infra/offsite-backup/README.md) | restic, rest-server |
 

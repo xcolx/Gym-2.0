@@ -9,7 +9,7 @@ How the production stack is built, deployed, monitored and backed up. For runnin
 | --- | --- |
 | [`backend.Dockerfile`](backend.Dockerfile) | The image of the backend and the `maintenance` job, includes NudeNet's model |
 | [`web.Dockerfile`](web.Dockerfile) | The image of the web app: `dev` (hot reload, used by docker-compose.yml) and `runner` (the standalone production build) |
-| [`mailserver/`](mailserver) | Sends the account emails (verification, email change, password reset, already registered), only reachable by the backend |
+| [`mailserver/`](mailserver) | Sends the account emails (verification, email change, password reset, notices about an existing or deleted account), only reachable by the backend |
 | [`backup/`](backup) | The nightly backup ([backup.sh](backup/backup.sh)) and the restore script ([restore-dump.sh](backup/restore-dump.sh)), see [Backups](#backups) |
 | [`offsite-backup/`](offsite-backup) | The server on another machine that stores the encrypted backups, see [offsite-backup/README.md](offsite-backup/README.md) |
 

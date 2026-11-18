@@ -270,7 +270,8 @@ def delete_user_account(db: Session, user: User) -> None:
     """
     Soft deletes the user account and logs it out on all devices. The messages the user sent are deleted right away, as if
     the user had deleted each of them, their direct chats are deleted and they leave their group chats.
-    The account and its data are removed 30 days later by the daily prune job (app/jobs/prune.py).
+    The account and its data are removed 30 days later by the daily prune job (app/jobs/prune.py). Until then the user
+    reenables the account by logging in again (auth_service.login_with_email).
     """
     user.deleted_at = datetime.now(UTC)
     crud_session.delete_all_sessions_for_user(db, user.id)

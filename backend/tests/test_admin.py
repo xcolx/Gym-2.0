@@ -349,8 +349,9 @@ def test_deleting_a_user_in_the_admin_deletes_the_account(admin, make_user):
     assert admin.delete("/user/delete", params={"pks": user.id}).status_code == 200
 
     assert user.client.get("/v1/users/me").status_code == 401
-    assert login(user.client, user.email).status_code == 401
+    assert run_sql('SELECT deleted_at IS NOT NULL FROM "user" WHERE id = :id', id=user.id)[0][0] is True
     action(admin, "user", "restore", user.id)
+    assert run_sql('SELECT deleted_at FROM "user" WHERE id = :id', id=user.id)[0][0] is None
     assert login(user.client, user.email).status_code == 200
 
 

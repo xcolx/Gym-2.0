@@ -137,11 +137,12 @@ def run_sql(sql: str, **params) -> Any:
 
 @dataclass
 class SentMail:
-    kind: str  # "verification", "password_reset" or "already_registered"
+    kind: str  # "verification", "password_reset", "already_registered" or "account_notice"
     email: str
     user_id: int
     token: str | None
-    reason: str | None = None
+    reason: str | None = None  # Of a verification, or the notice of an account notice
+    removal_date: str | None = None
 
 
 @dataclass
@@ -164,8 +165,13 @@ def outbox(monkeypatch) -> Outbox:
         box.mails.append(SentMail("verification", email, user_id, raw_token, reason))
         return box.accept
 
-    def send_password_reset_email(email, user_id, raw_token, expires_at):
-        box.mails.append(SentMail("password_reset", email, user_id, raw_token))
+    def send_password_reset_email(email, user_id, raw_token, expires_at, removal_date=None):
+        box.mails.append(SentMail("password_reset", email, user_id, raw_token, removal_date=removal_date))
+        return box.accept
+
+    def send_account_notice_email(email, user_id, notice, raw_reset_token=None, reset_expires_at=None, removal_date=None):
+        assert (raw_reset_token is None) == (reset_expires_at is None)
+        box.mails.append(SentMail("account_notice", email, user_id, raw_reset_token, notice, removal_date))
         return box.accept
 
     def send_already_registered_email(email, user_id):
@@ -175,6 +181,7 @@ def outbox(monkeypatch) -> Outbox:
     monkeypatch.setattr(mail_service, "send_verification_email", send_verification_email)
     monkeypatch.setattr(mail_service, "send_password_reset_email", send_password_reset_email)
     monkeypatch.setattr(mail_service, "send_already_registered_email", send_already_registered_email)
+    monkeypatch.setattr(mail_service, "send_account_notice_email", send_account_notice_email)
     return box
 
 
